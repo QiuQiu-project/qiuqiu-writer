@@ -1,0 +1,77 @@
+.announcements {
+  background: var(--bg-primary);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: 0 2px 12px rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.1);
+  transition: all var(--transition-base);
+}
+
+.announcements:hover {
+  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.15);
+  transform: translateY(-2px);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.more-link {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent-primary);
+  text-decoration: none;
+  font-size: 12px;
+  transition: all var(--transition-base);
+}
+
+.more-link:hover {
+  gap: 6px;
+  color: var(--accent-secondary);
+}
+
+.announcements-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.announcement-item {
+  padding: 12px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  border: 1px solid transparent;
+}
+
+.announcement-item:hover {
+  border-color: var(--accent-primary);
+  background: var(--accent-light);
+  transform: translateX(4px);
+}
+
+.announcement-title {
+  font-size: 13px;
+  color: var(--text-primary);
+  margin: 0 0 6px 0;
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+.announcement-date {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+

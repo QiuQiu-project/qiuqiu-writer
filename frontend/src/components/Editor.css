@@ -1,0 +1,88 @@
+.editor-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.editor-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  padding: 48px;
+  max-width: 800px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.editor-content {
+  outline: none;
+  min-height: 100%;
+}
+
+.editor-content p {
+  margin: 0 0 16px 0;
+  line-height: 1.8;
+  font-size: 16px;
+  color: var(--text-primary);
+}
+
+.editor-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--text-secondary);
+  pointer-events: none;
+  height: 0;
+}
+
+.editor-content h1 {
+  font-size: 32px;
+  font-weight: 700;
+  margin: 32px 0 16px 0;
+  line-height: 1.3;
+}
+
+.editor-content h2 {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 24px 0 12px 0;
+  line-height: 1.4;
+}
+
+.editor-content h3 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 20px 0 10px 0;
+  line-height: 1.4;
+}
+
+.editor-content ul,
+.editor-content ol {
+  margin: 16px 0;
+  padding-left: 32px;
+}
+
+.editor-content li {
+  margin: 8px 0;
+  line-height: 1.8;
+}
+
+.editor-content blockquote {
+  border-left: 4px solid var(--accent-color);
+  padding-left: 16px;
+  margin: 16px 0;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.editor-content strong {
+  font-weight: 600;
+}
+
+.editor-content em {
+  font-style: italic;
+}
+
+.editor-content u {
+  text-decoration: underline;
+}
+

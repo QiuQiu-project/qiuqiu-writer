@@ -1,0 +1,37 @@
+.editor-page {
+  width: 100%;
+  min-height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  animation: fadeIn 0.4s ease-out;
+}
+
+.editor-body {
+  flex: 1;
+  display: flex;
+  min-height: calc(100vh - 64px);
+}
+
+.editor-main {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--bg-primary);
+  padding: 2rem;
+}
+
+.placeholder-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  color: var(--text-secondary);
+}
+
+.placeholder-content h2 {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+}
+

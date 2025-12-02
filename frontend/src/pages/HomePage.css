@@ -1,0 +1,67 @@
+.home-page {
+  width: 100%;
+  min-height: 100%;
+  animation: fadeIn 0.4s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.home-main {
+  display: flex;
+  gap: 24px;
+  max-width: 1600px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 0;
+  min-height: calc(100vh - 64px);
+}
+
+.home-content-left {
+  flex: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.home-content-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 320px;
+}
+
+@media (max-width: 1200px) {
+  .home-main {
+    flex-direction: column;
+  }
+  
+  .home-content-right {
+    min-width: 100%;
+  }
+}
+
+/* 移动端样式 */
+@media (max-width: 768px) {
+  .home-main {
+    gap: 16px;
+  }
+  
+  .home-content-left,
+  .home-content-right {
+    gap: 16px;
+  }
+  
+  /* 可以在这里添加特定模块的隐藏样式 */
+  /* 例如：.home-content-right .case-sharing { display: none; } */
+}
+

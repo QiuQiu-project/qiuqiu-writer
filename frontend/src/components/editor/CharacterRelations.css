@@ -1,0 +1,527 @@
+.character-relations {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: white;
+  overflow: hidden;
+}
+
+.relations-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.relations-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: 1px solid #10b981;
+  background: white;
+  color: #10b981;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.action-btn:hover {
+  background: #ecfdf5;
+  border-color: #059669;
+}
+
+.relations-content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.relations-canvas {
+  flex: 1;
+  position: relative;
+  background: #f9fafb;
+  min-height: 500px;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* 确保 G6 容器有尺寸 */
+.relations-canvas > div {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* G6 图容器样式 */
+.relations-canvas canvas {
+  display: block;
+}
+
+/* React 节点样式 */
+.character-node-react {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.character-node-react:hover {
+  transform: scale(1.05);
+}
+
+.character-node-circle {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+  border: 2px solid #10b981;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #10b981;
+  flex-shrink: 0;
+}
+
+.character-node-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1f2937;
+  text-align: center;
+  white-space: nowrap;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* 图例 */
+.flow-legend {
+  background: white;
+  padding: 12px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.legend-node {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+  border: 2px solid #10b981;
+}
+
+.legend-edge {
+  width: 30px;
+  height: 2px;
+  background: #10b981;
+}
+
+.relations-sidebar {
+  width: 300px;
+  border-left: 1px solid #e5e7eb;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.sidebar-section {
+  padding: 20px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.sidebar-section:last-child {
+  border-bottom: none;
+}
+
+.sidebar-section h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 16px 0;
+}
+
+.character-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.character-item {
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.character-item:hover {
+  border-color: #10b981;
+  background: #f9fafb;
+}
+
+.character-item.active {
+  border-color: #10b981;
+  background: #ecfdf5;
+}
+
+.character-info {
+  flex: 1;
+}
+
+.character-name {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.character-gender {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.character-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.relations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.relation-item {
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.relation-item:hover {
+  border-color: #10b981;
+  background: #f9fafb;
+}
+
+.relation-item.active {
+  border-color: #10b981;
+  background: #ecfdf5;
+}
+
+.relation-item:hover {
+  border-color: #10b981;
+  background: #f9fafb;
+}
+
+.relation-item.editing {
+  border-color: #10b981;
+  background: #ecfdf5;
+}
+
+.relation-item-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.relation-from,
+.relation-to {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 13px;
+}
+
+.relation-type {
+  color: #10b981;
+  font-weight: 500;
+  padding: 2px 8px;
+  background: #ecfdf5;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.relation-description {
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 8px;
+}
+
+.relation-actions {
+  display: flex;
+  gap: 8px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.relation-item:hover .relation-actions {
+  opacity: 1;
+}
+
+.action-icon-btn {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.action-icon-btn:hover {
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+.relation-edit-form {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.edit-input,
+.edit-select,
+.edit-textarea {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  font-size: 13px;
+  margin-bottom: 8px;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.edit-input:focus,
+.edit-select:focus,
+.edit-textarea:focus {
+  outline: none;
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.edit-textarea {
+  resize: vertical;
+  min-height: 50px;
+}
+
+.edit-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.save-btn,
+.cancel-btn {
+  flex: 1;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.save-btn {
+  background: #10b981;
+  color: white;
+}
+
+.save-btn:hover {
+  background: #059669;
+}
+
+.cancel-btn {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.cancel-btn:hover {
+  background: #e5e7eb;
+  color: #1f2937;
+}
+
+/* 编辑模态框 */
+.edit-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.edit-modal {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  min-width: 400px;
+  max-width: 500px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.edit-modal h4 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 20px 0;
+}
+
+.modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modal-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.modal-form label span {
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.edit-textarea {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 80px;
+  box-sizing: border-box;
+}
+
+.edit-textarea:focus {
+  outline: none;
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.modal-actions .save-btn,
+.modal-actions .cancel-btn {
+  flex: 1;
+  padding: 10px 20px;
+  font-size: 14px;
+}
+
+/* 关系信息显示样式 */
+.relation-info-display {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  background: #f9fafb;
+  border-radius: 8px;
+}
+
+.relation-characters {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.relation-char-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  padding: 8px 16px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+}
+
+.relation-type-display {
+  font-size: 16px;
+  font-weight: 600;
+  color: #10b981;
+  padding: 8px 16px;
+  background: #ecfdf5;
+  border-radius: 6px;
+  border: 1px solid #10b981;
+}
+
+.relation-desc-display {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+}
+
+.desc-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.desc-text {
+  font-size: 14px;
+  color: #1f2937;
+  line-height: 1.6;
+}
