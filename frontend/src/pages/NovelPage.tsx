@@ -37,7 +37,11 @@ export default function NovelPage() {
               <p>两万字以内的短篇故事，情节简单节奏快</p>
             </div>
           </div>
-          <div className="novel-new-card">
+          <div 
+            className="novel-new-card"
+            onClick={() => navigate('/book-splitter')}
+            style={{ cursor: 'pointer' }}
+          >
             <div className="card-icon-wrapper">
               <div className="card-icon-bg tertiary-bg" />
               <div className="card-icon tertiary-icon">
