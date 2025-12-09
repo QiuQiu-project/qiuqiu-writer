@@ -44,24 +44,53 @@ router = APIRouter(prefix="/product", tags=["Server API"])
 # Instance ID for identifying this server instance in logs and responses
 INSTANCE_ID = f"{socket.gethostname()}:{os.getpid()}:{_random.randint(1000, 9999)}"
 
-# Initialize all server components
-components = handlers.init_server()
+# Lazy initialization - components will be initialized on first use
+_components = None
+_dependencies = None
+_search_handler = None
+_add_handler = None
+_chat_handler = None
+_mem_scheduler = None
+_llm = None
+_naive_mem_cube = None
 
-# Create dependency container
-dependencies = HandlerDependencies.from_init_server(components)
 
-# Initialize all handlers with dependency injection
-search_handler = SearchHandler(dependencies)
-add_handler = AddHandler(dependencies)
-chat_handler = ChatHandler(
-    dependencies, search_handler, add_handler, online_bot=components.get("online_bot")
-)
+def _init_components():
+    """Lazy initialization of server components."""
+    global _components, _dependencies, _search_handler, _add_handler, _chat_handler
+    global _mem_scheduler, _llm, _naive_mem_cube
+    
+    if _components is None:
+        try:
+            _components = handlers.init_server()
+            _dependencies = HandlerDependencies.from_init_server(_components)
+            _search_handler = SearchHandler(_dependencies)
+            _add_handler = AddHandler(_dependencies)
+            _chat_handler = ChatHandler(
+                _dependencies, _search_handler, _add_handler, online_bot=_components.get("online_bot")
+            )
+            _mem_scheduler = _components["mem_scheduler"]
+            _llm = _components["llm"]
+            _naive_mem_cube = _components["naive_mem_cube"]
+        except Exception as e:
+            logger.error(f"Failed to initialize server components: {e}", exc_info=True)
+            raise
+    
+    return {
+        "components": _components,
+        "dependencies": _dependencies,
+        "search_handler": _search_handler,
+        "add_handler": _add_handler,
+        "chat_handler": _chat_handler,
+        "mem_scheduler": _mem_scheduler,
+        "llm": _llm,
+        "naive_mem_cube": _naive_mem_cube,
+    }
 
-# Extract commonly used components for function-based handlers
-# (These can be accessed from the components dict without unpacking all of them)
-mem_scheduler: BaseScheduler = components["mem_scheduler"]
-llm = components["llm"]
-naive_mem_cube = components["naive_mem_cube"]
+
+def get_components():
+    """Get initialized components, initializing if necessary."""
+    return _init_components()
 
 
 # =============================================================================
@@ -76,7 +105,8 @@ def search_memories(search_req: APISearchRequest):
 
     This endpoint uses the class-based SearchHandler for better code organization.
     """
-    return search_handler.handle_search_memories(search_req)
+    comps = get_components()
+    return comps["search_handler"].handle_search_memories(search_req)
 
 
 # =============================================================================
@@ -91,7 +121,8 @@ def add_memories(add_req: APIADDRequest):
 
     This endpoint uses the class-based AddHandler for better code organization.
     """
-    return add_handler.handle_add_memories(add_req)
+    comps = get_components()
+    return comps["add_handler"].handle_add_memories(add_req)
 
 
 # =============================================================================
@@ -102,9 +133,10 @@ def add_memories(add_req: APIADDRequest):
 @router.get("/scheduler/status", summary="Get scheduler running status")
 def scheduler_status(user_name: str | None = None):
     """Get scheduler running status."""
+    comps = get_components()
     return handlers.scheduler_handler.handle_scheduler_status(
         user_name=user_name,
-        mem_scheduler=mem_scheduler,
+        mem_scheduler=comps["mem_scheduler"],
         instance_id=INSTANCE_ID,
     )
 
@@ -116,11 +148,12 @@ def scheduler_wait(
     poll_interval: float = 0.2,
 ):
     """Wait until scheduler is idle for a specific user."""
+    comps = get_components()
     return handlers.scheduler_handler.handle_scheduler_wait(
         user_name=user_name,
         timeout_seconds=timeout_seconds,
         poll_interval=poll_interval,
-        mem_scheduler=mem_scheduler,
+        mem_scheduler=comps["mem_scheduler"],
     )
 
 
@@ -131,11 +164,12 @@ def scheduler_wait_stream(
     poll_interval: float = 0.2,
 ):
     """Stream scheduler progress via Server-Sent Events (SSE)."""
+    comps = get_components()
     return handlers.scheduler_handler.handle_scheduler_wait_stream(
         user_name=user_name,
         timeout_seconds=timeout_seconds,
         poll_interval=poll_interval,
-        mem_scheduler=mem_scheduler,
+        mem_scheduler=comps["mem_scheduler"],
         instance_id=INSTANCE_ID,
     )
 
@@ -152,7 +186,8 @@ def chat_complete(chat_req: APIChatCompleteRequest):
 
     This endpoint uses the class-based ChatHandler.
     """
-    return chat_handler.handle_chat_complete(chat_req)
+    comps = get_components()
+    return comps["chat_handler"].handle_chat_complete(chat_req)
 
 
 @router.post("/chat", summary="Chat with MemOS")
@@ -163,7 +198,8 @@ def chat(chat_req: ChatRequest):
     This endpoint uses the class-based ChatHandler which internally
     composes SearchHandler and AddHandler for a clean architecture.
     """
-    return chat_handler.handle_chat_stream(chat_req)
+    comps = get_components()
+    return comps["chat_handler"].handle_chat_stream(chat_req)
 
 
 # =============================================================================
@@ -178,12 +214,13 @@ def chat(chat_req: ChatRequest):
 )
 def get_suggestion_queries(suggestion_req: SuggestionRequest):
     """Get suggestion queries for a specific user with language preference."""
+    comps = get_components()
     return handlers.suggestion_handler.handle_get_suggestion_queries(
         user_id=suggestion_req.mem_cube_id,
         language=suggestion_req.language,
         message=suggestion_req.message,
-        llm=llm,
-        naive_mem_cube=naive_mem_cube,
+        llm=comps["llm"],
+        naive_mem_cube=comps["naive_mem_cube"],
     )
 
 
@@ -200,6 +237,7 @@ def get_all_memories(memory_req: GetMemoryRequest):
     If search_query is provided, returns a subgraph based on the query.
     Otherwise, returns all memories of the specified type.
     """
+    comps = get_components()
     if memory_req.search_query:
         return handlers.memory_handler.handle_get_subgraph(
             user_id=memory_req.user_id,
@@ -208,7 +246,7 @@ def get_all_memories(memory_req: GetMemoryRequest):
             ),
             query=memory_req.search_query,
             top_k=20,
-            naive_mem_cube=naive_mem_cube,
+            naive_mem_cube=comps["naive_mem_cube"],
         )
     else:
         return handlers.memory_handler.handle_get_all_memories(
@@ -217,5 +255,5 @@ def get_all_memories(memory_req: GetMemoryRequest):
                 memory_req.mem_cube_ids[0] if memory_req.mem_cube_ids else memory_req.user_id
             ),
             memory_type=memory_req.memory_type or "text_mem",
-            naive_mem_cube=naive_mem_cube,
+            naive_mem_cube=comps["naive_mem_cube"],
         )

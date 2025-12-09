@@ -7,9 +7,10 @@ from typing import Dict, Any, Optional
 
 from sqlalchemy import (
     Column, Integer, String, Boolean, DateTime, Text, JSON,
-    Index, ForeignKey
+    Index, ForeignKey, and_
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import relationship, foreign
 from sqlalchemy.sql import func
 
 from memos.api.core.database import Base
@@ -27,7 +28,7 @@ class Work(Base):
     work_type = Column(String(20), nullable=False, index=True)  # novel/script/short_story/film_script
     status = Column(String(20), default="draft", index=True)  # draft/published/archived
     cover_image_url = Column(String(255))
-    tags = Column(JSON, default=list)
+    tags = Column(JSONB, default=list)
     category = Column(String(50), index=True)
     genre = Column(String(50), index=True)
     target_audience = Column(String(50))
@@ -39,8 +40,8 @@ class Work(Base):
     collaborator_count = Column(Integer, default=0)
     is_public = Column(Boolean, default=False, index=True)
     is_collaborative = Column(Boolean, default=False)
-    settings = Column(JSON, default=dict)  # 作品设置
-    work_metadata = Column("metadata", JSON, default=dict)  # 扩展元数据
+    settings = Column(JSONB, default=dict)  # 作品设置
+    work_metadata = Column("metadata", JSONB, default=dict)  # 扩展元数据
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     published_at = Column(DateTime(timezone=True))
@@ -52,7 +53,11 @@ class Work(Base):
     characters = relationship("Character", back_populates="work", cascade="all, delete-orphan")
     factions = relationship("Faction", back_populates="work", cascade="all, delete-orphan")
     extended_info = relationship("WorkInfoExtended", back_populates="work", cascade="all, delete-orphan")
-    ai_analyses = relationship("AIAnalysis", back_populates="work", cascade="all, delete-orphan")
+    ai_analyses = relationship(
+        "AIAnalysis",
+        primaryjoin=lambda: _get_work_ai_analyses_join(),
+        cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<Work(id={self.id}, title='{self.title}', type='{self.work_type}')>"
@@ -146,7 +151,7 @@ class WorkCollaborator(Base):
 
     # 关系
     work = relationship("Work", back_populates="collaborators")
-    user = relationship("User", back_populates="work_collaborations")
+    user = relationship("User", back_populates="work_collaborations", foreign_keys=[user_id])
     inviter = relationship("User", foreign_keys=[invited_by])
 
     def __repr__(self):
@@ -198,3 +203,13 @@ Index("idx_work_collaborators_permission", WorkCollaborator.permission)
 Index("idx_works_owner_status", Work.owner_id, Work.status)
 Index("idx_works_type_status", Work.work_type, Work.status)
 Index("idx_work_collaborators_work_permission", WorkCollaborator.work_id, WorkCollaborator.permission)
+
+
+# 延迟导入 AIAnalysis 以避免循环导入
+def _get_work_ai_analyses_join():
+    """获取 Work 和 AIAnalysis 之间的连接条件"""
+    from memos.api.models.writing import AIAnalysis
+    return and_(
+        Work.id == foreign(AIAnalysis.target_id),
+        AIAnalysis.target_type == 'work'
+    )

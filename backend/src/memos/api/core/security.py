@@ -4,9 +4,9 @@
 
 from datetime import datetime, timedelta
 from typing import Any, Union, Optional
+import hashlib
+import bcrypt
 from jose import JWTError, jwt
-from passlib.context import CryptContext
-from passlib.hash import bcrypt
 from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
@@ -16,8 +16,8 @@ from memos.api.core.redis import get_redis
 settings = get_settings()
 security = HTTPBearer()
 
-# 密码加密上下文
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# bcrypt 工作因子（rounds）
+BCRYPT_ROUNDS = 12
 
 
 def create_access_token(
@@ -108,28 +108,99 @@ def verify_token(token: str, token_type: str = "access") -> Optional[dict]:
 def get_password_hash(password: str) -> str:
     """
     生成密码哈希
+    
+    bcrypt 限制密码最多 72 字节，如果密码超过这个长度，
+    先使用 SHA-256 哈希（32 字节），然后 hex 编码（64 字节），
+    最后再用 bcrypt 哈希。
+    
+    直接使用 bcrypt 库，避免 passlib 的初始化问题。
 
     Args:
         password: 明文密码
 
     Returns:
-        密码哈希字符串
+        密码哈希字符串（bcrypt 格式）
     """
-    return pwd_context.hash(password)
+    # 将密码编码为字节
+    password_bytes = password.encode('utf-8')
+    
+    # 如果密码超过 72 字节，先使用 SHA-256 哈希
+    if len(password_bytes) > 72:
+        # 使用 SHA-256 哈希将任意长度的密码压缩到固定长度（32 字节）
+        # 然后使用 hex 编码转换为 64 字节的字符串（在 72 字节限制内）
+        password_for_bcrypt = hashlib.sha256(password_bytes).hexdigest().encode('utf-8')
+    else:
+        # 密码在 72 字节以内，直接使用
+        password_for_bcrypt = password_bytes
+    
+    # 最终检查：确保传递给 bcrypt 的字节不超过 72 字节
+    if len(password_for_bcrypt) > 72:
+        # 如果仍然超过，截断到 72 字节（这种情况理论上不应该发生）
+        password_for_bcrypt = password_for_bcrypt[:72]
+    
+    # 使用 bcrypt 生成哈希
+    salt = bcrypt.gensalt(rounds=BCRYPT_ROUNDS)
+    hashed = bcrypt.hashpw(password_for_bcrypt, salt)
+    
+    # 返回字符串格式（bcrypt 哈希是 bytes，需要解码）
+    return hashed.decode('utf-8')
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
     验证密码
+    
+    需要与 get_password_hash 使用相同的处理逻辑。
+    支持两种格式：直接 bcrypt 哈希和 passlib 格式（向后兼容）。
 
     Args:
         plain_password: 明文密码
-        hashed_password: 密码哈希
+        hashed_password: 密码哈希（bcrypt 格式）
 
     Returns:
         密码是否正确
     """
-    return pwd_context.verify(plain_password, hashed_password)
+    if not hashed_password:
+        return False
+    
+    # 将密码编码为字节
+    password_bytes = plain_password.encode('utf-8')
+    
+    # 如果密码超过 72 字节，先使用 SHA-256 哈希
+    if len(password_bytes) > 72:
+        # 使用 SHA-256 哈希将任意长度的密码压缩到固定长度（32 字节）
+        # 然后使用 hex 编码转换为 64 字节的字符串（在 72 字节限制内）
+        password_for_bcrypt = hashlib.sha256(password_bytes).hexdigest().encode('utf-8')
+    else:
+        # 密码在 72 字节以内，直接使用
+        password_for_bcrypt = password_bytes
+    
+    # 最终检查：确保传递给 bcrypt 的字节不超过 72 字节
+    if len(password_for_bcrypt) > 72:
+        # 如果仍然超过，截断到 72 字节（这种情况理论上不应该发生）
+        password_for_bcrypt = password_for_bcrypt[:72]
+    
+    # 使用 bcrypt 验证密码
+    try:
+        hashed_bytes = hashed_password.encode('utf-8')
+        # 直接使用 bcrypt 验证
+        result = bcrypt.checkpw(password_for_bcrypt, hashed_bytes)
+        
+        # 如果验证失败，可能是旧密码（passlib 格式），尝试原始密码验证
+        # passlib 可能对密码进行了不同的处理
+        if not result and len(password_bytes) <= 72:
+            # 尝试使用原始密码（不经过 SHA-256 处理）验证
+            # 这可能是 passlib 哈希的密码
+            try:
+                result = bcrypt.checkpw(password_bytes, hashed_bytes)
+            except Exception:
+                pass
+        
+        return result
+    except Exception as e:
+        # 记录错误以便调试
+        print(f"密码验证错误: {e}")
+        return False
 
 
 async def get_current_user_id(

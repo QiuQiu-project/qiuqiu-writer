@@ -38,7 +38,7 @@ async def register(
     """
     用户注册
     """
-    user_service = UserService(db)
+    user_service = UserService()
 
     # 检查用户名是否已存在
     existing_user = await user_service.get_user_by_username(request.username)
@@ -57,48 +57,50 @@ async def register(
         )
 
     # 创建用户
-    password_hash = get_password_hash(request.password)
     user = await user_service.create_user(
         username=request.username,
         email=request.email,
-        password_hash=password_hash,
-        display_name=request.display_name
+        password=request.password,
+        display_name=request.display_name,
+        real_name=request.real_name,
+        gender=request.gender,
+        birthday=request.birthday,
+        location=request.location,
+        website=request.website,
+        bio=request.bio
     )
-
-    # 创建用户档案
-    if request.real_name or request.gender or request.birthday:
-        await user_service.create_user_profile(
-            user_id=user.id,
-            real_name=request.real_name,
-            gender=request.gender,
-            birthday=request.birthday,
-            location=request.location,
-            website=request.website,
-            bio=request.bio
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="创建用户失败"
         )
 
+
+    user_id = user.get("id")
+    
     # 生成令牌
     access_token = create_access_token(
-        subject=user.id,
+        subject=user_id,
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     refresh_token = create_refresh_token(
-        subject=user.id,
+        subject=user_id,
         expires_delta=timedelta(minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES)
     )
 
     # 存储会话到Redis
-    from app.core.redis import get_redis
+    from memos.api.core.redis import get_redis
     redis = await get_redis()
     session_data = {
-        "user_id": user.id,
-        "username": user.username,
-        "email": user.email,
-        "status": user.status,
-        "last_activity": str(user.last_login_at),
+        "user_id": user_id,
+        "username": user.get("username"),
+        "email": user.get("email"),
+        "status": user.get("status"),
+        "last_activity": str(user.get("last_login_at", "")),
     }
     await redis.setex(
-        f"session:{user.id}",
+        f"session:{user_id}",
         settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         str(session_data)
     )
@@ -107,7 +109,7 @@ async def register(
         success=True,
         message="注册成功",
         data={
-            "user": user.to_dict(),
+            "user": user,
             "access_token": access_token,
             "refresh_token": refresh_token,
             "token_type": "bearer",
@@ -125,7 +127,7 @@ async def login(
     """
     用户登录
     """
-    user_service = UserService(db)
+    user_service = UserService()
 
     # 获取用户（支持用户名或邮箱登录）
     if "@" in request.username_or_email:
@@ -140,34 +142,36 @@ async def login(
         )
 
     # 验证密码
-    if not verify_password(request.password, user.password_hash):
+    if not verify_password(request.password, user.get("password_hash", "")):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="用户名或密码错误"
         )
 
     # 检查用户状态
-    if user.status != "active":
+    if user.get("status") != "active":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="用户账户已被禁用"
         )
 
+    user_id = user.get("id")
+    
     # 更新最后登录时间
-    await user_service.update_last_login(user.id)
+    await user_service.update_last_login(user_id)
 
     # 生成令牌
     access_token = create_access_token(
-        subject=user.id,
+        subject=user_id,
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     refresh_token = create_refresh_token(
-        subject=user.id,
+        subject=user_id,
         expires_delta=timedelta(minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES)
     )
 
     # 存储会话到Redis
-    from app.core.redis import get_redis
+    from memos.api.core.redis import get_redis
     redis = await get_redis()
 
     # 获取设备信息
@@ -178,26 +182,26 @@ async def login(
     })
 
     session_data = {
-        "user_id": user.id,
-        "username": user.username,
-        "email": user.email,
-        "status": user.status,
+        "user_id": user_id,
+        "username": user.get("username"),
+        "email": user.get("email"),
+        "status": user.get("status"),
         "device_info": device_info,
-        "last_activity": str(user.last_login_at),
+        "last_activity": str(user.get("last_login_at", "")),
     }
 
     await redis.setex(
-        f"session:{user.id}",
+        f"session:{user_id}",
         settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         str(session_data)
     )
 
     # 记录审计日志
     await user_service.create_audit_log(
-        user_id=user.id,
+        user_id=user_id,
         action="login",
         target_type="user",
-        target_id=user.id,
+        target_id=user_id,
         details=device_info,
         ip_address=http_request.client.host if http_request.client else None,
         user_agent=http_request.headers.get("user-agent")
@@ -207,7 +211,7 @@ async def login(
         access_token=access_token,
         refresh_token=refresh_token,
         token_type="bearer",
-        user=user.to_dict(),
+        user=user,
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
     )
 
@@ -229,17 +233,17 @@ async def refresh_token(
         )
 
     user_id = int(payload.get("sub"))
-    user_service = UserService(db)
+    user_service = UserService()
     user = await user_service.get_user_by_id(user_id)
 
-    if not user or user.status != "active":
+    if not user or user.get("status") != "active":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="用户不存在或已被禁用"
         )
 
     # 检查会话是否存在
-    from app.core.redis import get_redis
+    from memos.api.core.redis import get_redis
     redis = await get_redis()
     session_exists = await redis.exists(f"session:{user_id}")
 
@@ -251,7 +255,7 @@ async def refresh_token(
 
     # 生成新的访问令牌
     access_token = create_access_token(
-        subject=user.id,
+        subject=user_id,
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
 
@@ -268,7 +272,7 @@ async def refresh_token(
         access_token=access_token,
         refresh_token=request.refresh_token,
         token_type="bearer",
-        user=user.to_dict(),
+        user=user,
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
     )
 
@@ -277,12 +281,13 @@ async def refresh_token(
 async def logout(
     request: LogoutRequest,
     http_request: Request,
-    current_user_id: int = Depends(security)
+    current_user_id: int = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_async_db)
 ) -> AuthResponse:
     """
     用户登出
     """
-    from app.core.redis import get_redis
+    from memos.api.core.redis import get_redis
     redis = await get_redis()
 
     # 删除会话
@@ -294,12 +299,13 @@ async def logout(
         await blacklist_token(request.refresh_token)
 
     # 记录审计日志
-    user_service = UserService(http_request.state.db)
+    user_service = UserService()
     await user_service.create_audit_log(
         user_id=current_user_id,
         action="logout",
         target_type="user",
         target_id=current_user_id,
+        details={},
         ip_address=http_request.client.host if http_request.client else None,
         user_agent=http_request.headers.get("user-agent")
     )
@@ -329,7 +335,7 @@ async def check_username_availability(
     """
     检查用户名可用性
     """
-    user_service = UserService(db)
+    user_service = UserService()
     existing_user = await user_service.get_user_by_username(username)
 
     return {
@@ -346,7 +352,7 @@ async def check_email_availability(
     """
     检查邮箱可用性
     """
-    user_service = UserService(db)
+    user_service = UserService()
     existing_user = await user_service.get_user_by_email(email)
 
     return {
@@ -362,7 +368,7 @@ async def get_user_sessions(
     """
     获取用户会话列表
     """
-    from app.core.redis import get_redis
+    from memos.api.core.redis import get_redis
     redis = await get_redis()
 
     session_data = await redis.get(f"session:{current_user_id}")

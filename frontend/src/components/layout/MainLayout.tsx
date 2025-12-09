@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { Home, BookOpen, FileText, Video, PenTool, User, Bell, Coins, Bot, GraduationCap, Info, Package, PlaySquare } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import LoginModal from '../auth/LoginModal';
+import { authApi, type UserInfo } from '../../utils/authApi';
 import './MainLayout.css';
 
 type NavItem = 
@@ -32,6 +34,58 @@ const bottomNavItems = [
 export default function MainLayout() {
   const location = useLocation();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  // 检查登录状态
+  useEffect(() => {
+    const checkAuth = async () => {
+      if (authApi.isAuthenticated()) {
+        const storedUser = authApi.getUserInfo();
+        if (storedUser) {
+          setUserInfo(storedUser);
+          setIsAuthenticated(true);
+        } else {
+          // 尝试获取用户信息
+          try {
+            const user = await authApi.getCurrentUser();
+            setUserInfo(user);
+            setIsAuthenticated(true);
+            authApi.setUserInfo(user);
+          } catch (error) {
+            // Token可能已过期
+            authApi.clearToken();
+            setIsAuthenticated(false);
+            setUserInfo(null);
+          }
+        }
+      } else {
+        setIsAuthenticated(false);
+        setUserInfo(null);
+      }
+    };
+
+    checkAuth();
+  }, []);
+
+  const handleLoginSuccess = (user: UserInfo) => {
+    setUserInfo(user);
+    setIsAuthenticated(true);
+    setLoginModalOpen(false);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await authApi.logout();
+    } catch (error) {
+      console.error('登出失败:', error);
+    } finally {
+      setUserInfo(null);
+      setIsAuthenticated(false);
+      setUserMenuOpen(false);
+    }
+  };
 
   return (
     <div className="main-layout">
@@ -51,31 +105,40 @@ export default function MainLayout() {
             <Coins size={18} />
             <span>514+</span>
           </div>
-          <div className="user-menu-wrapper">
-            <button 
-              className="user-avatar-btn"
-              onClick={() => setUserMenuOpen(!userMenuOpen)}
-            >
-              <User size={20} />
-            </button>
-            {userMenuOpen && (
-              <div className="user-menu-dropdown">
-                <div className="user-info">
-                  <div className="user-avatar-large">
-                    <User size={24} />
+          {isAuthenticated ? (
+            <div className="user-menu-wrapper">
+              <button 
+                className="user-avatar-btn"
+                onClick={() => setUserMenuOpen(!userMenuOpen)}
+              >
+                <User size={20} />
+              </button>
+              {userMenuOpen && (
+                <div className="user-menu-dropdown">
+                  <div className="user-info">
+                    <div className="user-avatar-large">
+                      <User size={24} />
+                    </div>
+                    <div className="user-details">
+                      <p className="user-name">{userInfo?.display_name || userInfo?.username || '用户'}</p>
+                      <p className="user-email">{userInfo?.email || ''}</p>
+                    </div>
                   </div>
-                  <div className="user-details">
-                    <p className="user-name">蛙蛙tL2L3z</p>
-                    <p className="user-email">user@example.com</p>
-                  </div>
+                  <div className="menu-divider"></div>
+                  <a href="#" className="menu-item">个人设置</a>
+                  <a href="#" className="menu-item">会员中心</a>
+                  <a href="#" className="menu-item" onClick={(e) => { e.preventDefault(); handleLogout(); }}>退出登录</a>
                 </div>
-                <div className="menu-divider"></div>
-                <a href="#" className="menu-item">个人设置</a>
-                <a href="#" className="menu-item">会员中心</a>
-                <a href="#" className="menu-item">退出登录</a>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          ) : (
+            <button 
+              className="login-btn"
+              onClick={() => setLoginModalOpen(true)}
+            >
+              登录
+            </button>
+          )}
         </div>
       </header>
 
@@ -128,6 +191,13 @@ export default function MainLayout() {
           );
         })}
       </nav>
+
+      {/* 登录弹窗 */}
+      <LoginModal
+        isOpen={loginModalOpen}
+        onClose={() => setLoginModalOpen(false)}
+        onLoginSuccess={handleLoginSuccess}
+      />
     </div>
   );
 }

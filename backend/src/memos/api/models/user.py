@@ -36,7 +36,12 @@ class User(Base):
     # 关系
     profile = relationship("UserProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
     works = relationship("Work", back_populates="owner", cascade="all, delete-orphan")
-    work_collaborations = relationship("WorkCollaborator", back_populates="user", cascade="all, delete-orphan")
+    work_collaborations = relationship(
+        "WorkCollaborator", 
+        back_populates="user", 
+        foreign_keys=lambda: [_get_work_collaborator_user_id()],
+        cascade="all, delete-orphan"
+    )
     chapter_versions = relationship("ChapterVersion", back_populates="created_by_user", cascade="all, delete-orphan")
     audit_logs = relationship("AuditLog", back_populates="user", cascade="all, delete-orphan")
 
@@ -102,6 +107,24 @@ class UserProfile(Base):
     def __repr__(self):
         return f"<UserProfile(id={self.id}, user_id={self.user_id})>"
 
+    def to_dict(self) -> Dict[str, Any]:
+        """转换为字典"""
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "display_name": self.display_name,
+            "real_name": self.real_name,
+            "gender": self.gender,
+            "birthday": self.birthday.isoformat() if self.birthday else None,
+            "location": self.location,
+            "website": self.website,
+            "social_links": self.social_links or [],
+            "writing_stats": self.writing_stats or {},
+            "preferences": self.preferences or {},
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
 
 # 索引
 Index("idx_users_username", User.username)
@@ -110,3 +133,10 @@ Index("idx_users_status", User.status)
 Index("idx_users_created_at", User.created_at)
 
 Index("idx_user_profiles_user_id", UserProfile.user_id)
+
+
+# 延迟导入 WorkCollaborator 以避免循环导入
+def _get_work_collaborator_user_id():
+    """获取 WorkCollaborator.user_id 列对象"""
+    from memos.api.models.work import WorkCollaborator
+    return WorkCollaborator.user_id

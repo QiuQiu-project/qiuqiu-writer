@@ -179,7 +179,7 @@ venv.bak/
 
 # but do not ignore docs/openapi.json
 !docs/openapi.json
-
+!requirements.txt
 
 # mypy
 .mypy_cache/

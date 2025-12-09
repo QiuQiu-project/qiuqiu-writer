@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func, text
 from sqlalchemy.orm import selectinload
 
-from memos.api.core.database import get_async_session
+from memos.api.core.database import engine
 from memos.api.core.security import get_password_hash, verify_password
 from memos.api.core.redis import get_redis
 from memos.api.models.user import User, UserProfile
@@ -49,7 +49,7 @@ class UserService:
         Returns:
             用户信息字典，创建失败返回None
         """
-        async with get_async_session()() as session:
+        async with AsyncSession(engine) as session:
             try:
                 # 检查用户名和邮箱是否已存在
                 existing_user = await self._get_existing_user(session, username, email)
@@ -86,11 +86,22 @@ class UserService:
                 # 记录审计日志
                 await self._create_audit_log(session, user.id, "create", "user", user.id, {"username": username})
 
-                return await self.get_user_by_id(user.id)
+                # 刷新对象以获取关联数据
+                await session.refresh(user)
+                await session.refresh(profile)
+
+                # 直接返回用户数据，避免创建新会话
+                user_data = user.to_dict()
+                if profile:
+                    user_data["profile"] = profile.to_dict()
+
+                return user_data
 
             except Exception as e:
                 await session.rollback()
                 print(f"❌ 创建用户失败: {e}")
+                import traceback
+                traceback.print_exc()
                 return None
 
     async def authenticate_user(self, username_or_email: str, password: str) -> Optional[Dict[str, Any]]:
@@ -104,7 +115,7 @@ class UserService:
         Returns:
             用户信息字典，认证失败返回None
         """
-        async with get_async_session()() as session:
+        async with AsyncSession(engine) as session:
             try:
                 # 查找用户
                 stmt = select(User).options(
@@ -133,6 +144,7 @@ class UserService:
                 return user.to_dict()
 
             except Exception as e:
+                await session.rollback()
                 print(f"❌ 用户认证失败: {e}")
                 return None
 
@@ -147,7 +159,7 @@ class UserService:
         Returns:
             用户信息字典，用户不存在返回None
         """
-        async with get_async_session()() as session:
+        async with AsyncSession(engine) as session:
             try:
                 if include_profile:
                     stmt = select(User).options(
@@ -195,7 +207,7 @@ class UserService:
         Returns:
             用户信息字典，用户不存在返回None
         """
-        async with get_async_session()() as session:
+        async with AsyncSession(engine) as session:
             try:
                 if include_profile:
                     stmt = select(User).options(
@@ -231,7 +243,7 @@ class UserService:
         Returns:
             用户信息字典，用户不存在返回None
         """
-        async with get_async_session()() as session:
+        async with AsyncSession(engine) as session:
             try:
                 if include_profile:
                     stmt = select(User).options(
@@ -273,7 +285,7 @@ class UserService:
         Returns:
             更新后的用户信息字典，更新失败返回None
         """
-        async with get_async_session()() as session:
+        async with AsyncSession(engine) as session:
             try:
                 # 获取用户
                 stmt = select(User).options(
@@ -343,7 +355,7 @@ class UserService:
         Returns:
             更新是否成功
         """
-        async with get_async_session()() as session:
+        async with AsyncSession(engine) as session:
             try:
                 # 获取用户
                 stmt = select(User).filter(User.id == user_id)
@@ -381,7 +393,7 @@ class UserService:
         Returns:
             删除是否成功
         """
-        async with get_async_session()() as session:
+        async with AsyncSession(engine) as session:
             try:
                 # 获取用户
                 stmt = select(User).filter(User.id == user_id)
@@ -430,7 +442,7 @@ class UserService:
         Returns:
             用户列表信息
         """
-        async with get_async_session()() as session:
+        async with AsyncSession(engine) as session:
             try:
                 # 构建查询
                 query = select(User)
@@ -498,7 +510,7 @@ class UserService:
         Returns:
             用户名是否可用
         """
-        async with get_async_session()() as session:
+        async with AsyncSession(engine) as session:
             try:
                 stmt = select(User.id).filter(User.username == username)
                 result = await session.execute(stmt)
@@ -519,7 +531,7 @@ class UserService:
         Returns:
             邮箱是否可用
         """
-        async with get_async_session()() as session:
+        async with AsyncSession(engine) as session:
             try:
                 stmt = select(User.id).filter(User.email == email)
                 result = await session.execute(stmt)
@@ -528,6 +540,77 @@ class UserService:
 
             except Exception as e:
                 print(f"❌ 检查邮箱可用性失败: {e}")
+                return False
+
+    async def update_last_login(self, user_id: int) -> bool:
+        """
+        更新用户最后登录时间
+
+        Args:
+            user_id: 用户ID
+
+        Returns:
+            更新是否成功
+        """
+        async with AsyncSession(engine) as session:
+            try:
+                stmt = select(User).filter(User.id == user_id)
+                result = await session.execute(stmt)
+                user = result.scalar_one_or_none()
+
+                if not user:
+                    return False
+
+                user.last_login_at = datetime.utcnow()
+                await session.commit()
+
+                # 清除缓存
+                redis = await self.get_redis()
+                await redis.delete(f"user:{user_id}")
+
+                return True
+
+            except Exception as e:
+                await session.rollback()
+                print(f"❌ 更新最后登录时间失败: {e}")
+                return False
+
+    async def create_audit_log(
+        self,
+        user_id: int,
+        action: str,
+        target_type: Optional[str] = None,
+        target_id: Optional[int] = None,
+        details: Optional[Dict[str, Any]] = None,
+        ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None
+    ) -> bool:
+        """
+        创建审计日志（公共方法）
+
+        Args:
+            user_id: 用户ID
+            action: 操作类型
+            target_type: 目标类型
+            target_id: 目标ID
+            details: 详细信息
+            ip_address: IP地址
+            user_agent: 用户代理
+
+        Returns:
+            创建是否成功
+        """
+        async with AsyncSession(engine) as session:
+            try:
+                await self._create_audit_log(
+                    session, user_id, action, target_type, target_id,
+                    details, ip_address, user_agent
+                )
+                await session.commit()
+                return True
+            except Exception as e:
+                await session.rollback()
+                print(f"❌ 创建审计日志失败: {e}")
                 return False
 
     async def _get_existing_user(
@@ -560,7 +643,9 @@ class UserService:
         action: str,
         target_type: Optional[str],
         target_id: Optional[int],
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
+        ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None
     ):
         """
         创建审计日志
@@ -572,6 +657,8 @@ class UserService:
             target_type: 目标类型
             target_id: 目标ID
             details: 详细信息
+            ip_address: IP地址
+            user_agent: 用户代理
         """
         try:
             log = AuditLog(
@@ -579,7 +666,9 @@ class UserService:
                 action=action,
                 target_type=target_type,
                 target_id=target_id,
-                details=details or {}
+                details=details or {},
+                ip_address=ip_address,
+                user_agent=user_agent
             )
             session.add(log)
             # 不提交，让调用方处理事务

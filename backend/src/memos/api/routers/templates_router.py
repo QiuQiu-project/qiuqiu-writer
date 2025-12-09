@@ -7,8 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import and_, or_
 
-from app.core.database import get_async_db
-from app.core.security import get_current_user_id
+from memos.api.core.database import get_async_db
+from memos.api.core.security import get_current_user_id
 from memos.api.services.template_service import TemplateService
 from memos.api.models.template import WorkTemplate, TemplateField, WorkInfoExtended
 
