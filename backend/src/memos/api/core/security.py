@@ -150,8 +150,8 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
     验证密码
     
-    需要与 get_password_hash 使用相同的处理逻辑。
-    支持两种格式：直接 bcrypt 哈希和 passlib 格式（向后兼容）。
+    需要与 get_password_hash 使用完全相同的处理逻辑。
+    同时兼容旧密码（passlib 格式）。
 
     Args:
         plain_password: 明文密码
@@ -163,13 +163,12 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     if not hashed_password:
         return False
     
-    # 将密码编码为字节
+    # 将密码编码为字节（与 get_password_hash 完全一致）
     password_bytes = plain_password.encode('utf-8')
     
-    # 如果密码超过 72 字节，先使用 SHA-256 哈希
+    # 方法1：使用与 get_password_hash 完全相同的逻辑处理密码
     if len(password_bytes) > 72:
-        # 使用 SHA-256 哈希将任意长度的密码压缩到固定长度（32 字节）
-        # 然后使用 hex 编码转换为 64 字节的字符串（在 72 字节限制内）
+        # 如果密码超过 72 字节，先使用 SHA-256 哈希
         password_for_bcrypt = hashlib.sha256(password_bytes).hexdigest().encode('utf-8')
     else:
         # 密码在 72 字节以内，直接使用
@@ -177,20 +176,17 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     
     # 最终检查：确保传递给 bcrypt 的字节不超过 72 字节
     if len(password_for_bcrypt) > 72:
-        # 如果仍然超过，截断到 72 字节（这种情况理论上不应该发生）
         password_for_bcrypt = password_for_bcrypt[:72]
     
     # 使用 bcrypt 验证密码
     try:
         hashed_bytes = hashed_password.encode('utf-8')
-        # 直接使用 bcrypt 验证
+        # 方法1：使用处理后的密码验证（新方法，与哈希时使用的密码完全一致）
         result = bcrypt.checkpw(password_for_bcrypt, hashed_bytes)
         
-        # 如果验证失败，可能是旧密码（passlib 格式），尝试原始密码验证
-        # passlib 可能对密码进行了不同的处理
+        # 方法2：如果失败且密码不超过 72 字节，尝试使用原始密码验证
+        # 这可能是旧密码（passlib 或直接 bcrypt 哈希的原始密码）
         if not result and len(password_bytes) <= 72:
-            # 尝试使用原始密码（不经过 SHA-256 处理）验证
-            # 这可能是 passlib 哈希的密码
             try:
                 result = bcrypt.checkpw(password_bytes, hashed_bytes)
             except Exception:
@@ -200,6 +196,10 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     except Exception as e:
         # 记录错误以便调试
         print(f"密码验证错误: {e}")
+        print(f"  密码长度: {len(password_bytes)} 字节")
+        print(f"  处理后长度: {len(password_for_bcrypt)} 字节")
+        print(f"  哈希长度: {len(hashed_password)} 字符")
+        print(f"  哈希前缀: {hashed_password[:20] if len(hashed_password) > 20 else hashed_password}")
         return False
 
 

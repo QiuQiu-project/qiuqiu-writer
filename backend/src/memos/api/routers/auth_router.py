@@ -130,23 +130,44 @@ async def login(
     user_service = UserService()
 
     # 获取用户（支持用户名或邮箱登录）
+    # 登录时需要获取 password_hash，所以直接查询数据库
+    from memos.api.models.user import User
+    from sqlalchemy import select
+    
     if "@" in request.username_or_email:
-        user = await user_service.get_user_by_email(request.username_or_email)
+        stmt = select(User).filter(User.email == request.username_or_email)
     else:
-        user = await user_service.get_user_by_username(request.username_or_email)
-
-    if not user:
+        stmt = select(User).filter(User.username == request.username_or_email)
+    
+    result = await db.execute(stmt)
+    user_model = result.scalar_one_or_none()
+    
+    if not user_model:
+        print(f"❌ 登录失败: 用户不存在 - {request.username_or_email}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="用户名或密码错误"
         )
 
-    # 验证密码
-    if not verify_password(request.password, user.get("password_hash", "")):
+    # 验证密码（直接从模型获取 password_hash）
+    password_hash = user_model.password_hash or ""
+    password_valid = verify_password(request.password, password_hash)
+    
+    if not password_valid:
+        print(f"❌ 登录失败: 密码验证失败")
+        print(f"  用户名: {request.username_or_email}")
+        print(f"  密码哈希存在: {bool(password_hash)}")
+        print(f"  密码哈希长度: {len(password_hash) if password_hash else 0}")
+        print(f"  密码哈希前缀: {password_hash[:30] if password_hash and len(password_hash) > 30 else password_hash}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="用户名或密码错误"
         )
+    
+    print(f"✅ 登录成功: {request.username_or_email}")
+    
+    # 转换为字典格式（用于后续处理）
+    user = user_model.to_dict()
 
     # 检查用户状态
     if user.get("status") != "active":

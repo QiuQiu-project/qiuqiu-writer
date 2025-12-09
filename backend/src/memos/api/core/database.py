@@ -60,13 +60,21 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
             await session.close()
 
 
-def get_async_db() -> AsyncGenerator[AsyncSession, None]:
+async def get_async_db() -> AsyncGenerator[AsyncSession, None]:
     """
     获取异步数据库会话（别名，用于兼容性）
 
     这是 get_async_session 的别名，用于保持与旧代码的兼容性
     """
-    return get_async_session()
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
 
 
 def get_sync_session():
