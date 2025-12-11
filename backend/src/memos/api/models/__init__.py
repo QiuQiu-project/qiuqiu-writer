@@ -7,6 +7,8 @@ from memos.api.models.work import Work, WorkCollaborator
 from memos.api.models.chapter import Chapter, ChapterVersion
 from memos.api.models.template import WorkTemplate, TemplateField, WorkInfoExtended
 from memos.api.models.characters import Character, Faction
+from memos.api.models.location import Location
+from memos.api.models.prompt_template import PromptTemplate
 from memos.api.models.writing import WritingPrompt, AIAnalysis
 from memos.api.models.system import SystemSetting, AuditLog
 from memos.api.models.document import DocumentSyncHistory
@@ -17,6 +19,8 @@ __all__ = [
     "Chapter", "ChapterVersion",
     "WorkTemplate", "TemplateField", "WorkInfoExtended",
     "Character", "Faction",
+    "Location",
+    "PromptTemplate",
     "WritingPrompt", "AIAnalysis",
     "SystemSetting", "AuditLog",
     "DocumentSyncHistory"

@@ -52,6 +52,7 @@ class Work(Base):
     chapters = relationship("Chapter", back_populates="work", cascade="all, delete-orphan")
     characters = relationship("Character", back_populates="work", cascade="all, delete-orphan")
     factions = relationship("Faction", back_populates="work", cascade="all, delete-orphan")
+    locations = relationship("Location", back_populates="work", cascade="all, delete-orphan")
     extended_info = relationship("WorkInfoExtended", back_populates="work", cascade="all, delete-orphan")
     ai_analyses = relationship(
         "AIAnalysis",

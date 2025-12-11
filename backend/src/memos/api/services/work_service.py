@@ -39,6 +39,20 @@ class WorkService:
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def find_work_by_filename(self, file_name: str, user_id: int) -> Optional[Work]:
+        """根据文件名查找作品（从work_metadata中查找source_file）"""
+        from sqlalchemy import and_
+        from sqlalchemy.dialects.postgresql import JSONB
+        
+        stmt = select(Work).where(
+            and_(
+                Work.owner_id == user_id,
+                Work.work_metadata['source_file'].astext == file_name
+            )
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def get_user_works(
         self,
         user_id: int,

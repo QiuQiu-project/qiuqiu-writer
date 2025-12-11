@@ -14,6 +14,11 @@ export interface Chapter {
   status: string;
   word_count: number;
   content?: string;
+  metadata?: {
+    outline?: string;
+    detailed_outline?: string;
+    [key: string]: any;
+  };
   created_at: string;
   updated_at: string;
 }
@@ -30,6 +35,11 @@ export interface ChapterUpdate {
   title?: string;
   content?: string;
   status?: string;
+  chapter_metadata?: {
+    outline?: string;
+    detailed_outline?: string;
+    [key: string]: any;
+  };
 }
 
 export interface ChapterListResponse {

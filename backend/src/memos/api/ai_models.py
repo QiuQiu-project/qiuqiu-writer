@@ -65,6 +65,43 @@ class AnalyzeChapterRequest(BaseModel):
     )
 
 
+class AnalyzeChapterByFileRequest(BaseModel):
+    """基于文件名的章节分析请求模型"""
+
+    file_name: str = Field(
+        ...,
+        min_length=1,
+        description="文件名，用于查找或创建作品",
+        json_schema_extra={"example": "我的小说.txt"},
+    )
+    content: str = Field(
+        ...,
+        min_length=1,
+        description="要分析的章节内容",
+        json_schema_extra={"example": "第一章 开始\\n\\n这是一个故事的开始..."},
+    )
+    chapter_number: int = Field(
+        ...,
+        ge=1,
+        description="章节号",
+        json_schema_extra={"example": 1},
+    )
+    volume_number: int = Field(
+        default=1,
+        ge=0,
+        description="卷号（可选，默认为1，0表示未分卷）",
+        json_schema_extra={"example": 1},
+    )
+    prompt: str | None = Field(
+        None,
+        description="自定义分析提示词（可选，如果不提供则使用默认提示词）",
+    )
+    settings: AnalysisSettings | None = Field(
+        default_factory=AnalysisSettings,
+        description="AI分析设置",
+    )
+
+
 class SSEMessage(BaseModel):
     """服务器发送事件消息模型"""
 

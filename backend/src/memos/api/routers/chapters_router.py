@@ -36,6 +36,10 @@ class ChapterUpdate(BaseModel):
     title: Optional[str] = None
     content: Optional[str] = None
     status: Optional[str] = None
+    summary: Optional[str] = None
+    chapter_metadata: Optional[Dict[str, Any]] = None  # 包含outline和detailed_outline
+    tags: Optional[List[str]] = None
+    notes: Optional[Dict[str, Any]] = None
 
 class ChapterResponse(BaseModel):
     id: int
@@ -45,8 +49,20 @@ class ChapterResponse(BaseModel):
     volume_number: int
     status: str
     word_count: int
+    estimated_reading_time: Optional[int] = 0
+    content_hash: Optional[str] = None
+    tags: Optional[List[str]] = []
+    summary: Optional[str] = None
+    notes: Optional[Dict[str, Any]] = {}
+    metadata: Optional[Dict[str, Any]] = {}  # 包含outline和detailed_outline
+    sort_order: Optional[int] = 0
     created_at: str
     updated_at: str
+    published_at: Optional[str] = None
+    content_preview: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
 
 class ChapterListResponse(BaseModel):
     chapters: List[ChapterResponse]

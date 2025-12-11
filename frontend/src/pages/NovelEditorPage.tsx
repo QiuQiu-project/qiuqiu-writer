@@ -562,8 +562,8 @@ export default function NovelEditorPage() {
             chapter_number: chapter.chapter_number,  // 保留章节号
             characters: [],
             locations: [],
-            outline: '',
-            detailOutline: '',
+            outline: chapter.metadata?.outline || '',
+            detailOutline: chapter.metadata?.detailed_outline || '',
           })),
         }));
 
@@ -590,8 +590,8 @@ export default function NovelEditorPage() {
             chapter_number: chapter.chapter_number,  // 保留章节号
             characters: [],
             locations: [],
-            outline: '',
-            detailOutline: '',
+            outline: chapter.metadata?.outline || '',
+            detailOutline: chapter.metadata?.detailed_outline || '',
           };
         });
         setChaptersData(chaptersDataMap);
@@ -1298,6 +1298,10 @@ export default function NovelEditorPage() {
         const chapterId = parseInt(data.id);
         await chaptersApi.updateChapter(chapterId, {
           title: data.title,
+          chapter_metadata: {
+            outline: data.outline || '',
+            detailed_outline: data.detailOutline || '',
+          },
         });
         
         // 更新本地状态
@@ -1315,7 +1319,12 @@ export default function NovelEditorPage() {
             return {
               ...vol,
               chapters: vol.chapters.map(chap =>
-                chap.id === data.id ? { ...chap, title: data.title } : chap
+                chap.id === data.id ? { 
+                  ...chap, 
+                  title: data.title,
+                  outline: data.outline || '',
+                  detailOutline: data.detailOutline || '',
+                } : chap
               ),
             };
           }
@@ -1355,6 +1364,16 @@ export default function NovelEditorPage() {
 
         const chapterId = String(newChapter.id);
         const newChapterNumber = maxChapterNumber + 1;
+        
+        // 如果创建章节时有大纲或细纲，立即更新保存
+        if (data.outline || data.detailOutline) {
+          await chaptersApi.updateChapter(newChapter.id, {
+            chapter_metadata: {
+              outline: data.outline || '',
+              detailed_outline: data.detailOutline || '',
+            },
+          });
+        }
         
         // 更新 allChapters，添加新创建的章节
         setAllChapters(prev => [...prev, {
