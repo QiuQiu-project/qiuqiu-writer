@@ -5,6 +5,7 @@ ShareDB服务 - 处理实时协作编辑
 import asyncio
 import json
 import uuid
+import hashlib
 from typing import Dict, Any, List, Optional, Set
 from datetime import datetime
 import logging
@@ -323,6 +324,70 @@ class ShareDBService:
             logger.error(f"应用操作失败: {e}")
 
         return result
+
+    def _calculate_diff_operations(self, old_content: str, new_content: str) -> List[Dict[str, Any]]:
+        """
+        计算两个内容之间的差异，生成操作列表
+        使用 difflib 计算差异，生成 insert_text/delete_text/replace_text 操作
+        """
+        import difflib
+        
+        if not old_content:
+            # 如果旧内容为空，所有新内容都是插入
+            return [{
+                "type": "insert_text",
+                "position": 0,
+                "text": new_content
+            }]
+        
+        if not new_content:
+            # 如果新内容为空，所有旧内容都是删除
+            return [{
+                "type": "delete_text",
+                "position": 0,
+                "length": len(old_content)
+            }]
+        
+        # 使用 difflib 计算差异
+        differ = difflib.SequenceMatcher(None, old_content, new_content)
+        operations = []
+        current_pos = 0
+        
+        for tag, i1, i2, j1, j2 in differ.get_opcodes():
+            if tag == 'equal':
+                # 相同部分，跳过
+                current_pos += (i2 - i1)
+            elif tag == 'delete':
+                # 删除操作
+                operations.append({
+                    "type": "delete_text",
+                    "position": current_pos,
+                    "length": i2 - i1
+                })
+                # 删除后位置不变
+            elif tag == 'insert':
+                # 插入操作
+                operations.append({
+                    "type": "insert_text",
+                    "position": current_pos,
+                    "text": new_content[j1:j2]
+                })
+                current_pos += (j2 - j1)
+            elif tag == 'replace':
+                # 替换操作（删除+插入）
+                operations.append({
+                    "type": "delete_text",
+                    "position": current_pos,
+                    "length": i2 - i1
+                })
+                operations.append({
+                    "type": "insert_text",
+                    "position": current_pos,
+                    "text": new_content[j1:j2]
+                })
+                current_pos += (j2 - j1) - (i2 - i1)
+        
+        return operations
 
     async def _broadcast_update(self, document_id: str, message: Dict[str, Any]):
         """广播文档更新给所有连接的客户端"""
@@ -937,7 +1002,8 @@ class ShareDBService:
                     }
                 else:
                     # 冲突检测和智能合并
-                    server_version = document.get("version", 0) or 0
+                    original_server_version = document.get("version", 0) or 0
+                    server_version = original_server_version  # 保存原始服务器版本用于记录
                     server_content = document.get("content", "")
                     
                     # 关键改进：即使版本号相同或客户端更大，也要检查内容是否不同
@@ -1022,25 +1088,111 @@ class ShareDBService:
                     json.dumps(document)
                 )
 
-                # 记录操作历史（可选）
-                operation_record = {
-                    "doc_id": document_id,
-                    "version": document["version"],
-                    "operation": {
-                        "type": "full_update",
-                        "content": content
-                    },
-                    "user_id": user_id or 0,
-                    "timestamp": datetime.utcnow().isoformat()
-                }
+                # 计算内容哈希
+                final_content = document["content"]
+                content_hash = hashlib.md5(final_content.encode('utf-8')).hexdigest() if final_content else None
+                
+                # 确定合并策略和冲突信息
+                # 注意：这里需要使用合并前的server_version，所以需要在合并逻辑中保存
+                merge_strategy = None
+                conflict_resolved = False
+                sync_type = "sync"
+                
+                # 根据实际的合并逻辑确定策略
+                # 如果文档不存在，说明是新文档
+                if not document or (document.get("version", 0) == 1 and not document.get("updated_at")):
+                    # 新文档，无冲突
+                    sync_type = "sync"
+                    original_server_version = 0
+                else:
+                    # 使用在合并逻辑中保存的server_version
+                    original_server_version = server_version
+                    
+                    # 判断合并策略
+                    if base_content is not None and base_content.strip() and base_content != content:
+                        # 使用差异合并
+                        merge_strategy = "diff_based"
+                        conflict_resolved = True
+                        sync_type = "merge"
+                    elif server_version > version or (content_different and server_version == version):
+                        # 有冲突并已解决
+                        merge_strategy = "smart_merge"
+                        conflict_resolved = True
+                        sync_type = "merge"
+                    elif content_different:
+                        # 并发修改
+                        merge_strategy = "smart_merge"
+                        conflict_resolved = True
+                        sync_type = "merge"
+                    else:
+                        # 普通同步
+                        sync_type = "sync"
+                
+                # 保存同步历史到数据库（如果提供了db_session）
+                if db_session is not None:
+                    try:
+                        from memos.api.models.document import DocumentSyncHistory
+                        
+                        sync_history = DocumentSyncHistory(
+                            document_id=document_id,
+                            version=document["version"],
+                            content=final_content if create_version else None,  # 只有create_version=True时才保存内容
+                            content_hash=content_hash,
+                            user_id=user_id,
+                            sync_type=sync_type,
+                            conflict_resolved=conflict_resolved,
+                            merge_strategy=merge_strategy,
+                            base_version=version if base_content else None,
+                            client_version=version,
+                            server_version=original_server_version if document else None,
+                            metadata={
+                                "create_version": create_version,
+                                "content_length": len(final_content) if final_content else 0,
+                            }
+                        )
+                        db_session.add(sync_history)
+                        await db_session.commit()
+                        logger.info(f"已保存文档同步历史: {document_id}, 版本: {document['version']}")
+                    except Exception as e:
+                        logger.warning(f"保存同步历史失败（不影响同步功能）: {e}")
+                        # 如果保存历史失败，不影响同步功能，只记录警告
+                        if db_session:
+                            try:
+                                await db_session.rollback()
+                            except:
+                                pass
 
-                # 广播更新给所有连接的客户端（广播合并后的内容）
+                # 计算差异并生成操作（增量更新）
+                operations = []
+                if document and "content" in document:
+                    # 获取之前的文档内容（用于计算差异）
+                    previous_content = document.get("previous_content") or server_content if document else ""
+                    new_content = document["content"]
+                    
+                    # 如果内容不同，计算差异
+                    if previous_content != new_content:
+                        operations = self._calculate_diff_operations(previous_content, new_content)
+                        logger.info(f"计算差异: 从 {len(previous_content)} 到 {len(new_content)} 字符，生成 {len(operations)} 个操作")
+                    
+                    # 保存当前内容作为下次的previous_content
+                    document["previous_content"] = new_content
+                
+                # 始终发送完整内容更新（更可靠）
+                # 同时也可以发送操作作为辅助信息，但优先使用完整内容
                 await self._broadcast_update(document_id, {
                     "type": "document_synced",
                     "document_id": document_id,
                     "version": document["version"],
-                    "content": document["content"]  # 广播合并后的内容，不是客户端原始内容
+                    "content": document["content"],  # 完整内容（主要方式）
+                    "operations": operations if len(operations) <= 100 else [],  # 操作（辅助，可选）
+                    "full_content": True  # 标记这是完整内容更新
                 })
+                
+                # 记录是否使用了增量操作
+                if operations and len(operations) <= 100:
+                    logger.info(f"已发送完整内容更新，同时包含 {len(operations)} 个增量操作（可选）")
+                else:
+                    logger.info(f"已发送完整内容更新（操作数: {len(operations) if operations else 0}，超过限制）")
 
                 logger.info(f"文档 {document_id} 已同步，版本: {document['version']}")
 

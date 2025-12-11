@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Info, Coins, Settings, Undo2, Redo2, Type, Bold, Underline, ToggleLeft, ToggleRight } from 'lucide-react';
+import { ArrowLeft, Info, Coins, Settings, Undo2, Redo2, Type, Bold, Underline, ToggleLeft, ToggleRight, RefreshCw, ChevronDown } from 'lucide-react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import UnderlineExtension from '@tiptap/extension-underline';
@@ -64,6 +64,10 @@ export default function NovelEditorPage() {
   const [currentVolumeId, setCurrentVolumeId] = useState('');
   const [currentVolumeTitle, setCurrentVolumeTitle] = useState('');
   const [currentChapterData, setCurrentChapterData] = useState<ChapterFullData | undefined>();
+  
+  // 标题下拉菜单状态
+  const [headingMenuOpen, setHeadingMenuOpen] = useState(false);
+  const headingMenuRef = useRef<HTMLDivElement>(null);
 
   // 编辑器实例
   const editor = useEditor({
@@ -123,45 +127,135 @@ export default function NovelEditorPage() {
             setHasCharacterModule(true);
             
             // 查找角色数据（可能在char-table或character-card组件中）
-            const findCharacterData = (components: any[]): any[] => {
+            // 只从character-card组件收集角色数据
+            const findAllCharacterData = (components: any[]): any[] => {
+              const allCharacters: any[] = [];
+              
               for (const comp of components) {
-                // 检查char-table组件
-                if (comp.type === 'table' && comp.id === 'char-table' && comp.value) {
-                  // 表格数据格式：数组，每行是一个对象
-                  // 使用name作为ID，确保稳定性
-                  return (comp.value as any[]).map((row) => ({
-                    id: row.name || String(Date.now() + Math.random()),
-                    name: row.name || '',
-                    avatar: row.avatar || undefined,
-                  })).filter(c => c.name);
-                }
-                
-                // 检查character-card组件
+                // 只检查character-card组件（不再检查table组件）
                 if (comp.type === 'character-card' && comp.value) {
                   // 角色卡片数据格式：数组，每个对象有name字段
-                  // 使用name作为ID，确保稳定性
-                  return (comp.value as any[]).map((char) => ({
+                  const cardChars = (comp.value as any[]).map((char) => ({
                     id: char.name || String(Date.now() + Math.random()),
                     name: char.name || '',
                     avatar: char.avatar || undefined,
+                    gender: char.gender || undefined,
+                    description: char.description || '',
+                    type: char.type || undefined,
+                    source: 'character-card',
                   })).filter(c => c.name);
+                  allCharacters.push(...cardChars);
                 }
                 
                 // 检查tabs组件（角色设定可能在tabs中）
                 if (comp.type === 'tabs' && comp.config?.tabs) {
                   for (const tab of comp.config.tabs) {
                     if (tab.components) {
-                      const found = findCharacterData(tab.components);
-                      if (found.length > 0) return found;
+                      const found = findAllCharacterData(tab.components);
+                      allCharacters.push(...found);
                     }
                   }
                 }
               }
-              return [];
+              
+              return allCharacters;
             };
             
-            const characterData = findCharacterData(characterModule.components || []);
-            setAvailableCharacters(characterData);
+            // 收集所有角色数据
+            const allCharacterData = findAllCharacterData(characterModule.components || []);
+            
+            // 去重：使用name作为唯一标识，保留最完整的数据
+            const characterMap = new Map<string, any>();
+            for (const char of allCharacterData) {
+              const existing = characterMap.get(char.name);
+              if (!existing) {
+                characterMap.set(char.name, char);
+              } else {
+                // 合并数据，保留更完整的信息
+                const merged = {
+                  ...existing,
+                  ...char,
+                  // 如果新数据有更多字段，则合并
+                  avatar: char.avatar || existing.avatar,
+                  gender: char.gender || existing.gender,
+                  description: char.description || existing.description,
+                  type: char.type || existing.type,
+                };
+                characterMap.set(char.name, merged);
+              }
+            }
+            
+            const uniqueCharacters = Array.from(characterMap.values());
+            
+            // 从章节内容中识别角色名称
+            const extractCharactersFromChapters = (): any[] => {
+              const extractedNames = new Set<string>();
+              
+              // 遍历所有章节内容
+              for (const chapter of allChapters) {
+                if (chapter.content) {
+                  // 简单的角色名称识别：查找常见的中文姓名模式
+                  // 匹配2-4个中文字符的姓名（排除常见非人名词汇）
+                  const namePattern = /[（(]?([\u4e00-\u9fa5]{2,4})[）)]?/g;
+                  const excludeWords = new Set([
+                    '章节', '内容', '正文', '开始', '结束', '时间', '地点', '人物',
+                    '主角', '配角', '反派', '角色', '人物', '主角', '配角',
+                    '第一', '第二', '第三', '第四', '第五', '第六', '第七', '第八', '第九', '第十',
+                    '今天', '明天', '昨天', '上午', '下午', '晚上', '中午', '凌晨',
+                    '这里', '那里', '哪里', '什么', '怎么', '为什么', '如何',
+                    '但是', '然而', '不过', '虽然', '因为', '所以', '如果', '那么',
+                    '可以', '应该', '必须', '需要', '想要', '希望', '觉得', '认为',
+                    '看到', '听到', '感到', '想到', '知道', '了解', '明白', '理解',
+                    '说话', '说道', '说道', '说道', '说道', '说道', '说道',
+                  ]);
+                  
+                  let match;
+                  while ((match = namePattern.exec(chapter.content)) !== null) {
+                    const name = match[1];
+                    // 排除常见非人名词汇
+                    if (!excludeWords.has(name) && name.length >= 2) {
+                      // 检查是否在引号或对话中（更可能是人名）
+                      const context = chapter.content.substring(
+                        Math.max(0, match.index - 10),
+                        Math.min(chapter.content.length, match.index + match[0].length + 10)
+                      );
+                      // 如果出现在"说"、"道"、"想"等动词前，更可能是人名
+                      if (/\b(说|道|想|看|听|问|答|喊|叫|称|叫|唤)\b/.test(context)) {
+                        extractedNames.add(name);
+                      }
+                    }
+                  }
+                }
+              }
+              
+              // 转换为角色对象
+              return Array.from(extractedNames).map(name => ({
+                id: `extracted_${name}`,
+                name: name,
+                source: 'extracted',
+                description: '从章节内容中识别',
+              }));
+            };
+            
+            // 合并从章节中提取的角色
+            const extractedCharacters = extractCharactersFromChapters();
+            for (const char of extractedCharacters) {
+              const existing = characterMap.get(char.name);
+              if (!existing) {
+                // 如果角色表中没有，则添加
+                characterMap.set(char.name, char);
+              }
+            }
+            
+            const allUniqueCharacters = Array.from(characterMap.values());
+            setAvailableCharacters(allUniqueCharacters);
+            
+            console.log('📋 合并后的角色列表:', {
+              total: allUniqueCharacters.length,
+              fromTable: uniqueCharacters.filter(c => c.source === 'char-table').length,
+              fromCard: uniqueCharacters.filter(c => c.source === 'character-card').length,
+              extracted: extractedCharacters.length,
+            });
           } else {
             setHasCharacterModule(false);
             setAvailableCharacters([]);
@@ -343,6 +437,23 @@ export default function NovelEditorPage() {
     }
   }, [isEditingTitle]);
 
+  // 点击外部关闭标题下拉菜单
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (headingMenuRef.current && !headingMenuRef.current.contains(event.target as Node)) {
+        setHeadingMenuOpen(false);
+      }
+    };
+
+    if (headingMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [headingMenuOpen]);
+
   // 保存标题
   const handleSaveTitle = async () => {
     if (!work || !workId || !titleValue.trim()) {
@@ -416,16 +527,29 @@ export default function NovelEditorPage() {
         // 保存所有章节数据
         setAllChapters(allChapters);
         
-        // 将章节按卷分组
+        // 根据作品类型处理分卷逻辑
+        // 长篇作品：按卷分组；短篇作品：所有章节归入"未分卷"
         const volumesMap = new Map<number, Array<Chapter>>();
         
-        allChapters.forEach((chapter) => {
-          const volNum = chapter.volume_number || 0;
-          if (!volumesMap.has(volNum)) {
-            volumesMap.set(volNum, []);
-          }
-          volumesMap.get(volNum)!.push(chapter);
-        });
+        if (work?.work_type === 'short') {
+          // 短篇作品：所有章节归入 volume_number = 0（未分卷）
+          allChapters.forEach((chapter) => {
+            const volNum = 0; // 短篇强制使用未分卷
+            if (!volumesMap.has(volNum)) {
+              volumesMap.set(volNum, []);
+            }
+            volumesMap.get(volNum)!.push(chapter);
+          });
+        } else {
+          // 长篇作品：按原有卷号分组
+          allChapters.forEach((chapter) => {
+            const volNum = chapter.volume_number || 0;
+            if (!volumesMap.has(volNum)) {
+              volumesMap.set(volNum, []);
+            }
+            volumesMap.get(volNum)!.push(chapter);
+          });
+        }
 
         // 转换为编辑页面需要的格式
         const volumesData = Array.from(volumesMap.entries()).map(([volNum, chapters]) => ({
@@ -442,6 +566,15 @@ export default function NovelEditorPage() {
             detailOutline: '',
           })),
         }));
+
+        // 如果短篇作品没有章节，确保至少有一个"未分卷"卷
+        if (work?.work_type === 'short' && volumesData.length === 0) {
+          volumesData.push({
+            id: 'vol0',
+            title: '未分卷',
+            chapters: [],
+          });
+        }
 
         setVolumes(volumesData);
 
@@ -945,6 +1078,53 @@ export default function NovelEditorPage() {
     }
   };
 
+  /**
+   * 强制从服务器拉取最新内容
+   */
+  const handleForcePull = async () => {
+    if (!editor || !currentChapterIdRef.current || !workId) {
+      console.warn('⚠️ 无法拉取：编辑器、章节ID或作品ID缺失');
+      return;
+    }
+
+    try {
+      const chapterId = currentChapterIdRef.current;
+      const documentId = `work_${workId}_chapter_${chapterId}`;
+      
+      console.log('🔄 [强制拉取] 开始从服务器拉取最新内容:', {
+        workId,
+        chapterId,
+        documentId,
+      });
+      
+      // 从服务器强制拉取最新内容
+      const serverDoc = await sharedbClient.forcePullFromServer(documentId);
+      
+      if (serverDoc && serverDoc.content) {
+        const serverContent = typeof serverDoc.content === 'string' 
+          ? serverDoc.content 
+          : JSON.stringify(serverDoc.content);
+        
+        // 更新编辑器内容
+        editor.commands.setContent(serverContent);
+        
+        console.log('✅ [强制拉取] 成功拉取并更新编辑器内容:', {
+          version: serverDoc.version,
+          contentLength: serverContent.length
+        });
+        
+        // 可以显示成功提示
+        // alert('已从服务器拉取最新内容');
+      } else {
+        console.warn('⚠️ [强制拉取] 服务器上没有找到文档');
+        // alert('服务器上没有找到文档');
+      }
+    } catch (err) {
+      console.error('❌ [强制拉取] 拉取失败:', err);
+      // alert('拉取失败: ' + (err instanceof Error ? err.message : String(err)));
+    }
+  };
+
   // 自动保存章节内容（本地优先策略 + 智能同步）
   useEffect(() => {
     if (!editor || !selectedChapter || !workId) {
@@ -1143,20 +1323,34 @@ export default function NovelEditorPage() {
         }));
       } else {
         // 创建新章节
-        const volNum = data.volumeId === 'draft' ? 0 : parseInt(data.volumeId.replace('vol', '')) || 0;
+        // 短篇作品强制使用 volume_number = 0（未分卷）
+        let volNum = data.volumeId === 'draft' ? 0 : parseInt(data.volumeId.replace('vol', '')) || 0;
+        if (work?.work_type === 'short') {
+          volNum = 0; // 短篇强制未分卷
+        }
         
-        // 计算章节号（获取该卷的最大章节号 + 1）
-        // 使用 allChapters 中同一卷的章节的 chapter_number 来计算
-        const volumeChapters = allChapters.filter(c => (c.volume_number || 0) === volNum);
-        const maxChapterNumber = volumeChapters.length > 0
-          ? Math.max(...volumeChapters.map(c => c.chapter_number || 0))
-          : 0;
+        // 计算章节号
+        let maxChapterNumber = 0;
+        if (work?.work_type === 'short') {
+          // 短篇作品：计算所有章节的最大章节号（不考虑卷号）
+          maxChapterNumber = allChapters.length > 0
+            ? Math.max(...allChapters.map(c => c.chapter_number || 0))
+            : 0;
+        } else {
+          // 长篇作品：计算该卷的最大章节号
+          const volumeChapters = allChapters.filter(c => (c.volume_number || 0) === volNum);
+          maxChapterNumber = volumeChapters.length > 0
+            ? Math.max(...volumeChapters.map(c => c.chapter_number || 0))
+            : 0;
+        }
         
         const newChapter = await chaptersApi.createChapter({
           work_id: Number(workId),
           title: data.title,
           chapter_number: maxChapterNumber + 1,
-          volume_number: volNum > 0 ? volNum : undefined,
+          // 短篇作品：volume_number 设为 0 或 undefined（后端会处理）
+          // 长篇作品：如果 volNum > 0 则设置，否则为 undefined
+          volume_number: work?.work_type === 'short' ? 0 : (volNum > 0 ? volNum : undefined),
         });
 
         const chapterId = String(newChapter.id);
@@ -1267,7 +1461,23 @@ export default function NovelEditorPage() {
       if (data.volumeId === 'draft') {
         return data.title;
       }
-      return `${data.volumeTitle} · ${data.title}`;
+      // 构建标题：卷名 + 章节号 + 标题
+      let titleParts: string[] = [];
+      
+      // 添加卷名（如果有）
+      if (data.volumeTitle && data.volumeTitle !== '未分卷') {
+        titleParts.push(data.volumeTitle);
+      }
+      
+      // 添加章节号（如果有）
+      if (data.chapter_number !== undefined && data.chapter_number !== null) {
+        titleParts.push(`第${data.chapter_number}章`);
+      }
+      
+      // 添加章节标题
+      titleParts.push(data.title);
+      
+      return titleParts.join(' · ');
     }
     // 从 ID 生成默认标题
     const parts = selectedChapter.split('-');
@@ -1435,6 +1645,7 @@ export default function NovelEditorPage() {
           onDraftsChange={setDrafts}
           volumes={volumes}
           onVolumesChange={setVolumes}
+          workType={work?.work_type}
         />
 
         {/* 主编辑区 */}
@@ -1444,7 +1655,7 @@ export default function NovelEditorPage() {
           {activeNav === 'tags' && <TagsManager />}
           {activeNav === 'outline' && <ChapterOutline />}
           {activeNav === 'map' && <MapView />}
-          {activeNav === 'characters' && <Characters />}
+          {activeNav === 'characters' && <Characters availableCharacters={availableCharacters} />}
           {activeNav === 'factions' && <Factions />}
           {activeNav === 'settings' && (
             <div className="placeholder-content">
@@ -1479,14 +1690,100 @@ export default function NovelEditorPage() {
                   </div>
                   <div className="toolbar-divider" />
                   <div className="toolbar-group">
-                    <button
-                      className="toolbar-btn"
-                      onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
-                      title="一级标题 (Markdown: # 标题)"
-                    >
-                      <Type size={16} />
-                      <span>H1</span>
-                    </button>
+                    {/* 标题下拉菜单 */}
+                    <div className="toolbar-dropdown" ref={headingMenuRef}>
+                      <button
+                        className="toolbar-btn"
+                        onClick={() => setHeadingMenuOpen(!headingMenuOpen)}
+                        title="标题样式"
+                      >
+                        <Type size={16} />
+                        <span>标题</span>
+                        <ChevronDown size={14} style={{ marginLeft: '4px' }} />
+                      </button>
+                      {headingMenuOpen && (
+                        <div className="toolbar-dropdown-menu">
+                          <button
+                            className="toolbar-dropdown-item"
+                            onClick={() => {
+                              editor?.chain().focus().toggleHeading({ level: 1 }).run();
+                              setHeadingMenuOpen(false);
+                            }}
+                            title="一级标题 (Markdown: # 标题)"
+                          >
+                            <span className="heading-label">H1</span>
+                            <span className="heading-preview">一级标题</span>
+                          </button>
+                          <button
+                            className="toolbar-dropdown-item"
+                            onClick={() => {
+                              editor?.chain().focus().toggleHeading({ level: 2 }).run();
+                              setHeadingMenuOpen(false);
+                            }}
+                            title="二级标题 (Markdown: ## 标题)"
+                          >
+                            <span className="heading-label">H2</span>
+                            <span className="heading-preview">二级标题</span>
+                          </button>
+                          <button
+                            className="toolbar-dropdown-item"
+                            onClick={() => {
+                              editor?.chain().focus().toggleHeading({ level: 3 }).run();
+                              setHeadingMenuOpen(false);
+                            }}
+                            title="三级标题 (Markdown: ### 标题)"
+                          >
+                            <span className="heading-label">H3</span>
+                            <span className="heading-preview">三级标题</span>
+                          </button>
+                          <button
+                            className="toolbar-dropdown-item"
+                            onClick={() => {
+                              editor?.chain().focus().toggleHeading({ level: 4 }).run();
+                              setHeadingMenuOpen(false);
+                            }}
+                            title="四级标题 (Markdown: #### 标题)"
+                          >
+                            <span className="heading-label">H4</span>
+                            <span className="heading-preview">四级标题</span>
+                          </button>
+                          <button
+                            className="toolbar-dropdown-item"
+                            onClick={() => {
+                              editor?.chain().focus().toggleHeading({ level: 5 }).run();
+                              setHeadingMenuOpen(false);
+                            }}
+                            title="五级标题 (Markdown: ##### 标题)"
+                          >
+                            <span className="heading-label">H5</span>
+                            <span className="heading-preview">五级标题</span>
+                          </button>
+                          <button
+                            className="toolbar-dropdown-item"
+                            onClick={() => {
+                              editor?.chain().focus().toggleHeading({ level: 6 }).run();
+                              setHeadingMenuOpen(false);
+                            }}
+                            title="六级标题 (Markdown: ###### 标题)"
+                          >
+                            <span className="heading-label">H6</span>
+                            <span className="heading-preview">六级标题</span>
+                          </button>
+                          <div className="toolbar-dropdown-divider" />
+                          <button
+                            className="toolbar-dropdown-item"
+                            onClick={() => {
+                              editor?.chain().focus().setParagraph().run();
+                              setHeadingMenuOpen(false);
+                            }}
+                            title="普通段落"
+                          >
+                            <span className="heading-label">P</span>
+                            <span className="heading-preview">普通段落</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
                     <button
                       className="toolbar-btn"
                       onClick={() => editor?.chain().focus().toggleBold().run()}
@@ -1500,6 +1797,17 @@ export default function NovelEditorPage() {
                       title="下划线"
                     >
                       <Underline size={16} />
+                    </button>
+                  </div>
+                  <div className="toolbar-divider" />
+                  <div className="toolbar-group">
+                    <button
+                      className="toolbar-btn"
+                      onClick={handleForcePull}
+                      title="强制从服务器拉取最新内容"
+                    >
+                      <RefreshCw size={16} />
+                      <span>拉取更新</span>
                     </button>
                   </div>
                 </div>
@@ -1518,15 +1826,7 @@ export default function NovelEditorPage() {
                   >
                     <Settings size={18} />
                   </button>
-                  <button 
-                    className="chapter-settings-btn"
-                    onClick={handleManualSave}
-                    title="手动保存（调试用）"
-                    style={{ marginLeft: '8px' }}
-                  >
-                    💾
-                  </button>
-                  <div className="setting-item">
+                  {/* <div className="setting-item">
                     <span>智能补全</span>
                     <button
                       className="toggle-btn"
@@ -1537,7 +1837,7 @@ export default function NovelEditorPage() {
                       role="switch"
                       aria-checked={smartCompletion}
                     />
-                  </div>
+                  </div> */}
                 </div>
               </div>
               {/* 文本编辑区域 */}

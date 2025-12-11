@@ -51,15 +51,26 @@ const mockCharacters: Character[] = [
 ];
 
 interface CharactersProps {
-  // 不再需要外部回调，内部管理
+  availableCharacters?: Array<{ id: string; name: string; avatar?: string; gender?: string; description?: string; type?: string }>;
 }
 
-export default function Characters(_props: CharactersProps) {
+export default function Characters({ availableCharacters = [] }: CharactersProps) {
   const [activeTab, setActiveTab] = useState<'list' | 'relationships' | 'timeline'>('list');
   const [selectedCharacter, setSelectedCharacter] = useState<{ id: string; name: string } | null>(null);
 
-  const mainCharacters = mockCharacters.filter(c => c.type === 'main');
-  const secondaryCharacters = mockCharacters.filter(c => c.type === 'secondary');
+  // 使用传入的角色数据，如果没有则使用 mock 数据
+  const characters: Character[] = availableCharacters.length > 0
+    ? availableCharacters.map(char => ({
+        id: char.id,
+        name: char.name,
+        gender: (char.gender as '男' | '女') || '男',
+        description: char.description || '',
+        type: (char.type === '主要角色' || char.type === 'main' ? 'main' : 'secondary') as 'main' | 'secondary',
+      }))
+    : mockCharacters;
+
+  const mainCharacters = characters.filter(c => c.type === 'main');
+  const secondaryCharacters = characters.filter(c => c.type === 'secondary');
 
   const handleCharacterClick = (character: Character) => {
     setSelectedCharacter({ id: character.id, name: character.name });

@@ -55,12 +55,13 @@ interface SideNavProps {
   onDraftsChange?: (drafts: Draft[]) => void;
   volumes?: Volume[];
   onVolumesChange?: (volumes: Volume[]) => void;
+  workType?: 'long' | 'short' | 'script' | 'video';  // 作品类型：长篇支持分卷，短篇不分卷
 }
 
 // 导出 Chapter 和 Volume 类型供外部使用
 export type { Chapter, Volume };
 
-export default function SideNav({ activeNav, onNavChange, selectedChapter, onChapterSelect, onOpenChapterModal, onChapterDelete, drafts: externalDrafts, onDraftsChange, volumes: externalVolumes, onVolumesChange }: SideNavProps) {
+export default function SideNav({ activeNav, onNavChange, selectedChapter, onChapterSelect, onOpenChapterModal, onChapterDelete, drafts: externalDrafts, onDraftsChange, volumes: externalVolumes, onVolumesChange, workType = 'long' }: SideNavProps) {
   const [chaptersExpanded, setChaptersExpanded] = useState(true);
   const [draftsExpanded, setDraftsExpanded] = useState(false);
   const [isChaptersReversed, setIsChaptersReversed] = useState(false); // 章节排序状态
@@ -239,80 +240,166 @@ export default function SideNav({ activeNav, onNavChange, selectedChapter, onCha
             >
               <ArrowUpDown size={14} />
             </button>
-            <button className="nav-add-btn" title="添加卷" onClick={handleAddVolume}>
-              <Plus size={14} />
-            </button>
+            {/* 只有长篇作品才显示添加卷按钮 */}
+            {workType === 'long' && (
+              <button className="nav-add-btn" title="添加卷" onClick={handleAddVolume}>
+                <Plus size={14} />
+              </button>
+            )}
           </div>
         </div>
         {chaptersExpanded && (
           <div className="nav-submenu">
-            {volumes.map((volume) => (
-              <div key={volume.id} className="nav-volume">
-                <div className="nav-volume-header">
-                  <button
-                    className="nav-volume-toggle"
-                    onClick={() => setVolumeExpanded(volume.id, !volumesExpanded[volume.id])}
-                  >
-                    {volumesExpanded[volume.id] ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                  </button>
-                  <button className="nav-volume-item">
-                    <span>{volume.title}</span>
-                  </button>
-                  <button 
-                    className="nav-add-btn small" 
-                    title="添加章"
-                    onClick={(e) => handleAddChapter(volume.id, volume.title, e)}
-                  >
-                    <Plus size={12} />
-                  </button>
-                </div>
-                {volumesExpanded[volume.id] && (
-                  <div className="nav-chapters">
-                    {(isChaptersReversed ? [...volume.chapters].reverse() : volume.chapters).map((chapter) => (
-                      <div
-                        key={chapter.id}
-                        className={`nav-chapter-item-wrapper ${selectedChapter === chapter.id ? 'active' : ''}`}
-                      >
+            {workType === 'long' ? (
+              // 长篇作品：显示分卷结构
+              volumes.map((volume) => (
+                <div key={volume.id} className="nav-volume">
+                  <div className="nav-volume-header">
+                    <button
+                      className="nav-volume-toggle"
+                      onClick={() => setVolumeExpanded(volume.id, !volumesExpanded[volume.id])}
+                    >
+                      {volumesExpanded[volume.id] ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                    </button>
+                    <button className="nav-volume-item">
+                      <span>{volume.title}</span>
+                    </button>
+                    <button 
+                      className="nav-add-btn small" 
+                      title="添加章"
+                      onClick={(e) => handleAddChapter(volume.id, volume.title, e)}
+                    >
+                      <Plus size={12} />
+                    </button>
+                  </div>
+                  {volumesExpanded[volume.id] && (
+                    <div className="nav-chapters">
+                      {(isChaptersReversed ? [...volume.chapters].reverse() : volume.chapters).map((chapter) => (
                         <div
-                          className={`nav-chapter-item ${selectedChapter === chapter.id ? 'active' : ''}`}
-                          onClick={() => onChapterSelect?.(chapter.id)}
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              onChapterSelect?.(chapter.id);
-                            }
-                          }}
+                          key={chapter.id}
+                          className={`nav-chapter-item-wrapper ${selectedChapter === chapter.id ? 'active' : ''}`}
                         >
-                          <span>
-                            {chapter.chapter_number !== undefined 
-                              ? `第${chapter.chapter_number}章 ${chapter.title}`
-                              : chapter.title
-                            }
-                          </span>
-                          <div className="nav-chapter-actions">
-                            <button
-                              className="nav-chapter-edit-btn"
-                              onClick={(e) => handleEditChapter(chapter, volume.title, e)}
-                              title="编辑章节设置"
-                            >
-                              <Settings size={12} />
-                            </button>
-                            <button
-                              className="nav-chapter-delete-btn"
-                              onClick={(e) => handleDeleteChapter(chapter, e)}
-                              title="删除章节"
-                            >
-                              <Trash2 size={12} />
-                            </button>
+                          <div
+                            className={`nav-chapter-item ${selectedChapter === chapter.id ? 'active' : ''}`}
+                            onClick={() => onChapterSelect?.(chapter.id)}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                onChapterSelect?.(chapter.id);
+                              }
+                            }}
+                          >
+                            <span>
+                              {chapter.chapter_number !== undefined 
+                                ? `第${chapter.chapter_number}章 ${chapter.title}`
+                                : chapter.title
+                              }
+                            </span>
+                            <div className="nav-chapter-actions">
+                              <button
+                                className="nav-chapter-edit-btn"
+                                onClick={(e) => handleEditChapter(chapter, volume.title, e)}
+                                title="编辑章节设置"
+                              >
+                                <Settings size={12} />
+                              </button>
+                              <button
+                                className="nav-chapter-delete-btn"
+                                onClick={(e) => handleDeleteChapter(chapter, e)}
+                                title="删除章节"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
                           </div>
                         </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))
+            ) : (
+              // 短篇作品：不显示分卷，直接显示所有章节（合并所有卷的章节）
+              (() => {
+                // 合并所有卷的章节
+                const allShortChapters = volumes.flatMap(vol => vol.chapters);
+                const defaultVolumeId = volumes.length > 0 ? volumes[0].id : 'vol0';
+                const defaultVolumeTitle = volumes.length > 0 ? volumes[0].title : '未分卷';
+                
+                return (
+                  <>
+                    {allShortChapters.length > 0 ? (
+                      <div className="nav-chapters">
+                        {(isChaptersReversed ? [...allShortChapters].reverse() : allShortChapters).map((chapter) => {
+                          const volume = volumes.find(v => v.chapters.some(c => c.id === chapter.id));
+                          return (
+                            <div
+                              key={chapter.id}
+                              className={`nav-chapter-item-wrapper ${selectedChapter === chapter.id ? 'active' : ''}`}
+                            >
+                              <div
+                                className={`nav-chapter-item ${selectedChapter === chapter.id ? 'active' : ''}`}
+                                onClick={() => onChapterSelect?.(chapter.id)}
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    onChapterSelect?.(chapter.id);
+                                  }
+                                }}
+                              >
+                                <span>
+                                  {chapter.chapter_number !== undefined 
+                                    ? `第${chapter.chapter_number}章 ${chapter.title}`
+                                    : chapter.title
+                                  }
+                                </span>
+                                <div className="nav-chapter-actions">
+                                  <button
+                                    className="nav-chapter-edit-btn"
+                                    onClick={(e) => handleEditChapter(chapter, volume?.title || '未分卷', e)}
+                                    title="编辑章节设置"
+                                  >
+                                    <Settings size={12} />
+                                  </button>
+                                  <button
+                                    className="nav-chapter-delete-btn"
+                                    onClick={(e) => handleDeleteChapter(chapter, e)}
+                                    title="删除章节"
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
+                    ) : (
+                      <div className="nav-empty-state" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', color: 'var(--text-tertiary)', fontSize: '13px' }}>
+                        <span>暂无章节</span>
+                      </div>
+                    )}
+                    {/* 短篇作品：始终显示添加章节按钮 */}
+                    <div style={{ padding: '8px 16px' }}>
+                      <button 
+                        className="nav-add-btn small" 
+                        title="添加章节"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAddChapter(defaultVolumeId, defaultVolumeTitle, e);
+                        }}
+                        style={{ width: '100%', justifyContent: 'center' }}
+                      >
+                        <Plus size={12} />
+                        <span style={{ marginLeft: '4px' }}>添加章节</span>
+                      </button>
+                    </div>
+                  </>
+                );
+              })()
+            )}
           </div>
         )}
       </div>

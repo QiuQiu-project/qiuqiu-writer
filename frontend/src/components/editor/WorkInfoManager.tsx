@@ -313,14 +313,7 @@ const presetTemplates: TemplateConfig[] = [
           { id: 'char-tabs', type: 'tabs', label: '角色管理', config: {
             tabs: [
               { id: 'list', label: '角色列表', components: [
-                { id: 'char-table', type: 'table', label: '角色表', config: {
-                  columns: [
-                    { key: 'name', label: '姓名', width: '100px' },
-                    { key: 'role', label: '身份' },
-                    { key: 'personality', label: '性格' },
-                    { key: 'description', label: '简介' },
-                  ]
-                }, value: [] }
+                { id: 'char-cards', type: 'character-card', label: '角色卡片', config: {}, value: [] }
               ]},
               { id: 'relations', label: '关系图谱', components: [
                 { id: 'char-relations', type: 'relation-graph', label: '人物关系', config: {
@@ -475,15 +468,22 @@ const IconMap: Record<string, React.ReactNode> = {
 interface TabsComponentProps {
   tabs: { id: string; label: string; components: ComponentConfig[] }[];
   moduleId: string;
-  renderComponent: (comp: ComponentConfig, moduleId: string) => React.ReactNode;
+  tabsComponentId: string;  // tabs组件的ID
+  renderComponent: (comp: ComponentConfig, moduleId: string, tabsComponentId?: string, tabId?: string) => React.ReactNode;
+  onUpdateTabs?: (tabs: { id: string; label: string; components: ComponentConfig[] }[]) => void;
+  onAddComponentToTab?: (tabId: string) => void;
+  isEditMode?: boolean;  // 是否处于编辑模式
 }
 
-function TabsComponent({ tabs, moduleId, renderComponent }: TabsComponentProps) {
+function TabsComponent({ tabs, moduleId, tabsComponentId, renderComponent, onUpdateTabs, onAddComponentToTab, isEditMode = false }: TabsComponentProps) {
   const [activeTab, setActiveTab] = useState(tabs[0]?.id || '');
 
   if (tabs.length === 0) {
     return <div className="comp-empty">暂无标签页</div>;
   }
+
+  const activeTabData = tabs.find(t => t.id === activeTab);
+  const activeTabIndex = tabs.findIndex(t => t.id === activeTab);
 
   return (
     <div className="comp-tabs">
@@ -499,29 +499,65 @@ function TabsComponent({ tabs, moduleId, renderComponent }: TabsComponentProps) 
         ))}
       </div>
       <div className="tabs-content">
-        {tabs.find(t => t.id === activeTab)?.components.map(subComp => {
-          const showGenerateBtn = ['text', 'textarea', 'list', 'character-card', 'rank-system'].includes(subComp.type);
-          return (
-            <div key={subComp.id} className="comp-wrapper">
-              <div className="comp-header">
-                <label className="comp-label">{subComp.label}</label>
-                {showGenerateBtn && (
-                  <button 
-                    className="comp-generate-btn" 
-                    onClick={() => {
-                      console.log('生成内容:', subComp.label, subComp.generatePrompt);
-                    }}
-                    title={subComp.generatePrompt || '生成内容'}
-                  >
-                    <Sparkles size={14} />
-                    <span>生成</span>
-                  </button>
-                )}
+        {activeTabData && (
+          <>
+            {activeTabData.components.map(subComp => {
+              const showGenerateBtn = ['text', 'textarea', 'list', 'character-card', 'rank-system'].includes(subComp.type);
+              return (
+                <div key={subComp.id} className="comp-wrapper">
+                  <div className="comp-header">
+                    <label className="comp-label">{subComp.label}</label>
+                    <div className="comp-header-actions">
+                      {showGenerateBtn && (
+                        <button 
+                          className="comp-generate-btn" 
+                          onClick={() => {
+                            console.log('生成内容:', subComp.label, subComp.generatePrompt);
+                          }}
+                          title={subComp.generatePrompt || '生成内容'}
+                        >
+                          <Sparkles size={14} />
+                          <span>生成</span>
+                        </button>
+                      )}
+                      {isEditMode && (
+                        <button
+                          className="comp-delete-btn"
+                          onClick={() => {
+                            if (onUpdateTabs && activeTabData) {
+                              const newTabs = [...tabs];
+                              newTabs[activeTabIndex] = {
+                                ...activeTabData,
+                                components: activeTabData.components.filter(c => c.id !== subComp.id)
+                              };
+                              onUpdateTabs(newTabs);
+                            }
+                          }}
+                          title="删除组件"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {renderComponent(subComp, moduleId, tabsComponentId, activeTab)}
+                </div>
+              );
+            })}
+            {isEditMode && onAddComponentToTab && (
+              <div className="tabs-add-component">
+                <button
+                  className="tabs-add-component-btn"
+                  onClick={() => onAddComponentToTab(activeTab)}
+                  title="在此分页中添加组件"
+                >
+                  <Plus size={16} />
+                  <span>添加组件</span>
+                </button>
               </div>
-              {renderComponent(subComp, moduleId)}
-            </div>
-          );
-        })}
+            )}
+          </>
+        )}
       </div>
     </div>
   );
@@ -548,6 +584,7 @@ export default function WorkInfoManager() {
   const [showTemplateSelector, setShowTemplateSelector] = useState(false);
   const [showAddModule, setShowAddModule] = useState(false);
   const [showAddComponent, setShowAddComponent] = useState(false);
+  const [addingToTab, setAddingToTab] = useState<{ tabId: string; componentId: string } | null>(null);
   const [newModuleForm, setNewModuleForm] = useState({ name: '', icon: 'LayoutGrid', color: '#64748b' });
   const [newComponentForm, setNewComponentForm] = useState<{
     type: ComponentType;
@@ -570,8 +607,10 @@ export default function WorkInfoManager() {
     isOpen: boolean;
     compId: string;
     moduleId: string;
-    editIndex: number | null; // null表示新建
+    editIndex: number | null;
     form: { name: string; gender: string; type: string; description: string };
+    tabsComponentId?: string;  // 如果组件在分页中，保存分页组件的ID
+    tabId?: string;  // 如果组件在分页中，保存分页ID
   }>({
     isOpen: false,
     compId: '',
@@ -740,14 +779,48 @@ export default function WorkInfoManager() {
       value: getDefaultValue(newComponentForm.type),
     };
     
-    setTemplate(prev => ({
-      ...prev,
-      modules: prev.modules.map((m, i) => 
-        i === activeModuleIndex 
-          ? { ...m, components: [...m.components, newComp] }
-          : m
-      )
-    }));
+    // 如果是要添加到分页中
+    if (addingToTab) {
+      setTemplate(prev => ({
+        ...prev,
+        modules: prev.modules.map(m => {
+          return {
+            ...m,
+            components: m.components.map(comp => {
+              if (comp.id === addingToTab.componentId && comp.type === 'tabs' && comp.config.tabs) {
+                return {
+                  ...comp,
+                  config: {
+                    ...comp.config,
+                    tabs: comp.config.tabs.map(tab => {
+                      if (tab.id === addingToTab.tabId) {
+                        return {
+                          ...tab,
+                          components: [...tab.components, newComp]
+                        };
+                      }
+                      return tab;
+                    })
+                  }
+                };
+              }
+              return comp;
+            })
+          };
+        })
+      }));
+      setAddingToTab(null);
+    } else {
+      // 添加到模块中
+      setTemplate(prev => ({
+        ...prev,
+        modules: prev.modules.map((m, i) => 
+          i === activeModuleIndex 
+            ? { ...m, components: [...m.components, newComp] }
+            : m
+        )
+      }));
+    }
     closeAddComponentModal();
   };
 
@@ -756,6 +829,7 @@ export default function WorkInfoManager() {
     setShowAddComponent(false);
     setAddComponentStep('type');
     setEditingComponentId(null);
+    setAddingToTab(null);
     setNewComponentForm({ type: 'text', label: '', config: {}, generatePrompt: '', validatePrompt: '', tabsConfig: [], cardFields: [] });
     setNewTabName('');
     setNewCardFieldForm({ label: '', type: 'text' });
@@ -916,7 +990,7 @@ export default function WorkInfoManager() {
 
   // ============ 组件渲染器 ============
   
-  const renderComponent = (comp: ComponentConfig, moduleId: string) => {
+  const renderComponent = (comp: ComponentConfig, moduleId: string, tabsComponentId?: string, tabId?: string) => {
     const updateValue = (value: any) => updateComponentValue(moduleId, comp.id, value);
 
     switch (comp.type) {
@@ -1129,11 +1203,42 @@ export default function WorkInfoManager() {
 
       case 'tabs':
         const tabs = comp.config.tabs || [];
+        const handleUpdateTabs = (newTabs: { id: string; label: string; components: ComponentConfig[] }[]) => {
+          const updatedConfig = {
+            ...comp.config,
+            tabs: newTabs
+          };
+          setTemplate(prev => ({
+            ...prev,
+            modules: prev.modules.map(m => {
+              if (m.id !== moduleId) return m;
+              return {
+                ...m,
+                components: m.components.map(c => {
+                  if (c.id === comp.id) {
+                    return { ...c, config: updatedConfig };
+                  }
+                  return c;
+                })
+              };
+            })
+          }));
+        };
+        const handleAddComponentToTab = (tabId: string) => {
+          // 打开添加组件弹窗，并标记是要添加到分页中
+          setAddingToTab({ tabId, componentId: comp.id });
+          setShowAddComponent(true);
+          setAddComponentStep('type');
+        };
         return (
           <TabsComponent 
             tabs={tabs} 
-            moduleId={moduleId} 
-            renderComponent={renderComponent} 
+            moduleId={moduleId}
+            tabsComponentId={comp.id}
+            renderComponent={renderComponent}
+            onUpdateTabs={handleUpdateTabs}
+            onAddComponentToTab={handleAddComponentToTab}
+            isEditMode={isEditMode}
           />
         );
 
@@ -1211,18 +1316,122 @@ export default function WorkInfoManager() {
 
       case 'character-card':
         // 角色卡片 - 只读展示 + 弹窗编辑
+        // 当前组件的数据（用于显示和编辑）
         const characterData = (comp.value as { name: string; gender: string; type: string; description: string }[]) || [];
         const mainChars = characterData.filter(c => c.type === '主要角色');
         const secondaryChars = characterData.filter(c => c.type === '次要角色');
         
-        const openCharacterModal = (char: typeof characterData[0] | null, idx: number | null) => {
+        // 收集所有角色组件中的角色数据（包括当前组件和其他组件）
+        interface MergedCharacter {
+          name: string;
+          gender: string;
+          type: string;
+          description: string;
+          componentId: string;
+          componentIndex: number;
+        }
+        
+        const findAllCharactersInModule = (): MergedCharacter[] => {
+          const allChars: MergedCharacter[] = [];
+          
+          // 查找当前模块中的所有character-card组件
+          const findCharacterCards = (components: ComponentConfig[]): void => {
+            for (const c of components) {
+              if (c.type === 'character-card' && c.value) {
+                const chars = (c.value as { name: string; gender: string; type: string; description: string }[]) || [];
+                chars.forEach((char, idx) => {
+                  allChars.push({
+                    name: char.name || '',
+                    gender: char.gender || '',
+                    type: char.type || '',
+                    description: char.description || '',
+                    componentId: c.id,
+                    componentIndex: idx
+                  });
+                });
+              }
+              // 递归查找tabs中的组件
+              if (c.type === 'tabs' && c.config.tabs) {
+                for (const tab of c.config.tabs) {
+                  if (tab.components) {
+                    findCharacterCards(tab.components);
+                  }
+                }
+              }
+            }
+          };
+          
+          const module = template.modules.find(m => m.id === moduleId);
+          if (module) {
+            findCharacterCards(module.components);
+          }
+          
+          return allChars;
+        };
+        
+        // 获取所有角色并去重合并（以name为唯一标识）
+        const allCharactersInModule = findAllCharactersInModule();
+        const characterMapObj: Record<string, MergedCharacter> = {};
+        
+        for (const char of allCharactersInModule) {
+          const existing = characterMapObj[char.name];
+          if (!existing) {
+            characterMapObj[char.name] = char;
+          } else {
+            // 合并数据，保留更完整的信息
+            const merged: MergedCharacter = {
+              name: char.name,
+              gender: char.gender || existing.gender,
+              description: char.description || existing.description,
+              type: char.type || existing.type,
+              // 保留第一个找到的组件ID和索引（用于编辑）
+              componentId: existing.componentId,
+              componentIndex: existing.componentIndex
+            };
+            characterMapObj[char.name] = merged;
+          }
+        }
+        
+        // 合并后的所有角色（去重）
+        const mergedCharacters = Object.values(characterMapObj);
+        const mergedMainChars = mergedCharacters.filter(c => c.type === '主要角色');
+        const mergedSecondaryChars = mergedCharacters.filter(c => c.type === '次要角色');
+        
+        const openCharacterModal = (char: { name: string; gender: string; type: string; description: string } | null, idx: number | null) => {
           setCharacterModal({
             isOpen: true,
             compId: comp.id,
             moduleId: moduleId,
             editIndex: idx,
-            form: char ? { ...char } : { name: '', gender: '男', type: '主要角色', description: '' }
+            form: char ? { ...char } : { name: '', gender: '男', type: '主要角色', description: '' },
+            tabsComponentId: tabsComponentId,
+            tabId: tabId
           });
+        };
+        
+        // 打开合并视图的角色编辑（从合并列表中）
+        const openMergedCharacterModal = (char: MergedCharacter) => {
+          // 找到该角色在当前组件中的位置，如果存在
+          const localIdx = characterData.findIndex(c => c.name === char.name);
+          if (localIdx !== -1) {
+            // 如果当前组件中有该角色，编辑当前组件的
+            openCharacterModal(characterData[localIdx], localIdx);
+          } else {
+            // 如果当前组件中没有，创建一个新的
+            openCharacterModal(null, null);
+            // 设置表单数据为合并后的角色信息
+            setTimeout(() => {
+              setCharacterModal(prev => ({
+                ...prev,
+                form: { 
+                  name: char.name,
+                  gender: char.gender,
+                  type: char.type,
+                  description: char.description
+                }
+              }));
+            }, 0);
+          }
         };
         
         const renderCharCard = (char: typeof characterData[0], realIdx: number) => (
@@ -1290,6 +1499,74 @@ export default function WorkInfoManager() {
               <Plus size={16} />
               <span>添加角色</span>
             </button>
+            
+            {/* 合并视图：显示所有角色组件中的角色（如果有多个组件） */}
+            {mergedCharacters.length > 0 && mergedCharacters.length !== characterData.length && (
+              <div className="character-merged-view">
+                <div className="character-merged-header">
+                  <h4 className="character-section-title">合并视图（所有角色组件）</h4>
+                  <span className="character-merged-count">
+                    {mergedCharacters.length} 个角色（来自 {new Set(mergedCharacters.map(c => c.componentId)).size} 个组件）
+                  </span>
+                </div>
+                {mergedMainChars.length > 0 && (
+                  <div className="character-section">
+                    <h5 className="character-subsection-title">主要角色（合并）</h5>
+                    <div className="character-grid">
+                      {mergedMainChars.map((char) => (
+                        <div
+                          key={`merged-${char.name}`}
+                          className="character-card-item clickable merged"
+                          onClick={() => openMergedCharacterModal(char)}
+                          title={`来自组件: ${char.componentId}`}
+                        >
+                          <div className="character-card-header">
+                            <div className="character-name-row">
+                              <span className="character-name-display">{char.name || '未命名角色'}</span>
+                              <span className="character-gender-tag">{char.gender}</span>
+                            </div>
+                            {characterData.findIndex(c => c.name === char.name) === -1 && (
+                              <span className="character-source-badge" title="来自其他组件">其他</span>
+                            )}
+                          </div>
+                          <div className="character-desc-display">
+                            {char.description || '暂无简介'}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {mergedSecondaryChars.length > 0 && (
+                  <div className="character-section">
+                    <h5 className="character-subsection-title">次要角色（合并）</h5>
+                    <div className="character-grid">
+                      {mergedSecondaryChars.map((char) => (
+                        <div
+                          key={`merged-${char.name}`}
+                          className="character-card-item clickable merged"
+                          onClick={() => openMergedCharacterModal(char)}
+                          title={`来自组件: ${char.componentId}`}
+                        >
+                          <div className="character-card-header">
+                            <div className="character-name-row">
+                              <span className="character-name-display">{char.name || '未命名角色'}</span>
+                              <span className="character-gender-tag">{char.gender}</span>
+                            </div>
+                            {characterData.findIndex(c => c.name === char.name) === -1 && (
+                              <span className="character-source-badge" title="来自其他组件">其他</span>
+                            )}
+                          </div>
+                          <div className="character-desc-display">
+                            {char.description || '暂无简介'}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         );
 
@@ -2402,22 +2679,88 @@ export default function WorkInfoManager() {
                 className="btn-primary" 
                 onClick={() => {
                   const module = template.modules.find(m => m.id === characterModal.moduleId);
-                  const comp = module?.components.find(c => c.id === characterModal.compId);
-                  if (!comp) return;
+                  if (!module) return;
                   
-                  const currentData = (comp.value as { name: string; gender: string; type: string; description: string }[]) || [];
-                  let newData: typeof currentData;
-                  
-                  if (characterModal.editIndex !== null) {
-                    // 编辑现有角色
-                    newData = [...currentData];
-                    newData[characterModal.editIndex] = { ...characterModal.form };
+                  // 如果组件在分页中
+                  if (characterModal.tabsComponentId && characterModal.tabId) {
+                    const tabsComp = module.components.find(c => c.id === characterModal.tabsComponentId);
+                    if (!tabsComp || tabsComp.type !== 'tabs' || !tabsComp.config.tabs) return;
+                    
+                    const tab = tabsComp.config.tabs.find(t => t.id === characterModal.tabId);
+                    if (!tab) return;
+                    
+                    const subComp = tab.components.find(c => c.id === characterModal.compId);
+                    if (!subComp) return;
+                    
+                    const currentData = (subComp.value as { name: string; gender: string; type: string; description: string }[]) || [];
+                    let newData: typeof currentData;
+                    
+                    if (characterModal.editIndex !== null) {
+                      // 编辑现有角色
+                      newData = [...currentData];
+                      newData[characterModal.editIndex] = { ...characterModal.form };
+                    } else {
+                      // 添加新角色
+                      newData = [...currentData, { ...characterModal.form }];
+                    }
+                    
+                    // 更新分页中的组件
+                    const updatedTabs = tabsComp.config.tabs.map(t => {
+                      if (t.id === characterModal.tabId) {
+                        return {
+                          ...t,
+                          components: t.components.map(c => {
+                            if (c.id === characterModal.compId) {
+                              return { ...c, value: newData };
+                            }
+                            return c;
+                          })
+                        };
+                      }
+                      return t;
+                    });
+                    
+                    setTemplate(prev => ({
+                      ...prev,
+                      modules: prev.modules.map(m => {
+                        if (m.id !== characterModal.moduleId) return m;
+                        return {
+                          ...m,
+                          components: m.components.map(c => {
+                            if (c.id === characterModal.tabsComponentId) {
+                              return {
+                                ...c,
+                                config: {
+                                  ...c.config,
+                                  tabs: updatedTabs
+                                }
+                              };
+                            }
+                            return c;
+                          })
+                        };
+                      })
+                    }));
                   } else {
-                    // 添加新角色
-                    newData = [...currentData, { ...characterModal.form }];
+                    // 组件不在分页中，直接更新
+                    const comp = module.components.find(c => c.id === characterModal.compId);
+                    if (!comp) return;
+                    
+                    const currentData = (comp.value as { name: string; gender: string; type: string; description: string }[]) || [];
+                    let newData: typeof currentData;
+                    
+                    if (characterModal.editIndex !== null) {
+                      // 编辑现有角色
+                      newData = [...currentData];
+                      newData[characterModal.editIndex] = { ...characterModal.form };
+                    } else {
+                      // 添加新角色
+                      newData = [...currentData, { ...characterModal.form }];
+                    }
+                    
+                    updateComponentValue(characterModal.moduleId, characterModal.compId, newData);
                   }
                   
-                  updateComponentValue(characterModal.moduleId, characterModal.compId, newData);
                   setCharacterModal({ ...characterModal, isOpen: false });
                 }}
                 disabled={!characterModal.form.name.trim()}

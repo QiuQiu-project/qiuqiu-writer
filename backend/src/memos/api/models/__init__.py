@@ -9,6 +9,7 @@ from memos.api.models.template import WorkTemplate, TemplateField, WorkInfoExten
 from memos.api.models.characters import Character, Faction
 from memos.api.models.writing import WritingPrompt, AIAnalysis
 from memos.api.models.system import SystemSetting, AuditLog
+from memos.api.models.document import DocumentSyncHistory
 
 __all__ = [
     "User", "UserProfile",
@@ -17,5 +18,6 @@ __all__ = [
     "WorkTemplate", "TemplateField", "WorkInfoExtended",
     "Character", "Faction",
     "WritingPrompt", "AIAnalysis",
-    "SystemSetting", "AuditLog"
+    "SystemSetting", "AuditLog",
+    "DocumentSyncHistory"
 ]

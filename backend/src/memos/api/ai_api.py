@@ -44,21 +44,37 @@ except Exception as e:
     logger.error(f"❌ Failed to register AI router: {e}")
 
 # 注册WriterAI应用路由
+# 使用直接导入路由文件的方式，避免触发 memos.__init__.py 的导入
 try:
-    from memos.api.routers import (
-        get_auth_router,
-        get_chapters_router,
-        get_templates_router,
-        get_works_router,
-    )
+    # 直接导入路由模块，避免通过 memos.api.routers 包导入
+    import importlib
     
-    app.include_router(get_auth_router())
-    app.include_router(get_chapters_router())
-    app.include_router(get_templates_router())
-    app.include_router(get_works_router())
+    # 导入各个路由模块
+    auth_router_module = importlib.import_module('memos.api.routers.auth_router')
+    chapters_router_module = importlib.import_module('memos.api.routers.chapters_router')
+    templates_router_module = importlib.import_module('memos.api.routers.templates_router')
+    works_router_module = importlib.import_module('memos.api.routers.works_router')
+    
+    # 获取路由对象
+    auth_router = auth_router_module.router
+    chapters_router = chapters_router_module.router
+    templates_router = templates_router_module.router
+    works_router = works_router_module.router
+    
+    logger.info(f"📋 Works router prefix: {works_router.prefix}")
+    logger.info(f"📋 Works router routes count: {len(works_router.routes)}")
+    for route in works_router.routes:
+        if hasattr(route, 'path') and hasattr(route, 'methods'):
+            methods = list(route.methods) if hasattr(route, 'methods') else []
+            logger.info(f"  {methods} {route.path}")
+    
+    app.include_router(auth_router)
+    app.include_router(chapters_router)
+    app.include_router(templates_router)
+    app.include_router(works_router)
     logger.info("✅ WriterAI application routers registered successfully")
 except Exception as e:
-    logger.warning(f"⚠️  WriterAI application routers not available: {e}", exc_info=True)
+    logger.error(f"❌ WriterAI application routers not available: {e}", exc_info=True)
 
 # 尝试注册产品路由
 try:
@@ -87,6 +103,68 @@ except Exception as e:
 # 异常处理
 app.exception_handler(ValueError)(APIExceptionHandler.value_error_handler)
 app.exception_handler(Exception)(APIExceptionHandler.global_exception_handler)
+
+
+@app.websocket("/ws/yjs/{document_id}")
+async def yjs_websocket_endpoint(websocket: WebSocket, document_id: str):
+    """
+    Yjs WebSocket 端点
+    用于Yjs CRDT实时协作编辑
+    """
+    await websocket.accept()
+    logger.info(f"Yjs WebSocket 连接已建立: {websocket.client}, 文档: {document_id}")
+    
+    try:
+        from memos.api.services.yjs_service import yjs_service
+        if not yjs_service:
+            await websocket.close(code=1003, reason="Yjs服务不可用，请安装y-py")
+            return
+        
+        await yjs_service.initialize()
+        
+        # 从查询参数或消息中获取用户ID
+        user_id = 0  # 默认值，可以从认证中获取
+        
+        # 加入协作会话
+        await yjs_service.join_collaboration(
+            websocket=websocket,
+            document_id=document_id,
+            user_id=user_id
+        )
+    except Exception as e:
+        logger.error(f"Yjs WebSocket错误: {e}")
+        await websocket.close(code=1011, reason=str(e))
+
+
+@app.websocket("/ws/automerge/{document_id}")
+async def automerge_websocket_endpoint(websocket: WebSocket, document_id: str):
+    """
+    Automerge WebSocket 端点
+    用于Automerge CRDT实时协作编辑
+    """
+    await websocket.accept()
+    logger.info(f"Automerge WebSocket 连接已建立: {websocket.client}, 文档: {document_id}")
+    
+    try:
+        from memos.api.services.automerge_service import automerge_service
+        if not automerge_service:
+            await websocket.close(code=1003, reason="Automerge服务不可用，请安装automerge")
+            return
+        
+        await automerge_service.initialize()
+        
+        # 从查询参数或消息中获取用户ID
+        user_id = 0  # 默认值，可以从认证中获取
+        
+        # 加入协作会话
+        await automerge_service.join_collaboration(
+            websocket=websocket,
+            document_id=document_id,
+            user_id=user_id
+        )
+    except Exception as e:
+        logger.error(f"Automerge WebSocket错误: {e}")
+        await websocket.close(code=1011, reason=str(e))
 
 
 @app.websocket("/ws")
@@ -214,11 +292,22 @@ async def root():
     except:
         pass
     
+    # 添加所有注册的路由信息（用于调试）
+    registered_routes = []
+    for route in app.routes:
+        if hasattr(route, 'path') and hasattr(route, 'methods'):
+            methods = list(route.methods) if hasattr(route, 'methods') else []
+            registered_routes.append({
+                "methods": methods,
+                "path": route.path
+            })
+    
     return {
         "service": "WawaWriter API",
         "version": "1.0.0",
         "status": "running",
         "endpoints": endpoints,
+        "registered_routes": registered_routes[:50],  # 只返回前50个路由，避免响应过大
     }
 
 

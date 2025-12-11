@@ -146,40 +146,63 @@ class ShareDBClient {
   async getDocument(documentId: string): Promise<ShareDBDocument | null> {
     console.log('🔍 [ShareDB] 获取文档:', documentId);
     
-    // 1. 先从本地缓存获取
+    // 关键修复：总是先尝试从服务器获取最新版本
+    // 这样可以避免用旧缓存覆盖服务器上的新数据
+    // 但如果服务器没有数据，使用本地缓存（支持离线编辑）
+    let serverDoc: ShareDBDocument | null = null;
+    let serverFetchFailed = false;
+    
+    try {
+      // 设置超时，避免阻塞太久
+      const fetchPromise = this.fetchFromServer(documentId);
+      const timeoutPromise = new Promise<null>((resolve) => 
+        setTimeout(() => resolve(null), 2000) // 2秒超时
+      );
+      
+      serverDoc = await Promise.race([fetchPromise, timeoutPromise]) as ShareDBDocument | null;
+      
+      if (serverDoc) {
+        console.log('✅ [ShareDB] 从服务器获取到最新文档:', {
+          version: serverDoc.version,
+          contentLength: typeof serverDoc.content === 'string' ? serverDoc.content.length : 'not string'
+        });
+        
+        // 初始化版本和内容缓存
+        const contentStr = typeof serverDoc.content === 'string' ? serverDoc.content : JSON.stringify(serverDoc.content);
+        this.currentVersion.set(documentId, serverDoc.version || 1);
+        this.currentContent.set(documentId, contentStr);
+        
+        // 保存到本地缓存（异步，不阻塞）
+        localCacheManager.set(documentId, serverDoc, serverDoc.version).catch(console.error);
+        
+        return serverDoc;
+      } else {
+        serverFetchFailed = true;
+        console.warn('⚠️ [ShareDB] 从服务器获取文档超时或失败，尝试使用缓存');
+      }
+    } catch (error) {
+      serverFetchFailed = true;
+      console.warn('⚠️ [ShareDB] 从服务器获取文档失败，尝试使用缓存:', error);
+    }
+    
+    // 如果服务器获取失败或没有数据，才使用本地缓存
+    // 这样可以支持离线编辑，但需要确保本地内容已同步
     try {
       const cached = await localCacheManager.get<ShareDBDocument>(documentId);
-      console.log('📦 [ShareDB] 缓存原始数据:', {
+      console.log('📦 [ShareDB] 从缓存获取文档（服务器获取失败或没有数据）:', {
         documentId,
         hasCached: !!cached,
-        cachedType: cached ? typeof cached : 'null',
-        cachedKeys: cached && typeof cached === 'object' ? Object.keys(cached) : 'not object',
-        cachedContent: cached && typeof cached === 'object' && 'content' in cached
-          ? (typeof (cached as any).content === 'string' 
-              ? (cached as any).content.substring(0, 100)
-              : JSON.stringify((cached as any).content).substring(0, 200))
-          : 'no content key',
+        serverFetchFailed
       });
       
       if (cached) {
-        // localCacheManager.get 已经返回了 data 字段的内容，所以 cached 应该直接是 ShareDBDocument
-        // 如果在线，异步检查更新
-        if (this.connected) {
-          this.syncDocument(documentId).catch(console.error);
-        }
-        
         // 处理不同的缓存格式
         let doc: ShareDBDocument | null = null;
         
         if (cached && typeof cached === 'object') {
-          // localCacheManager.get 返回的是 data 字段，所以应该是 ShareDBDocument
           if ('document_id' in cached && 'content' in cached) {
-            // 直接是 ShareDBDocument 格式
-            console.log('✅ [ShareDB] 直接是 ShareDBDocument 格式');
             doc = cached as ShareDBDocument;
           } else if ('content' in cached) {
-            // 如果只有 content 字段，构建完整的文档
-            console.log('✅ [ShareDB] 从 content 字段构建文档');
             doc = {
               document_id: documentId,
               content: (cached as any).content,
@@ -187,8 +210,6 @@ class ShareDBClient {
               metadata: (cached as any).metadata,
             };
           } else {
-            // 如果整个对象就是内容（可能是字符串或其他格式）
-            console.log('⚠️ [ShareDB] 缓存对象格式异常，尝试构建文档');
             doc = {
               document_id: documentId,
               content: cached as any,
@@ -197,8 +218,6 @@ class ShareDBClient {
             };
           }
         } else if (typeof cached === 'string') {
-          // 如果缓存直接是字符串内容
-          console.log('✅ [ShareDB] 缓存是字符串内容');
           doc = {
             document_id: documentId,
             content: cached,
@@ -208,41 +227,36 @@ class ShareDBClient {
         }
         
         if (doc) {
-          // 初始化版本和内容缓存（借鉴 nexcode_web 的实现）
+          // 初始化版本和内容缓存
           const contentStr = typeof doc.content === 'string' ? doc.content : JSON.stringify(doc.content);
-          this.currentVersion.set(documentId, doc.version || 1);
+          const cachedVersion = doc.version || 1;
+          
+          // 关键修复：如果使用了缓存（服务器获取失败），标记版本为更小的值
+          // 这样可以强制在同步时检查服务器，避免用旧数据覆盖新数据
+          // 但如果服务器确实没有数据，使用缓存版本（支持离线编辑）
+          const adjustedVersion = serverFetchFailed ? Math.max(0, cachedVersion - 1) : cachedVersion;
+          this.currentVersion.set(documentId, adjustedVersion);
           this.currentContent.set(documentId, contentStr);
           
-          console.log('✅ [ShareDB] 返回文档:', {
+          console.log('⚠️ [ShareDB] 使用缓存文档（服务器获取失败或没有数据）:', {
             documentId: doc.document_id,
-            contentType: typeof doc.content,
+            cachedVersion,
+            adjustedVersion,
             contentLength: typeof doc.content === 'string' ? doc.content.length : 'not string',
-            contentPreview: typeof doc.content === 'string' ? doc.content.substring(0, 100) : 'not string',
+            note: serverFetchFailed ? '版本已调整，同步时会强制检查服务器' : '使用缓存版本'
           });
+          
+          // 如果在线，立即尝试同步检查更新
+          if (this.connected && serverFetchFailed) {
+            // 异步同步，不阻塞返回
+            this.syncDocument(documentId).catch(console.error);
+          }
+          
           return doc;
-        } else {
-          console.warn('⚠️ [ShareDB] 无法从缓存构建文档对象');
         }
       }
     } catch (error) {
       console.warn('⚠️ [ShareDB] 从缓存获取文档失败:', error);
-    }
-
-    // 2. 从服务器获取（无论是否在线都尝试，因为可能只是 ShareDB 未连接）
-    try {
-      const doc = await this.fetchFromServer(documentId);
-      if (doc) {
-        // 初始化版本和内容缓存
-        const contentStr = typeof doc.content === 'string' ? doc.content : JSON.stringify(doc.content);
-        this.currentVersion.set(documentId, doc.version || 1);
-        this.currentContent.set(documentId, contentStr);
-        
-        // 保存到本地缓存（异步，不阻塞）
-        localCacheManager.set(documentId, doc, doc.version).catch(console.error);
-        return doc;
-      }
-    } catch (error) {
-      console.error('从服务器获取文档失败:', error);
     }
 
     return null;
@@ -466,38 +480,17 @@ class ShareDBClient {
       const currentVersion = this.currentVersion.get(documentId) || 0;
       const contentStr = typeof content === 'string' ? content : JSON.stringify(content);
       
-      // 关键改进：在获取服务器文档之前，先保存 base_content（上次同步的内容）
-      // 这样即使服务器版本更新，base_content 仍然是正确的
-      let baseContent = this.currentContent.get(documentId) || '';
-      
-      // 如果 baseContent 为空，尝试从服务器获取（可能是第一次同步）
-      if (!baseContent && !serverDoc) {
-        try {
-          const initialDoc = await this.getDocument(documentId);
-          if (initialDoc) {
-            baseContent = typeof initialDoc.content === 'string' 
-              ? initialDoc.content 
-              : JSON.stringify(initialDoc.content);
-            console.log('📥 [同步] 初始化 baseContent:', {
-              length: baseContent.length,
-              preview: baseContent.substring(0, 100)
-            });
-          }
-        } catch (error) {
-          console.warn('⚠️ [同步] 获取初始文档失败，baseContent 将为空:', error);
-        }
-      }
-      
-      // 策略1：同步前先获取最新版本（避免覆盖）
-      // 关键改进：使用 Promise.race 确保即使获取慢也能继续，但使用更保守的版本号
+      // 关键修复：同步前必须获取服务器最新版本，避免用旧数据覆盖新数据
+      // 策略：总是先获取服务器文档，如果服务器版本更新，使用服务器内容作为baseContent
       let serverDoc: ShareDBDocument | null = null;
       let fetchFailed = false;
+      let baseContent = this.currentContent.get(documentId) || '';
       
       try {
         // 设置超时，避免阻塞太久
-        const fetchPromise = this.getDocument(documentId);
+        const fetchPromise = this.fetchFromServer(documentId);
         const timeoutPromise = new Promise<null>((resolve) => 
-          setTimeout(() => resolve(null), 2000) // 2秒超时
+          setTimeout(() => resolve(null), 3000) // 3秒超时
         );
         
         serverDoc = await Promise.race([fetchPromise, timeoutPromise]) as ShareDBDocument | null;
@@ -508,18 +501,45 @@ class ShareDBClient {
             ? serverDoc.content 
             : JSON.stringify(serverDoc.content);
           
-          // 如果服务器版本更新，说明有其他用户修改了
+          // 关键修复：如果服务器版本更新，说明有其他用户修改了
+          // 必须使用服务器内容作为baseContent，而不是本地旧内容
           if (serverVersion > currentVersion) {
-            console.log('⚠️ [同步] 检测到服务器版本更新:', {
+            console.log('⚠️ [同步] 检测到服务器版本更新，使用服务器内容作为baseContent:', {
               serverVersion,
               clientVersion: currentVersion,
               serverContentLength: serverContent.length,
-              clientContentLength: contentStr.length
+              clientContentLength: contentStr.length,
+              oldBaseContentLength: baseContent.length
             });
             
-            // 更新本地版本号，但不更新 currentContent（因为我们需要 baseContent 用于差异计算）
+            // 使用服务器内容作为baseContent，确保不会丢失其他用户的更改
+            baseContent = serverContent;
+            
+            // 更新本地版本号和内容
             this.currentVersion.set(documentId, serverVersion);
-            // 注意：不在这里更新 currentContent，让服务器合并后再更新
+            this.currentContent.set(documentId, serverContent);
+            
+            // 关键修复：用户当前的content参数是基于旧版本的，不能直接使用
+            // 需要通知编辑器更新内容，然后使用更新后的内容
+            // 或者：使用服务器内容作为content（因为编辑器会更新）
+            // 方案：通知编辑器更新，然后使用服务器内容作为content
+            const callbacks = this.documentUpdateCallbacks.get(documentId);
+            if (callbacks) {
+              callbacks.forEach(callback => {
+                try {
+                  callback(serverContent, serverVersion);
+                } catch (error) {
+                  console.error('执行文档更新回调失败:', error);
+                }
+              });
+            }
+            
+            // 关键修复：使用服务器内容作为content，因为用户的内容是基于旧版本的
+            // 编辑器已经更新为服务器内容，所以应该使用服务器内容
+            // 但用户可能还在编辑，所以需要等待编辑器更新完成
+            // 简化方案：使用服务器内容，让编辑器更新后再同步用户的更改
+            contentStr = serverContent;  // 使用服务器内容，避免基于旧版本的content导致合并错误
+            console.log('⚠️ [同步] 使用服务器内容作为content，因为用户的内容是基于旧版本的');
           } else if (serverVersion === currentVersion && serverContent !== contentStr) {
             // 版本相同但内容不同，说明有并发修改
             console.log('⚠️ [同步] 检测到并发修改（版本相同但内容不同）:', {
@@ -527,14 +547,52 @@ class ShareDBClient {
               serverContentLength: serverContent.length,
               clientContentLength: contentStr.length
             });
+            
+            // 使用服务器内容作为baseContent，确保合并正确
+            baseContent = serverContent;
+          } else if (serverVersion === currentVersion && serverContent === contentStr) {
+            // 版本和内容都相同，说明没有其他用户修改，可以使用本地baseContent
+            console.log('✅ [同步] 服务器版本和内容与客户端一致，使用本地baseContent');
+          } else {
+            // 服务器版本更小（不应该发生，但处理一下）
+            console.warn('⚠️ [同步] 服务器版本小于客户端版本（异常情况）:', {
+              serverVersion,
+              clientVersion: currentVersion
+            });
           }
         } else {
           fetchFailed = true;
-          console.warn('⚠️ [同步] 获取服务器文档超时或失败，使用保守策略');
+          console.warn('⚠️ [同步] 获取服务器文档超时或失败，使用本地baseContent（可能丢失数据）');
+          // 如果获取失败，使用本地baseContent，但会在同步时使用保守版本号
         }
       } catch (error) {
         fetchFailed = true;
-        console.warn('⚠️ [同步] 获取服务器文档失败，使用保守策略:', error);
+        console.warn('⚠️ [同步] 获取服务器文档失败，使用本地baseContent（可能丢失数据）:', error);
+      }
+      
+      // 如果baseContent仍然为空，尝试从本地获取
+      if (!baseContent) {
+        try {
+          const localDoc = await localCacheManager.get<ShareDBDocument>(documentId);
+          if (localDoc && typeof localDoc === 'object' && 'content' in localDoc) {
+            baseContent = typeof localDoc.content === 'string' 
+              ? localDoc.content 
+              : JSON.stringify(localDoc.content);
+            console.log('📥 [同步] 从本地缓存初始化 baseContent:', {
+              length: baseContent.length,
+              preview: baseContent.substring(0, 100)
+            });
+          }
+        } catch (error) {
+          console.warn('⚠️ [同步] 从本地缓存获取baseContent失败:', error);
+        }
+      }
+      
+      // 关键修复：如果baseContent仍然为空，使用当前content作为baseContent
+      // 这样可以确保后端能够正确合并
+      if (!baseContent) {
+        baseContent = contentStr;
+        console.log('⚠️ [同步] baseContent为空，使用当前内容作为baseContent');
       }
       
       // 尝试使用统一的同步 API（如果后端支持）
@@ -547,10 +605,11 @@ class ShareDBClient {
         const token = localStorage.getItem('access_token');
         
         // 关键改进：如果获取失败，使用更保守的版本号（减1），强制后端进行合并检查
-        // 如果获取成功，使用服务器版本；否则使用当前版本减1，确保不会覆盖
+        // 如果获取成功，使用已更新的版本号（因为可能已经更新了currentVersion）
         let syncVersion: number;
         if (serverDoc) {
-          syncVersion = serverDoc.version || currentVersion;
+          // 使用已更新的版本号（如果服务器版本更新，currentVersion已经更新）
+          syncVersion = this.currentVersion.get(documentId) || serverDoc.version || currentVersion;
         } else if (fetchFailed) {
           // 获取失败时，使用更保守的版本号，强制后端合并
           syncVersion = Math.max(0, currentVersion - 1);
@@ -727,6 +786,58 @@ class ShareDBClient {
   }
 
   /**
+   * 强制从服务器拉取最新内容（忽略本地缓存）
+   * 用于手动刷新，获取服务器上的最新版本
+   */
+  async forcePullFromServer(documentId: string): Promise<ShareDBDocument | null> {
+    console.log('🔄 [ShareDB] 强制从服务器拉取最新内容:', documentId);
+    
+    try {
+      // 直接从服务器获取，忽略本地缓存
+      const serverDoc = await this.fetchFromServer(documentId);
+      
+      if (serverDoc) {
+        const serverContent = typeof serverDoc.content === 'string' 
+          ? serverDoc.content 
+          : JSON.stringify(serverDoc.content);
+        const serverVersion = serverDoc.version || 1;
+        
+        // 更新本地状态
+        this.currentVersion.set(documentId, serverVersion);
+        this.currentContent.set(documentId, serverContent);
+        
+        // 更新本地缓存
+        await localCacheManager.set(documentId, serverDoc, serverVersion);
+        
+        console.log('✅ [ShareDB] 强制拉取成功:', {
+          version: serverVersion,
+          contentLength: serverContent.length
+        });
+        
+        // 通知编辑器更新内容
+        const callbacks = this.documentUpdateCallbacks.get(documentId);
+        if (callbacks) {
+          callbacks.forEach(callback => {
+            try {
+              callback(serverContent, serverVersion);
+            } catch (error) {
+              console.error('执行文档更新回调失败:', error);
+            }
+          });
+        }
+        
+        return serverDoc;
+      }
+      
+      console.warn('⚠️ [ShareDB] 服务器上没有找到文档:', documentId);
+      return null;
+    } catch (error) {
+      console.error('❌ [ShareDB] 强制拉取失败:', error);
+      throw error;
+    }
+  }
+
+  /**
    * 获取同步状态（借鉴 nexcode_web 的实现）
    */
   getSyncStatus(documentId?: string) {
@@ -882,6 +993,64 @@ class ShareDBClient {
     };
   }
 
+  /**
+   * 应用操作到内容（增量更新）
+   */
+  private applyOperations(content: string, operations: any[]): string {
+    let result = content;
+    
+    // 按位置从后往前排序，避免位置偏移问题
+    const sortedOps = [...operations].sort((a, b) => {
+      const posA = a.position || 0;
+      const posB = b.position || 0;
+      return posB - posA; // 从后往前
+    });
+    
+    for (const op of sortedOps) {
+      try {
+        const pos = op.position || 0;
+        
+        switch (op.type) {
+          case 'insert_text':
+            // 插入文本
+            const text = op.text || '';
+            if (pos >= result.length) {
+              result = result + text;
+            } else {
+              result = result.slice(0, pos) + text + result.slice(pos);
+            }
+            break;
+            
+          case 'delete_text':
+            // 删除文本
+            const length = op.length || 0;
+            if (pos < result.length) {
+              const endPos = Math.min(pos + length, result.length);
+              result = result.slice(0, pos) + result.slice(endPos);
+            }
+            break;
+            
+          case 'replace_text':
+            // 替换文本
+            const replaceLength = op.length || 0;
+            const replaceText = op.text || '';
+            if (pos < result.length) {
+              const endPos = Math.min(pos + replaceLength, result.length);
+              result = result.slice(0, pos) + replaceText + result.slice(endPos);
+            }
+            break;
+            
+          default:
+            console.warn('未知的操作类型:', op.type);
+        }
+      } catch (error) {
+        console.error('应用操作失败:', error, op);
+      }
+    }
+    
+    return result;
+  }
+
   private handleMessage(data: string): void {
     try {
       const message = JSON.parse(data);
@@ -901,19 +1070,27 @@ class ShareDBClient {
           
         case 'document_synced':
         case 'document_updated':
-          // 处理文档更新消息
+          // 处理文档更新消息（支持增量操作）
           const docId = message.document_id;
-          const content = message.content;
           const version = message.version;
+          const operations = message.operations || [];
+          const fullContent = message.full_content !== false; // 默认true，如果没有operations则使用完整内容
+          const content = message.content;
           
           console.log('🔄 [ShareDB] 收到文档更新:', {
             docId,
             version,
-            contentLength: content?.length || 0
+            hasOperations: operations.length > 0,
+            operationsCount: operations.length,
+            hasFullContent: !!content,
+            fullContent: fullContent
           });
           
-          // 更新本地版本和内容缓存
-          if (docId && content !== undefined) {
+          // 优先使用完整内容更新（更可靠）
+          // 如果提供了完整内容，直接使用；否则尝试应用操作
+          if (content !== undefined) {
+            // 使用完整内容更新（推荐方式）
+            console.log('📄 [ShareDB] 使用完整内容更新');
             this.currentVersion.set(docId, version);
             this.currentContent.set(docId, content);
             
@@ -928,6 +1105,27 @@ class ShareDBClient {
                 }
               });
             }
+          } else if (operations.length > 0 && !fullContent) {
+            // 如果没有完整内容，但有操作，尝试应用操作（增量更新）
+            console.log('📝 [ShareDB] 应用增量操作:', operations.length, '个操作');
+            let currentContent = this.currentContent.get(docId) || '';
+            currentContent = this.applyOperations(currentContent, operations);
+            this.currentVersion.set(docId, version);
+            this.currentContent.set(docId, currentContent);
+            
+            // 通知所有监听该文档的回调
+            const callbacks = this.documentUpdateCallbacks.get(docId);
+            if (callbacks) {
+              callbacks.forEach(callback => {
+                try {
+                  callback(currentContent, version);
+                } catch (error) {
+                  console.error('执行文档更新回调失败:', error);
+                }
+              });
+            }
+          } else {
+            console.warn('⚠️ [ShareDB] 收到文档更新但没有内容和操作');
           }
           break;
           

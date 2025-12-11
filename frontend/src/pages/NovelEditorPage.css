@@ -263,6 +263,74 @@
   margin: 0 4px;
 }
 
+/* 工具栏下拉菜单 */
+.toolbar-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.toolbar-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 160px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  overflow: hidden;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.toolbar-dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: white;
+  color: #374151;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.toolbar-dropdown-item:hover {
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+.toolbar-dropdown-item .heading-label {
+  font-weight: 600;
+  color: #6b7280;
+  min-width: 32px;
+}
+
+.toolbar-dropdown-item .heading-preview {
+  flex: 1;
+  color: #374151;
+}
+
+.toolbar-dropdown-divider {
+  height: 1px;
+  background: #e5e7eb;
+  margin: 4px 0;
+}
+
 /* AI写作提示 */
 .ai-writing-prompt {
   margin: 20px 24px;

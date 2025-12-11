@@ -12,6 +12,9 @@
   "dependencies": {
     "@antv/g6": "^5.0.50",
     "@antv/g6-extension-react": "^0.2.6",
+    "@automerge/automerge": "^2.1.0",
+    "@tiptap/extension-collaboration": "^3.11.0",
+    "@tiptap/extension-collaboration-cursor": "^3.11.0",
     "@tiptap/extension-placeholder": "^3.11.0",
     "@tiptap/extension-underline": "^3.11.1",
     "@tiptap/react": "^3.11.0",
@@ -23,7 +26,9 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.9.6",
-    "reactflow": "^11.11.4"
+    "reactflow": "^11.11.4",
+    "y-websocket": "^1.5.0",
+    "yjs": "^13.6.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

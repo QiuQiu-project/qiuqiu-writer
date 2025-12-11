@@ -553,6 +553,26 @@
   color: #d97706;
 }
 
+.comp-delete-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  border-radius: var(--radius);
+  transition: all var(--transition-base);
+}
+
+.comp-delete-btn:hover {
+  background: #fef2f2;
+  color: #ef4444;
+}
+
 .comp-actions {
   display: flex;
   align-items: center;
@@ -1093,6 +1113,41 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+/* 分页中添加组件按钮 */
+.tabs-add-component {
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--border-light);
+}
+
+.tabs-add-component-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--bg-secondary);
+  border: 2px dashed var(--border-light);
+  border-radius: var(--radius-lg);
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.tabs-add-component-btn:hover {
+  background: var(--accent-light);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  border-style: solid;
+}
+
+.tabs-add-component-btn svg {
+  color: inherit;
 }
 
 /* 关系图 */
@@ -2366,6 +2421,68 @@
 
 .character-desc-input::placeholder {
   color: var(--text-placeholder);
+}
+
+.character-desc-display {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  max-height: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+/* 合并视图样式 */
+.character-merged-view {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 2px dashed var(--border-light);
+}
+
+.character-merged-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.character-merged-count {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  padding: 4px 10px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-full);
+}
+
+.character-subsection-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  margin: 0 0 12px 0;
+  padding-left: 4px;
+}
+
+.character-card-item.merged {
+  border-color: var(--accent-light);
+  background: var(--bg-secondary);
+}
+
+.character-card-item.merged:hover {
+  border-color: var(--accent-primary);
+  background: var(--bg-primary);
+}
+
+.character-source-badge {
+  font-size: 11px;
+  padding: 2px 6px;
+  background: var(--accent-light);
+  color: var(--accent-primary);
+  border-radius: var(--radius-full);
+  font-weight: 500;
 }
 
 .character-type-select {

@@ -96,7 +96,7 @@ async def init_db():
         # 导入所有模型以确保它们被注册
         from memos.api.models import (
             user, work, chapter, template,
-            characters, writing, system
+            characters, writing, system, document
         )
 
         # 创建所有表
