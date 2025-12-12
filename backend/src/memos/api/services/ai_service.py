@@ -25,50 +25,58 @@ DEFAULT_SYSTEM_PROMPT = """
 
 # 默认章节分析提示词
 DEFAULT_ANALYSIS_PROMPT = """
-# Chapter Content
+ 章节内容
 {content}
 
-# Task
-Based on the above chapter content, you must read through and deeply understand this chapter, then analyze and extract ONLY the outline and detailed_outline in STRICT JSON format.
+# 任务
+基于上述章节内容，你必须仔细阅读并深入理解这些章节，然后以严格的JSON格式分析和提取章节信息。
 
-# CRITICAL REQUIREMENTS
-1. **MUST output ONLY valid JSON**, no Markdown code blocks, no explanations, no additional text before or after the JSON
-2. **ONLY two string fields are required**: "outline" and "detailed_outline"
-3. **EVERY string field MUST be filled** - use empty string "" if information is not available, NEVER use null
-4. Both "outline" and "detailed_outline" MUST be JSON strings (valid JSON when parsed), not plain text
+# 关键要求
+1. **必须只输出有效的JSON格式**，不要使用Markdown代码块，不要添加任何解释性文字，JSON前后不要有任何其他文字
+2. **所有字符串字段必须填写** - 如果信息不可用，使用空字符串 ""，字符串字段永远不要使用 null
+3. **所有数组字段必须是数组** - 如果没有项目，使用空数组 []，永远不要使用 null
+4. 章节号必须是整数（数字），不能是字符串
+5. 为内容中的每一章提取 chapter_number、title、outline 和 detailed_outline
 
-# DETAILED FIELD REQUIREMENTS
+# 字段详细要求
 
-## "outline" field - REQUIRED
-- **Type**: string (REQUIRED)
-- **Format**: Must be a valid JSON string that, when parsed, becomes a JSON object
-- **Structure**: {{"core_function": "string", "key_points": ["string"], "visual_scenes": ["string"], "atmosphere": ["string"], "hook": "string"}}
-- **Content**: Chapter outline including core function, key plot points, visual scenes, atmosphere, and hook
-- **If not found**: use empty string ""
+## "chapters" 数组 - 必需
+每个章节对象必须包含所有四个必需字段：
+[
+  {{
+    "chapter_number": "整数（必需）- 章节号必须是整数，不能是字符串。从内容中提取（例如：'第1章' -> 1, 'Chapter 2' -> 2），如果找不到则使用 0",
+    "title": "字符串（必需）- 从内容中提取的章节标题，如果找不到则使用空字符串 ''",
+    "outline": "字符串（必需）- 章节大纲，必须是文本描述格式（纯文本字符串）大纲是章节的概要信息，用自然语言描述章节的核心功能、关键情节点、画面感、氛围和结尾钩子等概括性内容。应该是一段连贯的文本描述，清晰简洁地概括章节的整体结构和主要信息。如果找不到则使用空字符串 ''",
+    "detailed_outline": "字符串（必需）- 章节细纲，必须是文本描述格式（纯文本字符串）。细纲是章节的具体情节信息，用自然语言详细描述每个小节的具体内容、情节发展、人物行动、对话要点等细节。应该是一段或多段详细的文本描述，深入描述章节的具体情节展开。如果找不到则使用空字符串 ''"
+  }}
+]
 
-## "detailed_outline" field - REQUIRED
-- **Type**: string (REQUIRED)
-- **Format**: Must be a valid JSON string that, when parsed, becomes a JSON object
-- **Structure**: {{"sections": [{{"section_number": integer, "title": "string", "content": "string"}}]}}
-- **Content**: Detailed outline with sections, each section has section_number, title, and content
-- **If not found**: use empty string ""
+# 重要说明
+- **大纲（outline）**：是章节的概要信息，用自然语言文本描述章节的核心功能、关键情节点、画面感、氛围和结尾钩子等概括性内容，用于快速了解章节的整体结构和主要信息。必须是纯文本格式。
+- **细纲（detailed_outline）**：是章节的具体情节信息，用自然语言文本详细描述每个小节的具体内容、情节发展、人物行动、对话要点等细节，用于深入了解章节的具体情节展开。必须是纯文本格式。
 
-# OUTPUT FORMAT - STRICT JSON ONLY
-You MUST output ONLY the following JSON structure, with NO additional text, NO Markdown code blocks, NO explanations:
+# 输出格式 - 严格JSON格式
+你必须只输出以下JSON结构，不要添加任何其他文字，不要使用Markdown代码块，不要添加解释：
 
 {{
-  "outline": "",
-  "detailed_outline": ""
+  "chapters": [
+    {{
+      "chapter_number": 0,
+      "title": "",
+      "outline": "",
+      "detailed_outline": ""
+    }}
+  ]
 }}
 
-# FINAL REMINDER
-- Output ONLY the JSON object above with ONLY two fields: "outline" and "detailed_outline"
-- Both fields MUST be valid JSON strings (when parsed they should be JSON objects)
-- Fill with appropriate JSON string values or empty strings ""
-- NO text before or after the JSON
-- NO Markdown code block markers (```json or ```)
-- NO explanations or comments
-- Start directly with {{ and end with }}
+# 最终提醒
+- 只输出上述JSON对象，只包含 "chapters" 数组
+- 每个章节必须包含 chapter_number（整数）、title（字符串）、outline（文本）、detailed_outline（文本）
+- 用适当的值或空字符串填充所有字段
+- JSON前后不要有任何文字
+- 不要使用Markdown代码块标记（```json 或 ```）
+- 不要添加解释或注释
+- 直接以 {{ 开始，以 }} 结束
 """
 
 
