@@ -126,9 +126,13 @@ async def generate_new_character(work_id: int, user_id: int):
         await prompt_service.initialize()
         
         # 构建上下文（包含所有角色和前文信息）
+        # 可以分别设置前n章的大纲、细纲、正文数量
         context = await prompt_service.build_context(
             work_id=work_id,
-            include_previous_chapters=5
+            include_previous_chapters=5,  # 基本信息（摘要等）
+            include_previous_content=3,  # 前3章的正文
+            include_previous_outlines=5,  # 前5章的大纲
+            include_previous_detailed_outlines=2  # 前2章的细纲
         )
         
         # 获取角色生成模板
@@ -331,12 +335,17 @@ template = PromptTemplate(
 - `{chapter_characters}`: 当前章节使用的角色列表
 - `{current_chapter_title}`: 当前章节标题
 - `{current_chapter_number}`: 当前章节号
+- `{current_chapter_summary}`: 当前章节摘要
+- `{content}`: 当前章节内容
+- `{current_chapter_content}`: 当前章节正文（与`{content}`相同）
+- `{current_chapter_outline}`: 当前章节的大纲（JSON格式）
+- `{current_chapter_detailed_outline}`: 当前章节的细纲（JSON格式）
+- `{outline}`: 当前章节的大纲（JSON格式，兼容旧变量名）
 - `{previous_chapters_summary}`: 前文章节摘要
 - `{previous_chapters_content}`: 前文内容
 - `{previous_outlines}`: 前文大纲
 - `{previous_detailed_outlines}`: 前文细纲
 - `{locations}`: 地点列表
-- `{content}`: 章节内容
 
 #### 中文变量名（推荐使用）
 
@@ -349,12 +358,15 @@ template = PromptTemplate(
 - `{章节号}`: 当前章节号
 - `{章节摘要}`: 当前章节摘要
 - `{章节内容}`: 当前章节内容
+- `{当前章节内容}`: 当前章节正文（与`{章节内容}`相同）
+- `{当前章节大纲}`: 当前章节的大纲（JSON格式）
+- `{当前章节细纲}`: 当前章节的细纲（JSON格式）
+- `{大纲}`: 当前章节的大纲（JSON格式，兼容旧变量名）
 - `{前文摘要}`: 前文章节摘要
 - `{前文内容}`: 前文内容
 - `{前文大纲}`: 前文大纲
 - `{前文细纲}`: 前文细纲
 - `{地点}`: 地点列表
-- `{大纲}`: 当前章节的大纲（JSON格式）
 
 #### 从Metadata中获取数据
 

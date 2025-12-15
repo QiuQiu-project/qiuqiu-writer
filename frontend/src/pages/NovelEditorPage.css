@@ -198,7 +198,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
   background: white;
   min-height: 0; /* 允许 flex 子元素缩小 */
   min-width: 0; /* 允许 flex 子元素缩小 */
@@ -502,6 +502,11 @@
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
+  height: 100%;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  position: relative;
 }
 
 /* 标题和工具栏合并容器 */
@@ -664,39 +669,110 @@
 }
 
 /* 编辑器包装器样式 */
-.chapter-editor-container .novel-editor-wrapper {
+.chapter-editor-container /* 章节加载动画 */
+.chapter-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(2px);
+}
+
+.chapter-loading-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spinner-ring {
+  width: 48px;
+  height: 48px;
+  border: 4px solid var(--border-light, #e5e5e5);
+  border-top-color: var(--accent-primary, #34d399);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.novel-editor-wrapper {
+  position: relative;
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 32px;
   max-width: 1200px;
   margin: 0 auto;
   width: 100%;
+  max-width: 100%;
   min-height: 0;
-  height: 100%;
   display: flex;
   flex-direction: column;
   background: var(--bg-secondary);
+  box-sizing: border-box;
+  /* 确保滚动条显示 */
+  -webkit-overflow-scrolling: touch;
 }
 
 .chapter-editor-container .novel-editor-wrapper > div {
   width: 100%;
-  height: 100%;
+  max-width: 100%;
+  min-height: 100%;
   display: flex;
   flex-direction: column;
-  min-height: 0;
   background: transparent;
+  flex: 1;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .chapter-editor-container .novel-editor-wrapper .ProseMirror {
   width: 100%;
-  height: 100%;
+  max-width: 100%;
   min-height: 100%;
   outline: none;
-  flex: 1;
   background: var(--bg-primary);
   border-radius: 0;
   padding: 48px 60px;
   box-shadow: none;
+  color: var(--text-primary);
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  /* 允许内容超出，由父容器处理滚动 */
+  height: auto;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+/* 确保章节编辑器内所有文本元素颜色一致 */
+.chapter-editor-container .novel-editor-wrapper .ProseMirror * {
+  color: inherit;
+}
+
+.chapter-editor-container .novel-editor-wrapper .ProseMirror p,
+.chapter-editor-container .novel-editor-wrapper .ProseMirror span,
+.chapter-editor-container .novel-editor-wrapper .ProseMirror div {
+  color: var(--text-primary);
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .chapter-title-centered {
@@ -706,6 +782,87 @@
   margin: 0;
   text-align: center;
   letter-spacing: 0.3px;
+}
+
+/* 分析本书按钮 */
+.analyze-work-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent-primary, #34d399);
+}
+
+.analyze-work-btn:hover:not(:disabled) {
+  background: var(--accent-light, rgba(52, 211, 153, 0.1));
+}
+
+.analyze-work-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.analyze-work-btn .spinner {
+  animation: spin 1s linear infinite;
+}
+
+/* 删除作品按钮 */
+.delete-work-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--error, #ef4444);
+}
+
+.delete-work-btn:hover {
+  background: var(--error-light, rgba(239, 68, 68, 0.1));
+}
+
+/* 分析进度覆盖层 */
+.analysis-progress-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  backdrop-filter: blur(4px);
+}
+
+.analysis-progress-content {
+  background: white;
+  padding: 32px;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  min-width: 300px;
+}
+
+.analysis-progress-content .spinner {
+  animation: spin 1s linear infinite;
+  color: var(--accent-primary, #34d399);
+}
+
+.analysis-progress-content p {
+  margin: 0;
+  color: var(--text-primary, #1f2937);
+  font-size: 14px;
+  text-align: center;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* 响应式设计 */

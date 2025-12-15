@@ -187,6 +187,44 @@
   color: var(--text-tertiary);
 }
 
+.template-card.create-template-card {
+  border: 2px dashed var(--border-light);
+  background: var(--bg-primary);
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+}
+
+.template-card.create-template-card:hover {
+  border-color: var(--accent-primary);
+  background: var(--accent-light);
+}
+
+.template-card.create-template-card svg {
+  color: var(--accent-primary);
+  margin-bottom: 4px;
+}
+
+.template-loading,
+.template-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 20px;
+  color: var(--text-tertiary);
+  font-size: 14px;
+}
+
+.card-badge {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 6px;
+  background: var(--accent-primary);
+  color: white;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+}
+
 /* ============ 模块标签栏 ============ */
 
 .module-tabs {
@@ -396,7 +434,9 @@
 .module-content {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 20px;
+  position: relative;
 }
 
 .empty-state {
@@ -424,6 +464,10 @@
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-light);
   overflow: hidden;
+  position: relative;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .page-header {
@@ -500,6 +544,11 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
+  overflow: hidden;
+  position: relative;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* ============ 组件通用样式 ============ */
@@ -508,6 +557,11 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  overflow: hidden;
+  position: relative;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .comp-header {
@@ -604,9 +658,34 @@
   color: #ef4444;
 }
 
+/* 文本输入包装容器 */
+.comp-input-wrapper {
+  width: 100%;
+  max-width: 100%;
+  background: #ffffff;
+  border-radius: 6px;
+  overflow: hidden;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.comp-textarea-wrapper {
+  width: 100%;
+  max-width: 100%;
+  background: #ffffff;
+  border-radius: 6px;
+  overflow: hidden;
+  box-sizing: border-box;
+  max-height: 400px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+}
+
 /* 文本输入 */
 .comp-input {
   width: 100%;
+  max-width: 100%;
   padding: 10px 12px;
   background: #ffffff;
   border: 1px solid #e5e7eb;
@@ -616,6 +695,10 @@
   font-family: inherit;
   transition: all 0.2s ease;
   box-sizing: border-box;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  overflow: hidden;
 }
 
 .comp-input::placeholder {
@@ -631,6 +714,7 @@
 /* 多行文本 */
 .comp-textarea {
   width: 100%;
+  max-width: 100%;
   padding: 10px 12px;
   background: #ffffff;
   border: 1px solid #e5e7eb;
@@ -641,8 +725,14 @@
   line-height: 1.6;
   resize: vertical;
   min-height: 80px;
+  max-height: 400px;
   transition: all 0.2s ease;
   box-sizing: border-box;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .comp-textarea::placeholder {
@@ -730,11 +820,21 @@
   color: var(--text-primary);
   font-size: 14px;
   cursor: pointer;
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  overflow: hidden;
 }
 
 .comp-select:focus {
   outline: none;
   border-color: var(--accent-primary);
+  z-index: 10;
 }
 
 /* 多选标签 */
@@ -935,6 +1035,11 @@
   font-size: 14px;
   font-weight: 500;
   transition: all 0.2s ease;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 .kv-key:focus {
@@ -972,8 +1077,15 @@
   font-family: inherit;
   line-height: 1.6;
   resize: vertical;
+  min-height: 60px;
+  max-height: 300px;
   box-sizing: border-box;
   transition: all 0.2s ease;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .kv-value::placeholder {
@@ -1238,8 +1350,15 @@
   font-family: inherit;
   line-height: 1.5;
   resize: vertical;
+  min-height: 60px;
+  max-height: 300px;
   transition: all 0.2s ease;
   box-sizing: border-box;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .timeline-desc::placeholder {
@@ -1612,6 +1731,21 @@
 .form-group label .required {
   color: #ef4444;
   margin-left: 2px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: normal;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  margin: 0;
 }
 
 .label-hint {
@@ -2003,11 +2137,15 @@
   color: var(--text-primary);
   font-size: 13px;
   cursor: pointer;
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
 }
 
 .field-type-select:focus {
   outline: none;
   border-color: var(--accent-primary);
+  z-index: 10;
 }
 
 .field-remove-btn {
@@ -2153,6 +2291,10 @@
   font-family: inherit;
   transition: all 0.2s ease;
   box-sizing: border-box;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  overflow-x: hidden;
 }
 
 .card-field-input::placeholder {
@@ -2177,8 +2319,14 @@
   line-height: 1.5;
   resize: vertical;
   min-height: 60px;
+  max-height: 300px;
   transition: all 0.2s ease;
   box-sizing: border-box;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .card-field-textarea::placeholder {
@@ -2372,11 +2520,15 @@
   color: var(--text-secondary);
   cursor: pointer;
   transition: all var(--transition-base);
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
 }
 
 .character-gender-select:focus {
   outline: none;
   border-color: var(--accent-primary);
+  z-index: 10;
 }
 
 .character-delete-btn {
@@ -2410,8 +2562,15 @@
   line-height: 1.5;
   resize: vertical;
   min-height: 50px;
+  max-height: 300px;
   font-family: inherit;
   transition: all var(--transition-base);
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  overflow-x: hidden;
+  overflow-y: auto;
+  box-sizing: border-box;
 }
 
 .character-desc-input:focus {
@@ -2495,11 +2654,15 @@
   color: var(--text-tertiary);
   cursor: pointer;
   transition: all var(--transition-base);
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
 }
 
 .character-type-select:focus {
   outline: none;
   border-color: var(--accent-primary);
+  z-index: 10;
 }
 
 .character-empty {
@@ -2846,8 +3009,15 @@
   line-height: 1.5;
   resize: vertical;
   min-height: 50px;
+  max-height: 300px;
   font-family: inherit;
   transition: all 0.2s ease;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  overflow-x: hidden;
+  overflow-y: auto;
+  box-sizing: border-box;
 }
 
 .rank-desc-input:focus {

@@ -130,8 +130,10 @@ async def create_chapter(
     )
 
     # 在ShareDB中创建文档
+    # 使用新格式 work_{work_id}_chapter_{chapter_id}，与前端保持一致
+    document_id = f"work_{chapter.work_id}_chapter_{chapter.id}"
     await sharedb_service.create_document(
-        document_id=f"chapter_{chapter.id}",
+        document_id=document_id,
         initial_content={
             "title": chapter.title,
             "content": chapter_data.content or "",
@@ -239,8 +241,13 @@ async def get_chapter(
         )
 
     # 从ShareDB获取最新内容
+    # 优先使用新格式，兼容旧格式
     try:
-        document = await sharedb_service.get_document(f"chapter_{chapter_id}")
+        document_id_new = f"work_{chapter.work_id}_chapter_{chapter_id}"
+        document_id_old = f"chapter_{chapter_id}"
+        document = await sharedb_service.get_document(document_id_new)
+        if not document:
+            document = await sharedb_service.get_document(document_id_old)
         if document:
             chapter.content = document.get("content", chapter.content)
     except Exception as e:
@@ -288,9 +295,24 @@ async def update_chapter(
     )
 
     # 如果有标题更新，同时更新ShareDB文档
+    # 优先使用新格式，兼容旧格式
     if chapter_update.title:
+        document_id_new = f"work_{chapter.work_id}_chapter_{chapter_id}"
+        document_id_old = f"chapter_{chapter_id}"
+        # 尝试更新新格式文档
+        document = await sharedb_service.get_document(document_id_new)
+        if not document:
+            # 如果新格式不存在，尝试旧格式
+            document = await sharedb_service.get_document(document_id_old)
+            if document:
+                # 如果旧格式存在，迁移到新格式
+                await sharedb_service.create_document(
+                    document_id=document_id_new,
+                    initial_content=document
+                )
+        
         await sharedb_service.update_document(
-            document_id=f"chapter_{chapter_id}",
+            document_id=document_id_new,
             update_data={
                 "title": chapter_update.title,
                 "metadata.updated_by": current_user_id,
@@ -433,8 +455,13 @@ async def create_chapter_version(
         )
 
     # 获取当前ShareDB文档内容
+    # 优先使用新格式，兼容旧格式
     try:
-        document = await sharedb_service.get_document(f"chapter_{chapter_id}")
+        document_id_new = f"work_{chapter.work_id}_chapter_{chapter_id}"
+        document_id_old = f"chapter_{chapter_id}"
+        document = await sharedb_service.get_document(document_id_new)
+        if not document:
+            document = await sharedb_service.get_document(document_id_old)
         current_content = document.get("content", "") if document else ""
         current_title = document.get("title", chapter.title) if document else chapter.title
     except Exception:
@@ -503,10 +530,23 @@ async def websocket_collaborate(
             return
 
         # 加入协作会话
-        document_id = f"chapter_{chapter_id}"
+        # 优先使用新格式，兼容旧格式
+        document_id_new = f"work_{chapter.work_id}_chapter_{chapter_id}"
+        document_id_old = f"chapter_{chapter_id}"
+        # 尝试使用新格式，如果不存在则使用旧格式
+        document = await sharedb_service.get_document(document_id_new)
+        if not document:
+            document = await sharedb_service.get_document(document_id_old)
+            if document:
+                # 如果旧格式存在，迁移到新格式
+                await sharedb_service.create_document(
+                    document_id=document_id_new,
+                    initial_content=document
+                )
+        
         await sharedb_service.join_collaboration(
             websocket=websocket,
-            document_id=document_id,
+            document_id=document_id_new,
             user_id=user_id
         )
 
@@ -547,14 +587,24 @@ async def get_chapter_document(
         )
 
     # 获取ShareDB文档
-    document = await sharedb_service.get_document(f"chapter_{chapter_id}")
+    # 优先使用新格式 work_{work_id}_chapter_{chapter_id}，兼容旧格式 chapter_{chapter_id}
+    document_id_new = f"work_{chapter.work_id}_chapter_{chapter_id}"
+    document_id_old = f"chapter_{chapter_id}"
+    
+    document = await sharedb_service.get_document(document_id_new)
+    if not document:
+        # 尝试旧格式（向后兼容）
+        document = await sharedb_service.get_document(document_id_old)
+        if document:
+            logger.info(f"使用旧格式文档ID: {document_id_old}")
+    
     if not document:
         # 如果ShareDB文档不存在，返回空内容而不是404
         # 这样前端可以正常初始化编辑器
         # 注意：Chapter 模型没有 content 属性，内容存储在 ShareDB 中
-        logger.warning(f"ShareDB文档不存在: chapter_{chapter_id}，返回空内容")
+        logger.warning(f"ShareDB文档不存在（新格式和旧格式都不存在）: {document_id_new} / {document_id_old}，返回空内容")
         document = {
-            "id": f"chapter_{chapter_id}",
+            "id": document_id_new,
             "content": "",  # 返回空内容，让前端可以正常初始化编辑器
             "version": 1,
             "created_at": datetime.utcnow().isoformat(),
@@ -562,7 +612,7 @@ async def get_chapter_document(
         }
 
     return {
-        "document_id": f"chapter_{chapter_id}",
+        "document_id": document_id_new,  # 返回新格式的文档ID
         "content": document,
         "chapter_info": chapter.to_dict()
     }

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Upload, FileText, Settings, Download, Loader2, Play, AlertCircle, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react';
-import { analyzeChapterByFile, testAPIConnection } from '../utils/bookAnalysisApi';
+import { createWorkFromFile, testAPIConnection } from '../utils/bookAnalysisApi';
 import './BookSplitterPage.css';
 
 interface Chapter {
@@ -234,16 +234,10 @@ export default function BookSplitterPage() {
     }
   };
 
-  // 开始分析（按单章处理）
+  // 开始创建作品和章节（不进行AI分析）
   const handleStartAnalysis = async () => {
     if (selectedChapters.length === 0) {
-      setErrorMessage('请至少选择一章进行分析');
-      return;
-    }
-
-    // 检查API连接状态
-    if (apiStatus === 'error') {
-      setErrorMessage('AI服务未连接，无法进行分析。请检查后端服务是否启动。');
+      setErrorMessage('请至少选择一章进行创建');
       return;
     }
 
@@ -254,151 +248,65 @@ export default function BookSplitterPage() {
       
       const selectedChaptersData = chapters.filter(ch => selectedChapters.includes(ch.id));
       
-      console.log(`📚 开始分析 ${selectedChaptersData.length} 章`);
+      console.log(`📚 开始创建作品和章节 ${selectedChaptersData.length} 章`);
       
-      // 逐章分析（参考 SmartReads 的 useAnalyzer.js）
-      for (let i = 0; i < selectedChaptersData.length; i++) {
-        const chapter = selectedChaptersData[i];
-        setCurrentAnalyzingChapter(chapter.title);
-        
-        console.log(`📝 [${i + 1}/${selectedChaptersData.length}] 开始分析: ${chapter.title}`);
-        
-        try {
-          // 创建临时结果对象用于显示进度
-          let metadata: any = {};
-          
-          // 自动展开当前分析的章节
-          setExpandedChapters(prev => new Set([...prev, chapter.id]));
-          
-          setAnalysisResults(prev => ({
-            ...prev,
-            [chapter.id]: {
-              fileName: chapter.title,
-              content: `正在分析 ${chapter.title}...\n\n`,
-              isComplete: false,
-              hasError: false,
-              timestamp: Date.now(),
-              metadata: {}
-            }
-          }));
-
-          // 调用基于文件名的章节分析接口（会自动创建作品并插入章节）
-          const fileName = selectedFile?.name || 'unknown.txt';
-          const analysisResult = await analyzeChapterByFile(
-            fileName,
-            chapter.content,
-            chapter.number,
-            1, // volume_number 默认为1
-            (progress) => {
-              // 实时更新分析内容
-              if (progress.text) {
-                setAnalysisResults(prev => ({
-                  ...prev,
-                  [chapter.id]: {
-                    ...prev[chapter.id],
-                    content: prev[chapter.id].content + progress.text
-                  }
-                }));
-              }
-              // 保存元数据（从start和done消息中）
-              if (progress.metadata) {
-                metadata = { ...metadata, ...progress.metadata };
-              }
-              // 处理作品创建和章节插入消息
-              if (progress.workCreated && progress.workId && progress.workTitle) {
-                setWorkId(progress.workId);
-                setWorkTitle(progress.workTitle);
-                console.log(`✅ 作品已创建: ${progress.workTitle} (ID: ${progress.workId})`);
-              }
-              if (progress.workId && progress.workTitle && !workId) {
-                setWorkId(progress.workId);
-                setWorkTitle(progress.workTitle);
-              }
-              if (progress.error) {
-                console.error(`分析 ${chapter.title} 时出错:`, progress.error);
-                throw new Error(progress.error);
-              }
-            },
-            {
-              model: 'codedrive-chat',
-              temperature: 0.7,
-              maxTokens: 4000
-            }
-          );
-          
-          // 更新作品信息（如果还没有设置）
-          if (analysisResult.work_id && !workId) {
-            setWorkId(analysisResult.work_id);
-            setWorkTitle(analysisResult.work_title);
-          }
-          
-          // 标记为完成，使用累积的内容
-          setAnalysisResults(prev => {
-            const currentResult = prev[chapter.id];
-            const accumulatedContent = currentResult?.content || '';
-            
-            // 移除初始的"正在分析..."提示
-            const cleanAccumulated = accumulatedContent.replace(/^正在分析.*?\.\.\.\n\n/, '');
-            
-            console.log(`📊 [${chapter.title}] 内容统计:`);
-            console.log(`   - 累积内容长度: ${cleanAccumulated.length} 字符`);
-            console.log(`   - 作品ID: ${analysisResult.work_id}`);
-            console.log(`   - 章节ID: ${analysisResult.chapter_id}`);
-            console.log(`   - 作品是否新创建: ${analysisResult.work_created}`);
-            
-            return {
-              ...prev,
-              [chapter.id]: {
-                fileName: chapter.title,
-                content: cleanAccumulated || '分析完成（内容已保存到作品）',
-                isComplete: true,
-                hasError: false,
-                timestamp: Date.now(),
-                metadata: {
-                  ...metadata,
-                  work_id: analysisResult.work_id,
-                  chapter_id: analysisResult.chapter_id,
-                  work_created: analysisResult.work_created,
-                }
-              }
-            };
-          });
-          
-          console.log(`✅ [${i + 1}/${selectedChaptersData.length}] 分析完成并已插入作品: ${chapter.title}`, {
-            work_id: analysisResult.work_id,
-            chapter_id: analysisResult.chapter_id,
-            work_created: analysisResult.work_created,
-          });
-          
-        } catch (error) {
-          console.error(`❌ 分析 ${chapter.title} 失败:`, error);
-          setAnalysisResults(prev => ({
-            ...prev,
-            [chapter.id]: {
-              fileName: chapter.title,
-              content: `❌ 分析失败\n\n错误信息：${error instanceof Error ? error.message : '未知错误'}`,
-              isComplete: true,
-              hasError: true,
-              timestamp: Date.now()
-            }
-          }));
-        }
-        
-        setAnalysisProgress(((i + 1) / selectedChaptersData.length) * 100);
-        
-        // 章节间添加延迟避免API限制（参考 SmartReads）
-        if (i < selectedChaptersData.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
+      // 准备章节数据
+      const chaptersData = selectedChaptersData.map(ch => ({
+        chapter_number: ch.number,
+        title: ch.title,
+        content: ch.content,
+        volume_number: 1
+      }));
+      
+      // 调用创建接口（一次性创建所有章节，不进行AI分析）
+      const fileName = selectedFile?.name || 'unknown.txt';
+      const result = await createWorkFromFile(fileName, chaptersData);
+      
+      // 更新作品信息
+      if (result.work_id) {
+        setWorkId(String(result.work_id));
+        setWorkTitle(result.work_title);
       }
       
+      // 更新分析结果（显示创建成功的信息）
+      selectedChaptersData.forEach((chapter, index) => {
+        const createdChapter = result.created_chapters.find(
+          c => c.chapter_number === chapter.number
+        );
+        
+        setAnalysisResults(prev => ({
+          ...prev,
+          [chapter.id]: {
+            fileName: chapter.title,
+            content: createdChapter 
+              ? `✅ 章节创建成功\n\n章节ID: ${createdChapter.chapter_id}\n章节号: ${createdChapter.chapter_number}\n标题: ${createdChapter.title}`
+              : '⚠️ 章节已存在，跳过创建',
+            isComplete: true,
+            hasError: false,
+            timestamp: Date.now(),
+            metadata: {
+              work_id: result.work_id,
+              chapter_id: createdChapter?.chapter_id,
+              work_created: result.work_created,
+            }
+          }
+        }));
+      });
+      
+      setAnalysisProgress(100);
       setAnalysisStatus('completed');
       setCurrentAnalyzingChapter('');
-      console.log('🎉 所有章节分析完成！');
+      
+      console.log('🎉 所有章节创建完成！', {
+        work_id: result.work_id,
+        work_title: result.work_title,
+        chapters_created: result.chapters_created,
+        chapters_skipped: result.chapters_skipped
+      });
       
     } catch (error) {
-      console.error('分析失败:', error);
-      setErrorMessage(error instanceof Error ? error.message : '分析失败');
+      console.error('创建失败:', error);
+      setErrorMessage(error instanceof Error ? error.message : '创建失败');
       setAnalysisStatus('error');
     }
   };

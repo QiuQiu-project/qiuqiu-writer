@@ -845,6 +845,81 @@ export async function analyzeChapterByFile(
 }
 
 /**
+ * 从文件直接创建作品和章节（不进行AI分析）
+ * 
+ * @param fileName 文件名
+ * @param chapters 章节数据列表
+ * @returns Promise<{ work_id: number; work_title: string; chapters_created: number; ... }>
+ */
+export async function createWorkFromFile(
+  fileName: string,
+  chapters: Array<{
+    chapter_number: number;
+    title: string;
+    content: string;
+    volume_number?: number;
+  }>
+): Promise<{
+  work_id: number;
+  work_title: string;
+  work_created: boolean;
+  chapters_created: number;
+  chapters_skipped: number;
+  created_chapters: Array<{
+    chapter_id: number;
+    chapter_number: number;
+    volume_number: number;
+    title: string;
+  }>;
+  skipped_chapters: Array<{
+    chapter_id: number;
+    chapter_number: number;
+    volume_number: number;
+    title: string;
+  }>;
+}> {
+  try {
+    console.log('📡 调用后端创建作品和章节接口...');
+    
+    const token = localStorage.getItem('access_token');
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/ai/create-work-from-file`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        file_name: fileName,
+        chapters: chapters.map(ch => ({
+          chapter_number: ch.chapter_number,
+          title: ch.title,
+          content: ch.content,
+          volume_number: ch.volume_number || 1
+        }))
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        errorData.detail || errorData.message || `API request failed: ${response.statusText}`
+      );
+    }
+
+    const result = await response.json();
+    console.log('✅ 作品和章节创建成功:', result);
+    return result;
+  } catch (error) {
+    console.error('❌ 创建作品和章节失败:', error);
+    throw error;
+  }
+}
+
+/**
  * 测试 API 连接
  * 连接 memos 后端检查 AI 服务是否可用
  */

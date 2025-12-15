@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Grid, List, Plus, BookOpen, Upload, Video, FileText, MoreVertical, ChevronDown, Download, Link2, Trash2, ChevronRight } from 'lucide-react';
+import { Grid, List, Plus, Upload, Video, FileText, MoreVertical, ChevronDown, Download, Link2, Trash2, ChevronRight } from 'lucide-react';
 import { worksApi, type Work } from '../utils/worksApi';
+import ImportWorkModal from '../components/ImportWorkModal';
 import './WorksPage.css';
 
 type WorkType = 'all' | 'short' | 'long' | 'script' | 'video';
@@ -23,6 +24,7 @@ export default function WorksPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   // 加载作品列表
   useEffect(() => {
@@ -110,6 +112,48 @@ export default function WorksPage() {
     };
   }, [openMenuId, showCreateMenu]);
 
+  // 处理删除作品
+  const handleDeleteWork = async (workId: string) => {
+    // 查找作品信息以显示标题
+    const workToDelete = works.find(w => String(w.id) === workId);
+    const workTitle = workToDelete?.title || '这个作品';
+    
+    // 确认删除
+    const confirmed = window.confirm(
+      `确定要删除作品《${workTitle}》吗？\n\n⚠️ 警告：此操作不可恢复！\n将永久删除作品及其所有章节、内容。`
+    );
+    
+    if (!confirmed) {
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // 调用删除API
+      await worksApi.deleteWork(Number(workId));
+      
+      // 显示成功提示
+      alert(`作品《${workTitle}》已成功删除`);
+      
+      // 如果当前页只有这一个作品，且不是第一页，则返回上一页
+      if (works.length === 1 && currentPage > 1) {
+        setCurrentPage(prev => prev - 1);
+      } else {
+        // 重新加载作品列表
+        await loadWorks();
+      }
+    } catch (err) {
+      console.error('删除作品失败:', err);
+      const errorMessage = err instanceof Error ? err.message : '删除作品失败，请稍后重试';
+      setError(errorMessage);
+      alert(`删除失败：${errorMessage}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // 处理菜单项点击
   const handleMenuAction = async (action: string, workId: string, format?: string) => {
     setOpenMenuId(null);
@@ -118,18 +162,61 @@ export default function WorksPage() {
     try {
       switch (action) {
         case 'delete':
-          if (confirm('确定要删除这个作品吗？')) {
-            await worksApi.deleteWork(Number(workId));
-            await loadWorks();
-          }
+          await handleDeleteWork(workId);
           break;
         case 'export':
           // TODO: 实现导出功能
           console.log(`导出作品 ${workId} 为 ${format} 格式`);
           break;
         case 'copy-link':
-          // TODO: 实现复制链接功能
-          console.log(`复制作品 ${workId} 的链接`);
+          // 生成作品链接
+          const workLink = `${window.location.origin}/novel/editor?workId=${workId}`;
+          
+          try {
+            // 使用 Clipboard API 复制链接
+            await navigator.clipboard.writeText(workLink);
+            // 显示成功提示
+            alert('链接已复制到剪贴板');
+          } catch (clipboardErr) {
+            // 如果 Clipboard API 不可用，使用备用方法
+            console.warn('Clipboard API 不可用，使用备用方法:', clipboardErr);
+            
+            // 创建临时文本区域
+            const textArea = document.createElement('textarea');
+            textArea.value = workLink;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-999999px';
+            textArea.style.top = '-999999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            try {
+              const successful = document.execCommand('copy');
+              document.body.removeChild(textArea);
+              
+              if (successful) {
+                alert('链接已复制到剪贴板');
+              } else {
+                // 如果复制失败，显示链接让用户手动复制
+                const userConfirmed = window.confirm(
+                  `无法自动复制链接，请手动复制：\n\n${workLink}\n\n点击"确定"打开链接`
+                );
+                if (userConfirmed) {
+                  window.open(workLink, '_blank');
+                }
+              }
+            } catch (fallbackErr) {
+              document.body.removeChild(textArea);
+              // 最后的后备方案：显示链接并询问是否打开
+              const userConfirmed = window.confirm(
+                `无法复制链接，请手动复制：\n\n${workLink}\n\n点击"确定"打开链接`
+              );
+              if (userConfirmed) {
+                window.open(workLink, '_blank');
+              }
+            }
+          }
           break;
         default:
           console.log(`Action: ${action}, Work ID: ${workId}, Format: ${format || 'N/A'}`);
@@ -154,6 +241,14 @@ export default function WorksPage() {
       console.error('创建作品失败:', err);
       alert(err instanceof Error ? err.message : '创建作品失败');
     }
+  };
+
+  // 处理导入成功
+  const handleImportSuccess = (_workId: number, _workTitle: string) => {
+    // 重新加载作品列表
+    loadWorks();
+    // 可选：跳转到作品页面
+    // navigate(`/novel/editor?workId=${workId}`);
   };
 
   return (
@@ -187,13 +282,9 @@ export default function WorksPage() {
               </div>
             )}
           </div>
-          <button className="action-btn">
-            <BookOpen size={16} />
-            <span>拆书</span>
-          </button>
-          <button className="action-btn">
+          <button className="action-btn" onClick={() => setShowImportModal(true)}>
             <Upload size={16} />
-            <span>导入</span>
+            <span>导入作品</span>
           </button>
           <div className="view-toggle">
             <button
@@ -387,6 +478,12 @@ export default function WorksPage() {
           <span className="pagination-info">共 {total} 条</span>
         </div>
       )}
+
+      <ImportWorkModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onSuccess={handleImportSuccess}
+      />
     </div>
   );
 }

@@ -21,6 +21,14 @@ class TemplateService:
 
     async def create_template(self, creator_id: int, **kwargs) -> WorkTemplate:
         """创建作品模板"""
+        # 确保 template_config 有默认值
+        if "template_config" not in kwargs or kwargs["template_config"] is None:
+            kwargs["template_config"] = {}
+        
+        # 确保 settings 有默认值
+        if "settings" not in kwargs or kwargs["settings"] is None:
+            kwargs["settings"] = {}
+        
         template = WorkTemplate(
             creator_id=creator_id,
             **kwargs
@@ -29,6 +37,13 @@ class TemplateService:
         self.db.add(template)
         await self.db.commit()
         await self.db.refresh(template)
+        
+        # 重新查询以预加载关系（避免懒加载问题）
+        stmt = select(WorkTemplate).options(
+            selectinload(WorkTemplate.fields)
+        ).where(WorkTemplate.id == template.id)
+        result = await self.db.execute(stmt)
+        template = result.scalar_one()
 
         return template
 

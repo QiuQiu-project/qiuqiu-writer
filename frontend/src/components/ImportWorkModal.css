@@ -1,0 +1,232 @@
+.import-work-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.import-work-modal {
+  background: var(--bg-primary, #ffffff);
+  border-radius: 12px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.import-work-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-light, #e5e5e5);
+}
+
+.import-work-modal-header h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary, #666);
+  transition: color 0.2s;
+}
+
+.close-btn:hover {
+  color: var(--text-primary, #1a1a1a);
+}
+
+.import-work-modal-body {
+  padding: 24px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.file-upload-area {
+  margin-bottom: 20px;
+}
+
+.file-input {
+  display: none;
+}
+
+.file-label {
+  display: block;
+  border: 2px dashed var(--border-light, #e5e5e5);
+  border-radius: 8px;
+  padding: 40px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--bg-secondary, #f9f9f9);
+}
+
+.file-label:hover:not(.disabled) {
+  border-color: var(--accent-primary, #4a90e2);
+  background: var(--bg-hover, #f0f7ff);
+}
+
+.file-label.disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.file-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-secondary, #666);
+}
+
+.file-placeholder svg {
+  color: var(--accent-primary, #4a90e2);
+}
+
+.file-hint {
+  font-size: 12px;
+  color: var(--text-tertiary, #999);
+}
+
+.file-selected {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.file-selected svg {
+  color: var(--accent-primary, #4a90e2);
+}
+
+.file-size {
+  font-size: 12px;
+  color: var(--text-tertiary, #999);
+}
+
+.import-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: var(--bg-secondary, #f9f9f9);
+  border-radius: 8px;
+  margin-bottom: 20px;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.import-error {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: #fee;
+  border: 1px solid #fcc;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  color: #c33;
+}
+
+.import-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.success-icon {
+  color: #4caf50;
+}
+
+.import-success h3 {
+  margin: 0;
+  font-size: 20px;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.import-success p {
+  margin: 0;
+  color: var(--text-secondary, #666);
+}
+
+.import-work-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px 24px;
+  border-top: 1px solid var(--border-light, #e5e5e5);
+}
+
+.btn-primary,
+.btn-secondary {
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.btn-primary {
+  background: var(--accent-primary, #4a90e2);
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-primary-hover, #357abd);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: var(--bg-secondary, #f9f9f9);
+  color: var(--text-primary, #1a1a1a);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--bg-hover, #f0f0f0);
+}
+
+.btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+

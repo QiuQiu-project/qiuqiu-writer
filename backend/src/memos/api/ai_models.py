@@ -3,7 +3,7 @@ AI接口的数据模型定义
 包含章节分析相关的请求和响应模型
 """
 
-from typing import Generic, Literal, TypeVar
+from typing import Generic, Literal, TypeVar, List
 
 from pydantic import BaseModel, Field
 
@@ -63,6 +63,20 @@ class AnalyzeChapterRequest(BaseModel):
         default_factory=AnalysisSettings,
         description="AI分析设置",
     )
+
+
+class ChapterData(BaseModel):
+    """章节数据模型"""
+    chapter_number: int = Field(..., description="章节号")
+    title: str = Field(..., description="章节标题")
+    content: str = Field(..., description="章节内容")
+    volume_number: int = Field(1, description="卷号")
+
+
+class CreateWorkFromFileRequest(BaseModel):
+    """从文件创建作品请求模型"""
+    file_name: str = Field(..., description="文件名")
+    chapters: List[ChapterData] = Field(..., description="章节数据列表")
 
 
 class AnalyzeChapterByFileRequest(BaseModel):

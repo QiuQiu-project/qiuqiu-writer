@@ -1,9 +1,17 @@
 import './NovelPage.css';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, ChevronDown, ChevronRight } from 'lucide-react';
+import ImportWorkModal from '../components/ImportWorkModal';
 
 export default function NovelPage() {
   const navigate = useNavigate();
+  const [showImportModal, setShowImportModal] = useState(false);
+
+  const handleImportSuccess = (workId: number) => {
+    // 导入成功后可以跳转到作品页面
+    navigate(`/novel/editor?workId=${workId}`);
+  };
 
   return (
     <div className="novel-page">
@@ -39,7 +47,7 @@ export default function NovelPage() {
           </div>
           <div 
             className="novel-new-card"
-            onClick={() => navigate('/book-splitter')}
+            onClick={() => setShowImportModal(true)}
             style={{ cursor: 'pointer' }}
           >
             <div className="card-icon-wrapper">
@@ -49,8 +57,8 @@ export default function NovelPage() {
               </div>
             </div>
             <div className="card-text">
-              <h2>小说拆书</h2>
-              <p>提取大纲，拆解剧情，助力创作</p>
+              <h2>导入作品</h2>
+              <p>上传文件，自动拆分章节，快速创建作品</p>
             </div>
           </div>
         </div>
@@ -122,6 +130,12 @@ export default function NovelPage() {
           </button>
         </div>
       </section>
+
+      <ImportWorkModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onSuccess={handleImportSuccess}
+      />
     </div>
   );
 }

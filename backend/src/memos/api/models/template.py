@@ -30,6 +30,7 @@ class WorkTemplate(Base):
     category = Column(String(50), index=True)
     tags = Column(JSON, default=list)
     template_config = Column(JSON, nullable=False)  # 模板配置信息
+    settings = Column(JSON, default=dict)  # 模板设置（如默认值、验证规则等）
     usage_count = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -65,12 +66,30 @@ class WorkTemplate(Base):
             "category": self.category,
             "tags": self.tags or [],
             "template_config": self.template_config or {},
+            "settings": self.settings or {},
             "usage_count": self.usage_count,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
 
         if include_fields:
+            # 安全地访问 fields，避免在异步上下文中触发懒加载
+            try:
+                # 检查 fields 是否已加载
+                if hasattr(self, '_sa_instance_state'):
+                    state = self._sa_instance_state
+                    fields_attr = state.attrs.get('fields')
+                    if fields_attr and fields_attr.loaded_value is not None:
+                        fields = fields_attr.loaded_value
+                    else:
+                        # 如果未加载，返回空列表（避免触发懒加载）
+                        fields = []
+                else:
+                    fields = getattr(self, 'fields', []) or []
+            except Exception:
+                # 如果访问失败，返回空列表
+                fields = []
+            
             data["fields"] = [
                 {
                     "id": field.id,
@@ -83,7 +102,7 @@ class WorkTemplate(Base):
                     "default_value": field.default_value,
                     "sort_order": field.sort_order,
                 }
-                for field in (self.fields or [])
+                for field in fields
             ]
 
         if include_stats:

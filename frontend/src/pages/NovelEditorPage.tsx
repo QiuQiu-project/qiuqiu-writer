@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Info, Coins, Settings, Undo2, Redo2, Type, Bold, Underline, ToggleLeft, ToggleRight, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Info, Coins, Settings, Undo2, Redo2, Type, Bold, Underline, ToggleLeft, ToggleRight, ChevronDown, Trash2, Sparkles, Loader2 } from 'lucide-react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import UnderlineExtension from '@tiptap/extension-underline';
@@ -52,9 +52,14 @@ export default function NovelEditorPage() {
   const [work, setWork] = useState<Work | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // 章节切换加载状态
+  const [chapterLoading, setChapterLoading] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleValue, setTitleValue] = useState('');
   const titleInputRef = useRef<HTMLInputElement>(null);
+  // 分析本书状态
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState<string>('');
   
   // 存储所有章节数据（用于计算章节号）
   const [allChapters, setAllChapters] = useState<Chapter[]>([]);
@@ -111,6 +116,9 @@ export default function NovelEditorPage() {
   // 自动保存定时器
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentChapterIdRef = useRef<number | null>(null);
+  // 关键修复：防止频闪 - 记录上次设置的内容，避免重复设置相同内容
+  const lastSetContentRef = useRef<string>('');
+  const updateContentTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 从WorkInfoManager缓存中提取角色数据
   // 关键修复：使用 useRef 存储上一次的结果，避免重复计算
@@ -569,6 +577,148 @@ export default function NovelEditorPage() {
     }
   };
 
+  // 删除作品
+  const handleDeleteWork = async () => {
+    if (!workId || !work) return;
+    
+    const confirmed = window.confirm(`确定要删除作品《${work.title}》吗？此操作不可恢复！`);
+    if (!confirmed) return;
+    
+    try {
+      await worksApi.deleteWork(Number(workId));
+      alert('作品删除成功');
+      navigate('/works');
+    } catch (err) {
+      console.error('删除作品失败:', err);
+      alert(err instanceof Error ? err.message : '删除作品失败');
+    }
+  };
+
+  // 分析本书
+  const handleAnalyzeWork = async () => {
+    if (!workId || !allChapters || allChapters.length === 0) {
+      alert('没有可分析的章节');
+      return;
+    }
+    
+    const confirmed = window.confirm(`确定要分析作品《${work?.title}》的所有章节吗？这将使用AI分析所有章节内容。`);
+    if (!confirmed) return;
+    
+    setIsAnalyzing(true);
+    setAnalysisProgress('准备分析...');
+    
+    try {
+      // 收集所有章节的内容
+      const chaptersContent: string[] = [];
+      for (const chapter of allChapters) {
+        try {
+          // 从 ShareDB 获取章节内容
+          const documentId = `work_${workId}_chapter_${chapter.id}`;
+          const doc = await sharedbClient.getDocument(documentId);
+          if (doc && doc.content) {
+            const content = typeof doc.content === 'string' ? doc.content : JSON.stringify(doc.content);
+            chaptersContent.push(content);
+          } else {
+            // 如果 ShareDB 没有，尝试从章节 API 获取
+            const chapterData = await chaptersApi.getChapter(chapter.id);
+            if (chapterData.content) {
+              chaptersContent.push(chapterData.content);
+            }
+          }
+        } catch (err) {
+          console.warn(`获取章节 ${chapter.id} 内容失败:`, err);
+        }
+      }
+      
+      if (chaptersContent.length === 0) {
+        alert('没有找到可分析的章节内容');
+        setIsAnalyzing(false);
+        return;
+      }
+      
+      // 合并所有章节内容（用分隔符分开）
+      const combinedContent = chaptersContent.join('\n\n---章节分隔符---\n\n');
+      
+      setAnalysisProgress(`开始分析 ${chaptersContent.length} 个章节...`);
+      
+      // 调用渐进式分析接口
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
+      const token = localStorage.getItem('access_token');
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/ai/analyze-chapters-incremental?work_id=${workId}`,
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            content: combinedContent,
+            settings: {},
+          }),
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error(`分析失败: ${response.status} ${response.statusText}`);
+      }
+      
+      // 处理流式响应
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('无法获取响应流');
+      }
+      
+      const decoder = new TextDecoder();
+      let buffer = '';
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.type === 'chunk' && data.content) {
+                setAnalysisProgress(data.content.substring(0, 100));
+              } else if (data.type === 'chapter_inserted') {
+                setAnalysisProgress(`第 ${data.chapter_index + 1} 章分析完成并已插入作品`);
+              } else if (data.type === 'all_chapters_complete') {
+                setAnalysisProgress('所有章节分析完成！');
+                setTimeout(() => {
+                  setIsAnalyzing(false);
+                  setAnalysisProgress('');
+                  alert('分析完成！角色、地点和章节信息已更新。');
+                  // 重新加载作品数据
+                  window.location.reload();
+                }, 1000);
+              } else if (data.type === 'error' || data.type === 'chapter_insert_error') {
+                console.error('分析错误:', data.message);
+                setAnalysisProgress(`错误: ${data.message}`);
+              }
+            } catch (e) {
+              // 忽略解析错误
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('分析失败:', err);
+      alert(err instanceof Error ? err.message : '分析失败');
+      setIsAnalyzing(false);
+      setAnalysisProgress('');
+    }
+  };
+
   // 加载章节列表
   useEffect(() => {
     if (!workId) return;
@@ -679,6 +829,11 @@ export default function NovelEditorPage() {
     if (!selectedChapter || !editor) return;
 
     const chapterId = parseInt(selectedChapter);
+    
+    // 关键修复：切换章节时清除上次设置的内容记录，避免影响新章节
+    if (!isNaN(chapterId) && currentChapterIdRef.current !== chapterId) {
+      lastSetContentRef.current = ''; // 清除记录，允许新章节设置内容
+    }
     if (isNaN(chapterId)) {
       // 如果是草稿或其他非数字ID，不加载
       editor.commands.setContent('<p></p>');
@@ -687,40 +842,130 @@ export default function NovelEditorPage() {
     }
 
     const loadChapterContent = async () => {
+      // 显示加载动画
+      setChapterLoading(true);
+      
       try {
-        // 使用 workId 和 chapterId 生成唯一的缓存键
-        const documentId = workId 
-          ? `work_${workId}_chapter_${chapterId}` 
-          : `chapter_${chapterId}`;
-        // 兼容旧格式的缓存键（没有 workId）
-        const oldDocumentId = `chapter_${chapterId}`;
-        currentChapterIdRef.current = chapterId;
+        // 关键修复：在加载新章节前，先保存当前章节的内容
+        const previousChapterId = currentChapterIdRef.current;
+      if (previousChapterId && previousChapterId !== chapterId && workId) {
+        try {
+          // 关键修复：立即清除所有待保存的定时器，避免保存到错误的章节
+          // 这样可以防止自动保存在新章节加载后保存到前一个章节
+          const saveTimeoutRef = (window as any).__chapterSaveTimeout;
+          if (saveTimeoutRef?.current) {
+            clearTimeout(saveTimeoutRef.current);
+            console.log('🛑 [切换章节] 已清除待保存的定时器，避免保存到错误章节');
+          }
+          
+          // 关键修复：清除自动拉取定时器，避免拉取其他章节的内容
+          const pullTimer = (window as any).__chapterPullTimer;
+          if (pullTimer) {
+            clearTimeout(pullTimer);
+            console.log('🛑 [切换章节] 已清除自动拉取定时器，避免拉取错误章节');
+            delete (window as any).__chapterPullTimer;
+          }
+          
+          // 等待一小段时间，确保所有异步保存操作完成
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          // 关键修复：在清空编辑器前，立即获取并保存当前章节内容
+          // 此时编辑器还显示前一个章节的内容
+          const currentContent = editor.getHTML();
+          const previousDocumentId = `work_${workId}_chapter_${previousChapterId}`;
+          
+          console.log('💾 [切换章节] 保存前一个章节内容:', {
+            previousChapterId,
+            newChapterId: chapterId,
+            previousDocumentId,
+            contentLength: currentContent.length,
+            contentPreview: currentContent.substring(0, 100),
+            editorContent: editor.getHTML().substring(0, 100), // 验证编辑器内容
+          });
+          
+          // 关键修复：验证编辑器内容确实属于前一个章节
+          // 如果编辑器内容已经被清空或改变，说明可能已经切换了，不应该保存
+          if (currentContent && currentContent.trim() !== '<p></p>' && currentContent.trim() !== '') {
+            // 立即保存前一个章节的内容，使用同步方式确保保存完成
+            await sharedbClient.updateDocument(previousDocumentId, currentContent, {
+              work_id: Number(workId),
+              chapter_id: previousChapterId,
+              updated_at: new Date().toISOString(),
+            });
+            
+            // 验证保存是否成功
+            const savedDoc = await sharedbClient.getDocument(previousDocumentId);
+            if (savedDoc && typeof savedDoc.content === 'string') {
+              if (savedDoc.content === currentContent) {
+                console.log('✅ [切换章节] 前一个章节内容已保存并验证成功');
+              } else {
+                console.warn('⚠️ [切换章节] 保存的内容与原始内容不匹配，可能存在问题', {
+                  savedLength: savedDoc.content.length,
+                  originalLength: currentContent.length,
+                });
+              }
+            }
+            
+            console.log('✅ [切换章节] 前一个章节内容已保存');
+          } else {
+            console.warn('⚠️ [切换章节] 编辑器内容为空，跳过保存');
+          }
+        } catch (err) {
+          console.error('❌ [切换章节] 保存前一个章节内容失败:', err);
+        }
+      }
+      
+      // 关键修复：在加载新章节前，先清空编辑器内容，避免显示旧内容
+      // 注意：不要提前更新 currentChapterIdRef，因为自动保存还在使用它来验证章节ID
+      console.log('🔄 [切换章节] 清空编辑器，准备加载新章节内容');
+      editor.commands.setContent('<p></p>');
+      
+      // 等待编辑器清空完成
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      try {
+        // 使用 workId 和 chapterId 生成唯一的缓存键（统一使用新格式）
+        if (!workId) {
+          console.error('❌ [章节加载] workId 不存在，无法加载章节内容');
+          setChapterLoading(false);
+          return;
+        }
+        const documentId = `work_${workId}_chapter_${chapterId}`;
         
         console.log('📖 加载章节内容:', {
           workId,
           chapterId,
           documentId,
-          oldDocumentId,
         });
         
         let content: string | null = null;
         
         // 1. 先从本地缓存获取（即时响应）- 优先新格式，兼容旧格式
         try {
+          // 关键修复：确保使用正确的文档ID，避免缓存键冲突
+          console.log('🔍 [缓存检查] 开始获取缓存，文档ID:', {
+            documentId,
+            chapterId,
+            workId,
+          });
+          
           // 先尝试新格式
           let cachedDoc = await sharedbClient.getDocument(documentId);
           
-          // 如果新格式没有，尝试旧格式（兼容性）
-          if (!cachedDoc && documentId !== oldDocumentId) {
-            console.log('🔄 新格式缓存未找到，尝试旧格式:', oldDocumentId);
-            cachedDoc = await sharedbClient.getDocument(oldDocumentId);
-            if (cachedDoc) {
-              console.log('✅ 从旧格式缓存找到内容，将迁移到新格式');
-              // 迁移到新格式（异步，不阻塞）
-              if (workId) {
-                sharedbClient.updateDocument(documentId, cachedDoc.content || '', cachedDoc.metadata)
-                  .catch(err => console.warn('迁移缓存失败:', err));
-              }
+          // 验证缓存内容是否属于当前章节
+          if (cachedDoc) {
+            const cachedChapterId = cachedDoc.metadata?.chapter_id;
+            if (cachedChapterId && cachedChapterId !== chapterId) {
+              console.warn('⚠️ [缓存检查] 缓存内容属于其他章节，清除缓存:', {
+                cachedChapterId,
+                expectedChapterId: chapterId,
+                documentId,
+              });
+              // 清除错误的缓存
+              await localCacheManager.delete(documentId);
+              cachedDoc = null;
+            } else {
+              console.log('✅ [缓存检查] 缓存内容验证通过，属于当前章节');
             }
           }
           
@@ -731,7 +976,6 @@ export default function NovelEditorPage() {
           
           console.log('💾 缓存数据:', {
             documentId,
-            oldDocumentId,
             cached: !!cachedDoc,
             cachedDoc,
             contentType: cachedDoc?.content ? typeof cachedDoc.content : 'null',
@@ -749,38 +993,7 @@ export default function NovelEditorPage() {
                 content = cachedDoc.content;
                 console.log('✅ 从缓存获取到字符串内容，长度:', content.length);
               } else {
-                console.log('⚠️ 缓存内容是空字符串，尝试从旧格式缓存获取...');
-                // 如果新格式缓存是空的，尝试从旧格式获取
-                if (documentId !== oldDocumentId) {
-                  try {
-                    const oldCachedDoc = await sharedbClient.getDocument(oldDocumentId);
-                    if (oldCachedDoc) {
-                      console.log('🔄 从旧格式缓存获取:', JSON.stringify(oldCachedDoc, null, 2));
-                      if (typeof oldCachedDoc.content === 'string' && oldCachedDoc.content.trim().length > 0) {
-                        content = oldCachedDoc.content;
-                        console.log('✅ 从旧格式缓存获取到内容，长度:', content.length);
-                        // 迁移到新格式
-                        if (workId) {
-                          sharedbClient.updateDocument(documentId, content, oldCachedDoc.metadata)
-                            .catch(err => console.warn('迁移缓存失败:', err));
-                        }
-                      } else if (oldCachedDoc.content && typeof oldCachedDoc.content === 'object') {
-                        const oldInnerContent = oldCachedDoc.content.content;
-                        if (typeof oldInnerContent === 'string' && oldInnerContent.trim().length > 0) {
-                          content = oldInnerContent;
-                          console.log('✅ 从旧格式缓存对象中提取内容，长度:', content.length);
-                          // 迁移到新格式
-                          if (workId) {
-                            sharedbClient.updateDocument(documentId, content, oldCachedDoc.metadata)
-                              .catch(err => console.warn('迁移缓存失败:', err));
-                          }
-                        }
-                      }
-                    }
-                  } catch (oldErr) {
-                    console.warn('从旧格式缓存获取失败:', oldErr);
-                  }
-                }
+                console.log('⚠️ 缓存内容是空字符串，将从服务器获取');
               }
             } else if (cachedDoc.content && typeof cachedDoc.content === 'object') {
               // 如果内容是对象，尝试提取 content 字段
@@ -790,38 +1003,7 @@ export default function NovelEditorPage() {
                   content = innerContent;
                   console.log('✅ 从缓存对象中提取内容，长度:', content.length);
                 } else {
-                  console.log('⚠️ 缓存对象中的 content 字段是空字符串，尝试从旧格式获取...');
-                  // 如果新格式缓存对象中的 content 是空的，尝试从旧格式获取
-                  if (documentId !== oldDocumentId) {
-                    try {
-                      const oldCachedDoc = await sharedbClient.getDocument(oldDocumentId);
-                      if (oldCachedDoc) {
-                        console.log('🔄 从旧格式缓存获取:', JSON.stringify(oldCachedDoc, null, 2));
-                        if (typeof oldCachedDoc.content === 'string' && oldCachedDoc.content.trim().length > 0) {
-                          content = oldCachedDoc.content;
-                          console.log('✅ 从旧格式缓存获取到字符串内容，长度:', content.length);
-                          // 迁移到新格式
-                          if (workId) {
-                            sharedbClient.updateDocument(documentId, content, oldCachedDoc.metadata)
-                              .catch(err => console.warn('迁移缓存失败:', err));
-                          }
-                        } else if (oldCachedDoc.content && typeof oldCachedDoc.content === 'object') {
-                          const oldInnerContent = oldCachedDoc.content.content;
-                          if (typeof oldInnerContent === 'string' && oldInnerContent.trim().length > 0) {
-                            content = oldInnerContent;
-                            console.log('✅ 从旧格式缓存对象中提取内容，长度:', content.length);
-                            // 迁移到新格式
-                            if (workId) {
-                              sharedbClient.updateDocument(documentId, content, oldCachedDoc.metadata)
-                                .catch(err => console.warn('迁移缓存失败:', err));
-                            }
-                          }
-                        }
-                      }
-                    } catch (oldErr) {
-                      console.warn('从旧格式缓存获取失败:', oldErr);
-                    }
-                  }
+                  console.log('⚠️ 缓存对象中的 content 字段是空字符串，将从服务器获取');
                 }
               } else {
                 // 尝试序列化为字符串
@@ -954,9 +1136,11 @@ export default function NovelEditorPage() {
               
               // 如果成功获取内容，保存到缓存
               if (content) {
-                const cacheKey = workId 
-                  ? `work_${workId}_chapter_${chapterId}` 
-                  : `chapter_${chapterId}`;
+                if (!workId) {
+                  console.error('❌ [缓存] workId 不存在，无法保存到缓存');
+                  return;
+                }
+                const cacheKey = `work_${workId}_chapter_${chapterId}`;
                 
                 console.log('💾 保存到缓存:', {
                   cacheKey,
@@ -990,9 +1174,11 @@ export default function NovelEditorPage() {
               
               if (chapter.content) {
                 content = chapter.content;
-                const cacheKey = workId 
-                  ? `work_${workId}_chapter_${chapterId}` 
-                  : `chapter_${chapterId}`;
+                if (!workId) {
+                  console.error('❌ [缓存] workId 不存在，无法保存到缓存');
+                  return;
+                }
+                const cacheKey = `work_${workId}_chapter_${chapterId}`;
                 
                 sharedbClient.updateDocument(cacheKey, chapter.content, {
                   work_id: chapter.work_id,
@@ -1016,38 +1202,121 @@ export default function NovelEditorPage() {
         // 即使内容为空，也设置编辑器（允许用户开始编辑）
         if (content !== null) {
           // content 可能是空字符串，这是正常的（新章节）
-          editor.commands.setContent(content || '<p></p>');
-          console.log('✅ 编辑器内容已设置，长度:', content?.length || 0);
+          // 关键修复：验证内容确实属于当前章节
+          if (!workId) {
+            console.error('❌ [章节加载] workId 不存在');
+            setChapterLoading(false);
+            return;
+          }
+          const expectedDocumentId = `work_${workId}_chapter_${chapterId}`;
+          
+          console.log('✏️ [设置编辑器] 验证内容来源:', {
+            expectedDocumentId,
+            chapterId,
+            contentLength: content?.length || 0,
+            contentPreview: content?.substring(0, 100) || 'empty',
+          });
+          
+          // 关键修复：防止频闪 - 检查是否与上次设置的内容相同
+          if (lastSetContentRef.current !== content) {
+            editor.commands.setContent(content || '<p></p>');
+            lastSetContentRef.current = content || '<p></p>'; // 记录已设置的内容
+            
+            // 验证设置后的内容
+            const setContent = editor.getHTML();
+            if (setContent === (content || '<p></p>')) {
+              console.log('✅ [设置编辑器] 内容已正确设置，长度:', setContent.length);
+            } else {
+              console.warn('⚠️ [设置编辑器] 内容设置后不匹配，可能存在缓存问题');
+            }
+          } else {
+            console.log('✅ [设置编辑器] 内容与上次设置相同，跳过更新，避免频闪');
+          }
         } else {
           // 如果 content 是 null（获取失败），设置空编辑器
           console.warn('⚠️ 内容获取失败，设置空编辑器');
           editor.commands.setContent('<p></p>');
         }
+        
+        // 在内容加载完成后，更新 currentChapterIdRef
+        // 这样下次切换章节时能正确保存当前章节
+        currentChapterIdRef.current = chapterId;
+        
+        console.log('✅ [章节加载完成] currentChapterIdRef 已更新为:', chapterId);
 
         // 关键修复：章节切换后延迟从服务器拉取最新更新
         // 延迟执行，避免与轮询冲突，减少频繁请求
         // 轮询会在10秒后自动检查更新，这里延迟5秒，给轮询留出时间
-        setTimeout(async () => {
+        // 使用一个标记来跟踪这个定时器，方便在切换章节时清除
+        const pullTimer = setTimeout(async () => {
           try {
+            // 关键修复：再次验证章节ID，确保没有切换章节
+            const currentChapterIdCheck = currentChapterIdRef.current;
+            if (currentChapterIdCheck !== chapterId) {
+              console.warn('⚠️ [自动拉取] 章节已切换，跳过拉取:', {
+                currentChapterIdRef: currentChapterIdCheck,
+                expectedChapterId: chapterId,
+              });
+              return;
+            }
+            
             console.log('🔄 [自动拉取] 章节切换后自动从服务器拉取最新更新:', documentId);
             const serverDoc = await sharedbClient.forcePullFromServer(documentId);
+            
+            // 再次验证章节ID（可能在异步操作期间切换了）
+            const currentChapterIdCheck2 = currentChapterIdRef.current;
+            if (currentChapterIdCheck2 !== chapterId) {
+              console.warn('⚠️ [自动拉取] 章节在拉取期间已切换，跳过更新:', {
+                currentChapterIdRef: currentChapterIdCheck2,
+                expectedChapterId: chapterId,
+              });
+              return;
+            }
             
             if (serverDoc && serverDoc.content) {
               const serverContent = typeof serverDoc.content === 'string' 
                 ? serverDoc.content 
                 : JSON.stringify(serverDoc.content);
               
+              // 关键修复：验证服务器内容确实属于当前章节
+              const serverChapterId = serverDoc.metadata?.chapter_id;
+              if (serverChapterId && serverChapterId !== chapterId) {
+                console.error('❌ [自动拉取] 严重错误：服务器内容属于其他章节！', {
+                  serverChapterId,
+                  expectedChapterId: chapterId,
+                  documentId,
+                });
+                return; // 不更新，避免覆盖错误的内容
+              }
+              
+              // 关键修复：防止频闪 - 检查是否与上次设置的内容相同
+              if (lastSetContentRef.current === serverContent) {
+                console.log('✅ [自动拉取] 内容与上次设置相同，跳过更新，避免频闪');
+                return;
+              }
+              
               // 如果服务器内容与当前编辑器内容不同，更新编辑器
               const currentContent = editor.getHTML();
-              if (serverContent !== currentContent) {
+              
+              // 关键修复：更严格的内容比较
+              const normalizeContent = (content: string) => {
+                return content.trim().replace(/\s+/g, ' ');
+              };
+              
+              const normalizedCurrent = normalizeContent(currentContent);
+              const normalizedServer = normalizeContent(serverContent);
+              
+              if (normalizedCurrent !== normalizedServer) {
                 console.log('✅ [自动拉取] 检测到服务器有新内容，更新编辑器:', {
                   serverVersion: serverDoc.version,
                   serverContentLength: serverContent.length,
                   currentContentLength: currentContent.length
                 });
                 editor.commands.setContent(serverContent);
+                lastSetContentRef.current = serverContent; // 记录已设置的内容
               } else {
                 console.log('✅ [自动拉取] 服务器内容与当前内容一致，无需更新');
+                lastSetContentRef.current = serverContent; // 更新记录，避免下次重复检查
               }
             }
           } catch (pullErr) {
@@ -1055,10 +1324,25 @@ export default function NovelEditorPage() {
             console.warn('⚠️ [自动拉取] 从服务器拉取更新失败（不影响使用）:', pullErr);
           }
         }, 5000); // 延迟5秒，避免与轮询冲突
-      } catch (err) {
-        console.error('加载章节内容失败:', err);
+        
+        // 将定时器存储到 ref 中，方便在切换章节时清除
+        (window as any).__chapterPullTimer = pullTimer;
+        
+        // 隐藏加载动画
+        setChapterLoading(false);
+      } catch (innerErr) {
+        console.error('加载章节内容失败:', innerErr);
         // 即使所有方法都失败，也显示空内容，保证编辑器可用
         editor.commands.setContent('<p></p>');
+        // 隐藏加载动画
+        setChapterLoading(false);
+      }
+      } catch (err) {
+        console.error('加载章节内容失败（外层）:', err);
+        // 即使所有方法都失败，也显示空内容，保证编辑器可用
+        editor.commands.setContent('<p></p>');
+        // 隐藏加载动画
+        setChapterLoading(false);
       }
     };
 
@@ -1076,12 +1360,73 @@ export default function NovelEditorPage() {
   const updateContent = async (newContent: string) => {
     if (!editor || !selectedChapter || !workId) return;
     
+    // 关键修复：验证章节ID，确保更新的是当前章节的内容
+    const chapterId = parseInt(selectedChapter);
+    if (isNaN(chapterId)) {
+      console.warn('⚠️ [智能同步] 章节ID无效，跳过更新');
+      return;
+    }
+    
+    const currentChapterIdCheck = currentChapterIdRef.current;
+    if (currentChapterIdCheck !== chapterId) {
+      console.warn('⚠️ [智能同步] 章节已切换，跳过更新:', {
+        currentChapterIdRef: currentChapterIdCheck,
+        expectedChapterId: chapterId,
+      });
+      return;
+    }
+    
+    // 关键修复：防止频闪 - 检查是否与上次设置的内容相同
+    if (lastSetContentRef.current === newContent) {
+      // 内容相同，不需要更新，避免频闪
+      return;
+    }
+    
     // 更新编辑器内容（仅在内容真正不同时）
     const currentContent = editor.getHTML();
-    if (currentContent !== newContent) {
-      editor.commands.setContent(newContent);
-      console.log('✅ [智能同步] 已更新编辑器内容');
+    
+    // 关键修复：更严格的内容比较，避免微小差异导致的频繁更新
+    // 去除空白字符后比较，或者使用更智能的比较逻辑
+    const normalizeContent = (content: string) => {
+      // 移除多余的空白字符，但保留基本结构
+      return content.trim().replace(/\s+/g, ' ');
+    };
+    
+    const normalizedCurrent = normalizeContent(currentContent);
+    const normalizedNew = normalizeContent(newContent);
+    
+    if (normalizedCurrent === normalizedNew) {
+      // 内容实质相同，不需要更新
+      lastSetContentRef.current = newContent; // 更新记录
+      return;
     }
+    
+    // 关键修复：防抖更新，避免频繁设置内容导致频闪
+    if (updateContentTimeoutRef.current) {
+      clearTimeout(updateContentTimeoutRef.current);
+    }
+    
+    updateContentTimeoutRef.current = setTimeout(() => {
+      // 再次验证章节ID（可能在防抖期间切换了）
+      const currentChapterIdCheck2 = currentChapterIdRef.current;
+      if (currentChapterIdCheck2 !== chapterId) {
+        console.warn('⚠️ [智能同步] 章节在更新期间已切换，跳过更新');
+        return;
+      }
+      
+      // 再次检查内容是否仍然不同（可能在防抖期间用户已编辑）
+      const currentContentCheck = editor.getHTML();
+      if (normalizeContent(currentContentCheck) === normalizedNew) {
+        // 内容已经相同，不需要更新
+        lastSetContentRef.current = newContent;
+        return;
+      }
+      
+      // 安全更新编辑器内容
+      editor.commands.setContent(newContent);
+      lastSetContentRef.current = newContent; // 记录已设置的内容
+      console.log('✅ [智能同步] 已更新编辑器内容，章节ID:', chapterId);
+    }, 100); // 100ms 防抖，减少频闪
   };
 
   // 只在有章节选中时启用智能同步
@@ -1147,22 +1492,47 @@ export default function NovelEditorPage() {
     console.log('✅ 自动保存已启动，章节ID:', chapterId);
 
     const handleUpdate = () => {
+      // 关键修复：在触发保存前，先检查章节是否已经切换
+      const currentChapterIdCheck = currentChapterIdRef.current;
+      if (currentChapterIdCheck !== chapterId) {
+        console.warn('⚠️ [自动保存] 章节已切换，跳过保存:', {
+          currentChapterIdRef: currentChapterIdCheck,
+          expectedChapterId: chapterId,
+        });
+        return;
+      }
+      
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
+      
+      // 更新全局引用，方便在切换章节时清除
+      (window as any).__chapterSaveTimeout = { current: null };
 
       saveTimeoutRef.current = setTimeout(async () => {
-        // 再次检查，确保章节没有切换
-        if (selectedChapter !== String(chapterId) || !workId) {
-          console.warn('⚠️ 自动保存跳过：章节已切换或作品ID缺失', {
+        // 再次检查，确保章节没有切换（双重验证）
+        const currentChapterIdCheck2 = currentChapterIdRef.current;
+        if (selectedChapter !== String(chapterId) || !workId || currentChapterIdCheck2 !== chapterId) {
+          console.warn('⚠️ [自动保存] 跳过：章节已切换或作品ID缺失', {
             currentSelected: selectedChapter,
             expectedChapter: chapterId,
+            currentChapterIdRef: currentChapterIdCheck2,
             workId,
           });
           return;
         }
 
         try {
+          // 关键修复：再次验证章节ID，确保保存到正确的章节
+          const currentChapterIdCheck = currentChapterIdRef.current;
+          if (currentChapterIdCheck !== chapterId) {
+            console.warn('⚠️ [自动保存] 章节ID不匹配，跳过保存:', {
+              currentChapterIdRef: currentChapterIdCheck,
+              expectedChapterId: chapterId,
+            });
+            return;
+          }
+          
           const content = editor.getHTML();
           // 使用 workId 和 chapterId 生成唯一的缓存键
           const documentId = `work_${workId}_chapter_${chapterId}`;
@@ -1173,7 +1543,14 @@ export default function NovelEditorPage() {
             documentId,
             contentLength: content.length,
             contentPreview: content.substring(0, 100),
+            currentChapterIdRef: currentChapterIdRef.current, // 验证章节ID
           });
+          
+          // 关键修复：验证内容不为空且确实属于当前章节
+          if (!content || content.trim() === '<p></p>' || content.trim() === '') {
+            console.warn('⚠️ [自动保存] 内容为空，跳过保存');
+            return;
+          }
           
           // 1. 立即保存到本地缓存（用户操作即时响应）
           await sharedbClient.updateDocument(documentId, content, {
@@ -1181,6 +1558,26 @@ export default function NovelEditorPage() {
             chapter_id: chapterId,
             updated_at: new Date().toISOString(),
           });
+          
+          // 关键修复：保存后验证内容确实保存到了正确的章节
+          const savedDoc = await sharedbClient.getDocument(documentId);
+          if (savedDoc) {
+            const savedChapterId = savedDoc.metadata?.chapter_id;
+            if (savedChapterId && savedChapterId !== chapterId) {
+              console.error('❌ [自动保存] 严重错误：内容被保存到了错误的章节！', {
+                savedChapterId,
+                expectedChapterId: chapterId,
+                documentId,
+              });
+              // 尝试修复：删除错误的缓存，重新保存
+              await localCacheManager.delete(documentId);
+              await sharedbClient.updateDocument(documentId, content, {
+                work_id: Number(workId),
+                chapter_id: chapterId,
+                updated_at: new Date().toISOString(),
+              });
+            }
+          }
           
           console.log('✅ [自动保存] 已保存到本地缓存:', documentId);
           
@@ -1218,6 +1615,14 @@ export default function NovelEditorPage() {
       editor.off('update', handleUpdate);
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
+      }
+      // 清除更新内容的防抖定时器
+      if (updateContentTimeoutRef.current) {
+        clearTimeout(updateContentTimeoutRef.current);
+      }
+      // 清除全局引用
+      if ((window as any).__chapterSaveTimeout) {
+        (window as any).__chapterSaveTimeout.current = null;
       }
       // 停止智能同步
       stopSync();
@@ -1636,6 +2041,32 @@ export default function NovelEditorPage() {
         <div className="header-right">
           <div className="header-actions">
             <ThemeSelector />
+            <button 
+              className="action-btn analyze-work-btn" 
+              onClick={handleAnalyzeWork}
+              disabled={isAnalyzing || !allChapters || allChapters.length === 0}
+              title="分析本书的所有章节"
+            >
+              {isAnalyzing ? (
+                <>
+                  <Loader2 size={16} className="spinner" />
+                  <span>分析中...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles size={16} />
+                  <span>分析本书</span>
+                </>
+              )}
+            </button>
+            <button 
+              className="action-btn delete-work-btn" 
+              onClick={handleDeleteWork}
+              title="删除作品"
+            >
+              <Trash2 size={16} />
+              <span>删除</span>
+            </button>
             <button className="action-btn">替换</button>
             <button className="action-btn">回收站</button>
             <button className="action-btn">分享</button>
@@ -1648,6 +2079,14 @@ export default function NovelEditorPage() {
             <button className="member-btn">开会员得蛙币</button>
           </div>
         </div>
+        {isAnalyzing && analysisProgress && (
+          <div className="analysis-progress-overlay">
+            <div className="analysis-progress-content">
+              <Loader2 size={24} className="spinner" />
+              <p>{analysisProgress}</p>
+            </div>
+          </div>
+        )}
       </header>
 
       <div className="novel-editor-body">

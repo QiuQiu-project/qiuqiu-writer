@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import CharacterRelations from './CharacterRelations';
 import type { CharacterRelationsData } from './CharacterRelations';
+import { templatesApi } from '../../utils/templatesApi';
 import './WorkInfoManager.css';
 
 // 势力数据类型
@@ -98,8 +99,24 @@ interface CacheData {
   lastModified: number;
 }
 
-// 从 localStorage 读取缓存（基于 workId）
-const loadFromCache = (workId: string | null): CacheData | null => {
+// 从 localStorage 读取缓存（基于 workId 和可选的 templateId）
+const loadFromCache = (workId: string | null, templateId?: string): CacheData | null => {
+  // 如果有 templateId，优先从模板特定的缓存加载
+  if (templateId) {
+    const templateKey = workId ? `wawawriter_workinfo_cache_${workId}_${templateId}` : `wawawriter_workinfo_cache_${templateId}`;
+    try {
+      const cached = localStorage.getItem(templateKey);
+      if (cached) {
+        const data = JSON.parse(cached);
+        console.log('✅ 从模板特定缓存加载:', templateKey);
+        return data;
+      }
+    } catch (e) {
+      console.warn('Failed to load template-specific cache:', e);
+    }
+  }
+  
+  // 回退到通用缓存
   try {
     const CACHE_KEY = getCacheKey(workId);
     const cached = localStorage.getItem(CACHE_KEY);
@@ -112,8 +129,20 @@ const loadFromCache = (workId: string | null): CacheData | null => {
   return null;
 };
 
-// 保存到 localStorage 缓存（基于 workId）
-const saveToCache = (data: CacheData, workId: string | null) => {
+// 保存到 localStorage 缓存（基于 workId 和可选的 templateId）
+const saveToCache = (data: CacheData, workId: string | null, templateId?: string) => {
+  // 如果有 templateId，保存到模板特定的缓存
+  if (templateId) {
+    const templateKey = workId ? `wawawriter_workinfo_cache_${workId}_${templateId}` : `wawawriter_workinfo_cache_${templateId}`;
+    try {
+      localStorage.setItem(templateKey, JSON.stringify(data));
+      console.log('✅ 已保存到模板特定缓存:', templateKey);
+    } catch (e) {
+      console.warn('Failed to save template-specific cache:', e);
+    }
+  }
+  
+  // 同时保存到通用缓存（向后兼容）
   try {
     const CACHE_KEY = getCacheKey(workId);
     localStorage.setItem(CACHE_KEY, JSON.stringify(data));
@@ -447,12 +476,6 @@ const presetTemplates: TemplateConfig[] = [
       },
     ]
   },
-  {
-    id: 'empty',
-    name: '空白模板',
-    description: '从零开始创建',
-    modules: []
-  },
 ];
 
 // ============ 图标映射 ============
@@ -595,6 +618,16 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
   const [activeModuleIndex, setActiveModuleIndex] = useState(0);
   const [isEditMode, setIsEditMode] = useState(false);
   const [showTemplateSelector, setShowTemplateSelector] = useState(false);
+  const [showCreateTemplate, setShowCreateTemplate] = useState(false);
+  const [createTemplateForm, setCreateTemplateForm] = useState({
+    name: '',
+    description: '',
+    work_type: 'novel',
+    category: '',
+    is_public: false
+  });
+  const [userTemplates, setUserTemplates] = useState<any[]>([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [showAddModule, setShowAddModule] = useState(false);
   const [showAddComponent, setShowAddComponent] = useState(false);
   const [addingToTab, setAddingToTab] = useState<{ tabId: string; componentId: string } | null>(null);
@@ -659,9 +692,12 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
 
   const activeModule = template.modules[activeModuleIndex];
 
-  // 当 workId 变化时，重新加载对应的缓存数据
+  // 当 workId 变化时，从数据库加载模板配置
   useEffect(() => {
-    const cached = loadFromCache(workId || null);
+    const loadTemplate = async () => {
+      if (!workId) {
+        // 如果没有 workId，从本地缓存加载
+        const cached = loadFromCache(null);
     if (cached) {
       const baseTemplate = presetTemplates.find(t => t.id === cached.templateId) || presetTemplates[0];
       setTemplate({
@@ -669,24 +705,156 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
         modules: cached.modules
       });
     } else {
-      // 如果没有缓存，使用默认模板
       setTemplate(JSON.parse(JSON.stringify(presetTemplates[0])));
     }
+        return;
+      }
+
+      try {
+        // 尝试从数据库加载
+        const response = await templatesApi.getWorkTemplateConfig(Number(workId));
+        console.log('初始加载模板配置响应:', response);
+        
+        if (response.template_config && 
+            response.template_config.templateId && 
+            response.template_config.modules &&
+            Array.isArray(response.template_config.modules)) {
+          // 从数据库加载成功
+          console.log('✅ 从数据库加载模板配置成功');
+          console.log('templateId:', response.template_config.templateId);
+          console.log('modules数量:', response.template_config.modules.length);
+          
+          // 尝试找到对应的预设模板或数据库模板
+          let baseTemplate = presetTemplates.find(t => t.id === response.template_config!.templateId);
+          
+          // 如果不是预设模板，尝试从数据库模板列表中找到（需要等待 userTemplates 加载）
+          if (!baseTemplate && response.template_config.templateId.startsWith('db-')) {
+            // 延迟加载，等待 userTemplates 加载完成
+            if (response.template_config) {
+              setTimeout(() => {
+                const dbTemplateId = parseInt(response.template_config!.templateId.replace('db-', ''));
+                const dbTemplate = userTemplates.find(t => t.id === dbTemplateId);
+                if (dbTemplate && response.template_config) {
+                  console.log('✅ 找到匹配的数据库模板，更新模板信息');
+                  setTemplate({
+                    id: `db-${dbTemplate.id}`,
+                    name: dbTemplate.name,
+                    description: dbTemplate.description || '',
+                    modules: response.template_config.modules
+                  });
+                }
+              }, 500);
+            }
+            // 先使用默认模板结构
+            baseTemplate = presetTemplates[0];
+          }
+          
+          // 如果还是找不到，使用默认模板
+          if (!baseTemplate) {
+            baseTemplate = presetTemplates[0];
+          }
+          
+          setTemplate({
+            ...baseTemplate,
+            modules: response.template_config.modules
+          });
+          
+          // 同时更新本地缓存（使用模板ID作为key的一部分）
+          saveToCache({
+            templateId: response.template_config.templateId,
+            modules: response.template_config.modules,
+            lastModified: Date.now()
+          }, workId, response.template_config.templateId);
+        } else {
+          console.log('⚠️ 数据库中没有模板配置，尝试从本地缓存加载');
+          // 数据库中没有，尝试从本地缓存加载（尝试加载最近使用的模板）
+          // 先尝试从通用缓存加载
+          const cached = loadFromCache(workId);
+          if (cached) {
+            const baseTemplate = presetTemplates.find(t => t.id === cached.templateId) || presetTemplates[0];
+            setTemplate({
+              ...baseTemplate,
+              modules: cached.modules
+            });
+            // 同时保存到模板特定缓存
+            saveToCache(cached, workId, cached.templateId);
+          } else {
+            setTemplate(JSON.parse(JSON.stringify(presetTemplates[0])));
+          }
+        }
+      } catch (error) {
+        console.error('加载模板配置失败:', error);
+        // 加载失败，从本地缓存加载
+        const cached = loadFromCache(workId);
+        if (cached) {
+          const baseTemplate = presetTemplates.find(t => t.id === cached.templateId) || presetTemplates[0];
+          setTemplate({
+            ...baseTemplate,
+            modules: cached.modules
+          });
+        } else {
+          setTemplate(JSON.parse(JSON.stringify(presetTemplates[0])));
+        }
+      }
+    };
+
+    loadTemplate();
   }, [workId]);
 
-  // 自动保存到缓存（防抖，基于 workId）
+  // 自动保存到数据库和缓存（防抖，基于 workId）
   useEffect(() => {
-    const timer = setTimeout(() => {
-      saveToCache({
+    // 如果模板为空或没有模块，不保存
+    if (!template || !template.modules || template.modules.length === 0) {
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      const templateData = {
         templateId: template.id,
         modules: template.modules,
         lastModified: Date.now()
-      }, workId || null);
+      };
+
+      console.log('准备保存模板配置:', {
+        workId,
+        templateId: template.id,
+        modulesCount: template.modules.length,
+        templateData
+      });
+
+      // 保存到本地缓存（使用模板ID作为key的一部分）
+      try {
+        saveToCache(templateData, workId || null, template.id);
+        console.log('✅ 模板配置已保存到本地缓存');
+      } catch (error) {
+        console.error('保存到本地缓存失败:', error);
+      }
+
+      // 如果有 workId，同时保存到数据库
+      if (workId) {
+        try {
+          const response = await templatesApi.saveWorkTemplateConfig(Number(workId), templateData);
+          console.log('✅ 模板配置已保存到数据库:', response);
       setHasUnsavedChanges(false);
-    }, 1000); // 1秒后自动保存
+        } catch (error) {
+          console.error('❌ 保存模板配置到数据库失败:', error);
+          // 保存失败时保持未保存状态
+          setHasUnsavedChanges(true);
+          // 显示错误提示
+          if (error instanceof Error) {
+            console.error('错误详情:', error.message);
+          }
+        }
+      } else {
+        // 没有 workId 时，只保存到缓存
+        setHasUnsavedChanges(false);
+      }
+    }, 2000); // 2秒后自动保存（防抖）
 
     setHasUnsavedChanges(true);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+    };
   }, [template, workId]);
 
 
@@ -726,11 +894,296 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
     });
   };
 
+  // 加载用户模板列表
+  useEffect(() => {
+    const loadUserTemplates = async () => {
+      try {
+        setLoadingTemplates(true);
+        const templates = await templatesApi.listTemplates({
+          work_type: 'novel',
+          include_fields: false
+        });
+        console.log('加载的模板列表:', templates);
+        console.log('模板数量:', templates?.length || 0);
+        setUserTemplates(templates || []);
+      } catch (error) {
+        console.error('加载模板列表失败:', error);
+        setUserTemplates([]);
+      } finally {
+        setLoadingTemplates(false);
+      }
+    };
+    
+    loadUserTemplates();
+  }, []);
+
+  // 当 userTemplates 加载完成后，重新加载模板配置（以便匹配数据库模板）
+  useEffect(() => {
+    if (workId && userTemplates.length > 0) {
+      const reloadTemplate = async () => {
+        try {
+          const response = await templatesApi.getWorkTemplateConfig(Number(workId));
+          if (response.template_config && 
+              response.template_config.templateId && 
+              response.template_config.modules &&
+              Array.isArray(response.template_config.modules)) {
+            // 检查是否是数据库模板
+            if (response.template_config.templateId.startsWith('db-')) {
+              const dbTemplateId = parseInt(response.template_config.templateId.replace('db-', ''));
+              const dbTemplate = userTemplates.find(t => t.id === dbTemplateId);
+              if (dbTemplate) {
+                console.log('✅ 找到匹配的数据库模板，更新模板信息');
+                setTemplate({
+                  id: `db-${dbTemplate.id}`,
+                  name: dbTemplate.name,
+                  description: dbTemplate.description || '',
+                  modules: response.template_config.modules
+                });
+              }
+            }
+          }
+        } catch (error) {
+          console.error('重新加载模板配置失败:', error);
+        }
+      };
+      reloadTemplate();
+    }
+  }, [workId, userTemplates.length]);
+
   // 应用模板
-  const applyTemplate = (t: TemplateConfig) => {
-    setTemplate(JSON.parse(JSON.stringify(t)));
+  const applyTemplate = async (t: TemplateConfig) => {
+    console.log('应用模板:', t);
+    
+    // 如果有 workId，先保存当前编辑的内容
+    if (workId && template && template.modules) {
+      try {
+        const currentTemplateData = {
+          templateId: template.id,
+          modules: template.modules,
+          lastModified: Date.now()
+        };
+        await templatesApi.saveWorkTemplateConfig(Number(workId), currentTemplateData);
+        console.log('✅ 切换模板前已保存当前内容');
+      } catch (error) {
+        console.error('切换模板前保存失败:', error);
+        // 即使保存失败，也继续切换模板
+      }
+    }
+    
+    const newTemplate = JSON.parse(JSON.stringify(t));
+    console.log('深拷贝后的模板:', newTemplate);
+    
+    // 确保 modules 是数组
+    if (!Array.isArray(newTemplate.modules)) {
+      console.warn('模板 modules 不是数组，设置为空数组');
+      newTemplate.modules = [];
+    }
+    
+    // 如果有 workId，尝试加载该作品保存的模板配置
+    if (workId) {
+      try {
+        const response = await templatesApi.getWorkTemplateConfig(Number(workId));
+        console.log('加载模板配置响应:', response);
+        console.log('当前模板ID:', newTemplate.id);
+        console.log('保存的模板ID:', response.template_config?.templateId);
+        
+        if (response.template_config && 
+            response.template_config.templateId === newTemplate.id &&
+            response.template_config.modules &&
+            Array.isArray(response.template_config.modules) &&
+            response.template_config.modules.length > 0) {
+          // 如果数据库中有该模板的保存内容，使用保存的内容
+          console.log('✅ 从数据库加载保存的模板内容，modules数量:', response.template_config.modules.length);
+          newTemplate.modules = response.template_config.modules;
+        } else {
+          console.log('⚠️ 没有找到匹配的保存内容，使用模板默认内容');
+          if (response.template_config) {
+            console.log('保存的templateId:', response.template_config.templateId, '当前templateId:', newTemplate.id);
+          }
+        }
+      } catch (error) {
+        console.error('加载保存的模板内容失败:', error);
+        // 加载失败，使用模板默认内容
+      }
+    }
+    
+    setTemplate(newTemplate);
     setActiveModuleIndex(0);
     setShowTemplateSelector(false);
+    
+    console.log('模板已应用，当前模板:', newTemplate);
+  };
+
+  // 应用数据库模板
+  const applyDatabaseTemplate = async (dbTemplate: any) => {
+    try {
+      console.log('应用数据库模板，原始数据:', dbTemplate);
+      
+      // 如果有 workId，先保存当前编辑的内容
+      if (workId && template && template.modules) {
+        try {
+          const currentTemplateData = {
+            templateId: template.id,
+            modules: template.modules,
+            lastModified: Date.now()
+          };
+          await templatesApi.saveWorkTemplateConfig(Number(workId), currentTemplateData);
+          console.log('✅ 切换模板前已保存当前内容');
+        } catch (error) {
+          console.error('切换模板前保存失败:', error);
+          // 即使保存失败，也继续切换模板
+        }
+      }
+      
+      // 从数据库模板的 template_config 中提取配置
+      const templateConfig = dbTemplate.template_config || {};
+      console.log('template_config:', templateConfig);
+      
+      // 确保 modules 存在且是数组
+      let modules = [];
+      if (templateConfig.modules && Array.isArray(templateConfig.modules)) {
+        modules = templateConfig.modules;
+      } else if (Array.isArray(templateConfig)) {
+        // 如果 template_config 本身就是 modules 数组
+        modules = templateConfig;
+      } else {
+        console.warn('模板配置中没有找到有效的 modules，使用空数组');
+        modules = [];
+      }
+      
+      console.log('提取的 modules:', modules);
+      
+      const newTemplate: TemplateConfig = {
+        id: `db-${dbTemplate.id}`,
+        name: dbTemplate.name || '未命名模板',
+        description: dbTemplate.description || '',
+        modules: modules
+      };
+      
+      console.log('应用的新模板:', newTemplate);
+      
+      // 如果有 workId，尝试从本地缓存加载该模板的保存内容
+      if (workId) {
+        try {
+          // 优先从本地缓存加载（每个模板独立保存）
+          const cached = loadFromCache(workId, newTemplate.id);
+          if (cached && cached.modules && Array.isArray(cached.modules) && cached.modules.length > 0) {
+            console.log('✅ 从本地缓存加载保存的模板内容，modules数量:', cached.modules.length);
+            newTemplate.modules = cached.modules;
+          } else {
+            // 如果本地缓存没有，尝试从数据库加载
+            const response = await templatesApi.getWorkTemplateConfig(Number(workId));
+            console.log('加载数据库模板配置响应:', response);
+            console.log('当前模板ID:', newTemplate.id);
+            console.log('保存的模板ID:', response.template_config?.templateId);
+            
+            if (response.template_config && 
+                response.template_config.templateId === newTemplate.id &&
+                response.template_config.modules &&
+                Array.isArray(response.template_config.modules) &&
+                response.template_config.modules.length > 0) {
+              // 如果数据库中有该模板的保存内容，使用保存的内容
+              console.log('✅ 从数据库加载保存的模板内容，modules数量:', response.template_config.modules.length);
+              newTemplate.modules = response.template_config.modules;
+              // 同时保存到本地缓存
+              saveToCache({
+                templateId: response.template_config.templateId,
+                modules: response.template_config.modules,
+                lastModified: Date.now()
+              }, workId, newTemplate.id);
+            } else {
+              console.log('⚠️ 没有找到匹配的保存内容，使用模板默认内容');
+              if (response.template_config) {
+                console.log('保存的templateId:', response.template_config.templateId, '当前templateId:', newTemplate.id);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('加载保存的模板内容失败:', error);
+          // 加载失败，使用模板默认内容
+        }
+      }
+      
+      // 应用模板
+      const copiedTemplate = JSON.parse(JSON.stringify(newTemplate));
+      
+      // 确保 modules 是数组
+      if (!Array.isArray(copiedTemplate.modules)) {
+        console.warn('模板 modules 不是数组，设置为空数组');
+        copiedTemplate.modules = [];
+      }
+      
+      setTemplate(copiedTemplate);
+      setActiveModuleIndex(0);
+      setShowTemplateSelector(false);
+      
+      console.log('模板已应用，当前模板:', copiedTemplate);
+    } catch (error) {
+      console.error('应用数据库模板失败:', error);
+      alert('应用模板失败: ' + (error instanceof Error ? error.message : '未知错误'));
+    }
+  };
+
+  // 创建新模板
+  const handleCreateTemplate = async () => {
+    if (!createTemplateForm.name.trim()) {
+      alert('请输入模板名称');
+      return;
+    }
+
+    try {
+      const templateData = {
+        name: createTemplateForm.name,
+        description: createTemplateForm.description || undefined,
+        work_type: createTemplateForm.work_type,
+        category: createTemplateForm.category || undefined,
+        is_public: createTemplateForm.is_public,
+        template_config: {
+          templateId: `custom-${Date.now()}`,
+          modules: template.modules
+        },
+        settings: {},
+        tags: []
+      };
+
+      const createdTemplate = await templatesApi.createTemplate(templateData);
+      
+      // 更新当前模板的 ID
+      const newTemplate = {
+        ...template,
+        id: `db-${createdTemplate.id || Date.now()}`,
+        name: createTemplateForm.name,
+        description: createTemplateForm.description
+      };
+      setTemplate(newTemplate);
+      
+      // 重新加载模板列表
+      try {
+        const templates = await templatesApi.listTemplates({
+          work_type: 'novel',
+          include_fields: false
+        });
+        setUserTemplates(templates);
+      } catch (error) {
+        console.error('重新加载模板列表失败:', error);
+      }
+      
+      // 关闭弹窗并重置表单
+      setShowCreateTemplate(false);
+      setShowTemplateSelector(false);
+      setCreateTemplateForm({
+        name: '',
+        description: '',
+        work_type: 'novel',
+        category: '',
+        is_public: false
+      });
+      
+      alert('模板创建成功！');
+    } catch (error) {
+      console.error('创建模板失败:', error);
+      alert('创建模板失败: ' + (error instanceof Error ? error.message : '未知错误'));
+    }
   };
 
   // 添加模块
@@ -1024,24 +1477,28 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
     switch (comp.type) {
       case 'text':
         return (
-          <input
-            type="text"
-            className="comp-input"
-            value={comp.value || ''}
-            onChange={(e) => updateValue(e.target.value)}
-            placeholder={comp.config.placeholder}
-          />
+          <div className="comp-input-wrapper">
+            <input
+              type="text"
+              className="comp-input"
+              value={comp.value || ''}
+              onChange={(e) => updateValue(e.target.value)}
+              placeholder={comp.config.placeholder}
+            />
+          </div>
         );
 
       case 'textarea':
         return (
-          <textarea
-            className="comp-textarea"
-            value={comp.value || ''}
-            onChange={(e) => updateValue(e.target.value)}
-            placeholder={comp.config.placeholder}
-            rows={4}
-          />
+          <div className="comp-textarea-wrapper">
+            <textarea
+              className="comp-textarea"
+              value={comp.value || ''}
+              onChange={(e) => updateValue(e.target.value)}
+              placeholder={comp.config.placeholder}
+              rows={4}
+            />
+          </div>
         );
 
       case 'image':
@@ -1937,6 +2394,32 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
           </span>
         </div>
         <div className="toolbar-right">
+          {workId && (
+            <button 
+              className="save-btn" 
+              onClick={async () => {
+                try {
+                  console.log('手动保存，当前模板:', template);
+                  const templateData = {
+                    templateId: template.id,
+                    modules: template.modules,
+                    lastModified: Date.now()
+                  };
+                  console.log('保存的数据:', templateData);
+                  const response = await templatesApi.saveWorkTemplateConfig(Number(workId), templateData);
+                  console.log('保存响应:', response);
+                  setHasUnsavedChanges(false);
+                  alert('保存成功！');
+                } catch (error) {
+                  console.error('手动保存失败:', error);
+                  alert('保存失败: ' + (error instanceof Error ? error.message : '未知错误'));
+                }
+              }}
+              title="手动保存"
+            >
+              <Save size={16} />
+            </button>
+          )}
           <button className={`edit-btn ${isEditMode ? 'active' : ''}`} onClick={() => setIsEditMode(!isEditMode)}>
             {isEditMode ? <Check size={16} /> : <Settings size={16} />}
             <span>{isEditMode ? '完成' : '编辑'}</span>
@@ -1952,12 +2435,125 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
             <button onClick={() => setShowTemplateSelector(false)}><X size={16} /></button>
           </div>
           <div className="template-grid">
+            {/* 预设模板 */}
             {presetTemplates.map(t => (
               <button key={t.id} className={`template-card ${template.id === t.id ? 'active' : ''}`} onClick={() => applyTemplate(t)}>
                 <div className="card-name">{t.name}</div>
                 <div className="card-desc">{t.description}</div>
               </button>
             ))}
+            
+            {/* 用户创建的模板 */}
+            {loadingTemplates ? (
+              <div className="template-loading">加载中...</div>
+            ) : userTemplates.length > 0 ? (
+              userTemplates.map(dbTemplate => {
+                console.log('渲染模板:', dbTemplate);
+                return (
+                  <button 
+                    key={`db-${dbTemplate.id}`} 
+                    className={`template-card ${template.id === `db-${dbTemplate.id}` ? 'active' : ''}`} 
+                    onClick={() => applyDatabaseTemplate(dbTemplate)}
+                  >
+                    <div className="card-name">{dbTemplate.name || '未命名模板'}</div>
+                    <div className="card-desc">{dbTemplate.description || '用户自定义模板'}</div>
+                    {dbTemplate.is_public && <div className="card-badge">公开</div>}
+                  </button>
+                );
+              })
+            ) : (
+              <div className="template-empty">暂无用户模板</div>
+            )}
+            
+            {/* 创建新模板按钮 */}
+            <button 
+              className="template-card create-template-card" 
+              onClick={() => {
+                setShowTemplateSelector(false);
+                setShowCreateTemplate(true);
+              }}
+            >
+              <Plus size={24} />
+              <div className="card-name">创建新模板</div>
+              <div className="card-desc">基于当前配置创建新模板</div>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 创建模板弹窗 */}
+      {showCreateTemplate && (
+        <div className="modal-overlay" onClick={() => setShowCreateTemplate(false)}>
+          <div className="modal-content create-template-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>创建新模板</h3>
+              <button className="modal-close" onClick={() => setShowCreateTemplate(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label>模板名称 <span className="required">*</span></label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={createTemplateForm.name}
+                  onChange={(e) => setCreateTemplateForm({ ...createTemplateForm, name: e.target.value })}
+                  placeholder="请输入模板名称"
+                />
+              </div>
+              <div className="form-group">
+                <label>模板描述</label>
+                <textarea
+                  className="form-input"
+                  value={createTemplateForm.description}
+                  onChange={(e) => setCreateTemplateForm({ ...createTemplateForm, description: e.target.value })}
+                  placeholder="请输入模板描述（可选）"
+                  rows={3}
+                />
+              </div>
+              <div className="form-group">
+                <label>作品类型</label>
+                <select
+                  className="form-input"
+                  value={createTemplateForm.work_type}
+                  onChange={(e) => setCreateTemplateForm({ ...createTemplateForm, work_type: e.target.value })}
+                >
+                  <option value="novel">小说</option>
+                  <option value="script">剧本</option>
+                  <option value="short_story">短篇</option>
+                  <option value="film_script">影视剧本</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>分类</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={createTemplateForm.category}
+                  onChange={(e) => setCreateTemplateForm({ ...createTemplateForm, category: e.target.value })}
+                  placeholder="请输入分类（可选）"
+                />
+              </div>
+              <div className="form-group">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={createTemplateForm.is_public}
+                    onChange={(e) => setCreateTemplateForm({ ...createTemplateForm, is_public: e.target.checked })}
+                  />
+                  <span>公开模板（其他用户可以使用）</span>
+                </label>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={() => setShowCreateTemplate(false)}>
+                取消
+              </button>
+              <button className="btn-primary" onClick={handleCreateTemplate}>
+                创建
+              </button>
+            </div>
           </div>
         </div>
       )}

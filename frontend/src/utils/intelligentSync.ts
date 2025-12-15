@@ -198,13 +198,43 @@ export function useIntelligentSync(
     }
 
     try {
-      console.log('[IntelligentSync] 开始轮询，文档ID:', documentId);
+      // 关键修复：验证 documentId 格式，确保是当前章节的文档
+      if (!documentId || documentId.trim() === '') {
+        console.log('[IntelligentSync] 文档ID为空，跳过轮询');
+        return;
+      }
+      
+      // 关键修复：从 documentId 中提取章节ID，用于验证
+      let expectedChapterId: number | null = null;
+      if (documentId.startsWith('work_') && documentId.includes('_chapter_')) {
+        const match = documentId.match(/work_\d+_chapter_(\d+)/);
+        if (match) {
+          expectedChapterId = parseInt(match[1]);
+        }
+      } else if (documentId.startsWith('chapter_')) {
+        expectedChapterId = parseInt(documentId.replace('chapter_', ''));
+      }
+      
+      console.log('[IntelligentSync] 开始轮询，文档ID:', documentId, '章节ID:', expectedChapterId);
       // 获取服务器最新状态
       const serverDoc = await sharedbClient.getDocument(documentId);
       
       if (!serverDoc) {
         console.log('[IntelligentSync] 服务器文档不存在:', documentId);
         return;
+      }
+
+      // 关键修复：验证服务器文档是否属于当前章节
+      if (expectedChapterId !== null) {
+        const serverChapterId = serverDoc.metadata?.chapter_id;
+        if (serverChapterId && serverChapterId !== expectedChapterId) {
+          console.error('❌ [IntelligentSync] 严重错误：服务器文档属于其他章节！', {
+            serverChapterId,
+            expectedChapterId,
+            documentId,
+          });
+          return; // 不更新，避免覆盖错误的内容
+        }
       }
 
       console.log('[IntelligentSync] 获取到服务器文档:', {
@@ -260,6 +290,7 @@ export function useIntelligentSync(
         if (serverContent !== lastSyncedContent.current) {
           if (!userIsEditing) {
             // 用户没有在编辑，直接更新
+            // 关键修复：updateContent 内部会验证章节ID，这里直接调用即可
             updateContent(serverContent);
             lastSyncedContent.current = serverContent;
             lastSyncedVersion.current = serverVersion;

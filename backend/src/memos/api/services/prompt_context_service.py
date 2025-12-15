@@ -13,8 +13,6 @@ from sqlalchemy import and_
 from memos.api.models.prompt_template import PromptTemplate
 from memos.api.models.work import Work
 from memos.api.models.chapter import Chapter
-from memos.api.models.characters import Character
-from memos.api.models.location import Location
 from memos.api.services.sharedb_service import ShareDBService
 from memos.api.services.work_service import WorkService
 from memos.api.services.chapter_service import ChapterService
@@ -29,13 +27,16 @@ class PromptContext:
     def __init__(self):
         self.work: Optional[Work] = None
         self.current_chapter: Optional[Chapter] = None
-        self.all_characters: List[Character] = []
-        self.chapter_characters: List[Character] = []  # 当前章节使用的角色
+        self.current_chapter_content: str = ""  # 当前章节正文
+        self.current_chapter_outline: Dict[str, Any] = {}  # 当前章节大纲
+        self.current_chapter_detailed_outline: Dict[str, Any] = {}  # 当前章节细纲
+        self.all_characters: List[Dict[str, Any]] = []  # 从 work_metadata 中读取
+        self.chapter_characters: List[Dict[str, Any]] = []  # 当前章节使用的角色
         self.previous_chapters: List[Chapter] = []
         self.previous_chapters_content: List[str] = []
         self.previous_outlines: List[Dict[str, Any]] = []
         self.previous_detailed_outlines: List[Dict[str, Any]] = []
-        self.locations: List[Location] = []
+        self.locations: List[Dict[str, Any]] = []  # 从 work_metadata 中读取
         self.custom_data: Dict[str, Any] = {}  # 自定义数据
     
     def to_dict(self) -> Dict[str, Any]:
@@ -54,8 +55,11 @@ class PromptContext:
                 "chapter_number": self.current_chapter.chapter_number if self.current_chapter else None,
                 "summary": self.current_chapter.summary if self.current_chapter else "",
             } if self.current_chapter else {},
-            "all_characters": [char.to_dict() for char in self.all_characters],
-            "chapter_characters": [char.to_dict() for char in self.chapter_characters],
+            "current_chapter_content": self.current_chapter_content,
+            "current_chapter_outline": self.current_chapter_outline,
+            "current_chapter_detailed_outline": self.current_chapter_detailed_outline,
+            "all_characters": self.all_characters,  # 已经是字典列表
+            "chapter_characters": self.chapter_characters,  # 已经是字典列表
             "previous_chapters": [
                 {
                     "title": ch.title,
@@ -67,10 +71,7 @@ class PromptContext:
             "previous_chapters_content": self.previous_chapters_content,
             "previous_outlines": self.previous_outlines,
             "previous_detailed_outlines": self.previous_detailed_outlines,
-            "locations": [loc.to_dict() if hasattr(loc, 'to_dict') else {
-                "name": loc.name,
-                "description": loc.description or "",
-            } for loc in self.locations],
+            "locations": self.locations,  # 已经是字典列表
             "custom_data": self.custom_data,
         }
 
@@ -172,9 +173,27 @@ class PromptContextService:
             requirements["need_previous_detailed_outlines"] = True
         
         # 章节内容相关变量
-        content_vars = {"content", "章节内容"}
+        content_vars = {
+            "content", "章节内容",
+            "current_chapter_content", "当前章节内容"
+        }
         if any(var in variables for var in content_vars):
             requirements["need_chapter_content"] = True
+        
+        # 当前章节大纲和细纲相关变量
+        current_outline_vars = {
+            "current_chapter_outline", "当前章节大纲",
+            "outline", "大纲"  # 兼容旧变量名
+        }
+        if any(var in variables for var in current_outline_vars):
+            requirements["need_chapter_content"] = True  # 需要章节信息来获取大纲
+        
+        current_detailed_outline_vars = {
+            "current_chapter_detailed_outline", "当前章节细纲",
+            "detailed_outline", "细纲"  # 兼容旧变量名
+        }
+        if any(var in variables for var in current_detailed_outline_vars):
+            requirements["need_chapter_content"] = True  # 需要章节信息来获取细纲
         
         # 检查是否有metadata访问（需要作品和章节的基本信息）
         # 这些在build_context中总是会获取，所以不需要特殊标记
@@ -185,7 +204,10 @@ class PromptContextService:
         self,
         work_id: int,
         chapter_id: Optional[int] = None,
-        include_previous_chapters: int = 3,  # 包含前N章
+        include_previous_chapters: int = 3,  # 包含前N章（用于摘要等基本信息）
+        include_previous_content: Optional[int] = None,  # 包含前N章的正文（None表示使用include_previous_chapters）
+        include_previous_outlines: Optional[int] = None,  # 包含前N章的大纲（None表示使用include_previous_chapters）
+        include_previous_detailed_outlines: Optional[int] = None,  # 包含前N章的细纲（None表示使用include_previous_chapters）
         include_characters: Optional[bool] = None,  # None表示自动判断
         include_locations: Optional[bool] = None,  # None表示自动判断
         custom_data: Optional[Dict[str, Any]] = None,
@@ -197,7 +219,10 @@ class PromptContextService:
         Args:
             work_id: 作品ID
             chapter_id: 当前章节ID（可选）
-            include_previous_chapters: 包含前N章的信息
+            include_previous_chapters: 包含前N章的信息（用于摘要等基本信息）
+            include_previous_content: 包含前N章的正文（None表示使用include_previous_chapters）
+            include_previous_outlines: 包含前N章的大纲（None表示使用include_previous_chapters）
+            include_previous_detailed_outlines: 包含前N章的细纲（None表示使用include_previous_chapters）
             include_characters: 是否包含角色信息（None表示根据requirements自动判断）
             include_locations: 是否包含地点信息（None表示根据requirements自动判断）
             custom_data: 自定义数据
@@ -237,20 +262,49 @@ class PromptContextService:
             context.current_chapter = await self.chapter_service.get_chapter_by_id(chapter_id)
             if context.current_chapter and context.current_chapter.work_id != work_id:
                 raise ValueError(f"章节 {chapter_id} 不属于作品 {work_id}")
+            
+            # 获取当前章节的正文、大纲、细纲
+            try:
+                document = await self.sharedb_service.get_document(f"chapter_{chapter_id}")
+                if document:
+                    context.current_chapter_content = document.get("content", "")
+            except Exception as e:
+                logger.warning(f"获取当前章节内容失败: {e}")
+                context.current_chapter_content = ""
+            
+            # 从章节metadata中获取大纲和细纲
+            if context.current_chapter:
+                metadata = context.current_chapter.chapter_metadata or {}
+                context.current_chapter_outline = metadata.get("outline", {})
+                context.current_chapter_detailed_outline = metadata.get("detailed_outline", {})
         
-        # 3. 获取所有角色（如果需要）
+        # 3. 获取所有角色（如果需要）- 从 work_metadata 中读取
         if need_characters:
-            stmt = select(Character).where(
-                and_(
-                    Character.work_id == work_id,
-                    Character.is_active == True
-                )
-            ).order_by(
-                Character.is_main_character.desc(),
-                Character.name.asc()
-            )
-            result = await self.db.execute(stmt)
-            context.all_characters = list(result.scalars().all())
+            work_metadata = context.work.work_metadata or {}
+            characters_data = work_metadata.get("characters", [])
+            # 通用排序：尝试按可能的优先级字段和标识字段排序
+            def get_sort_key(x):
+                # 尝试找到优先级字段（is_main, priority, order 等）
+                priority = 1
+                for key in ["is_main_character", "is_main", "priority", "order", "rank","主要角色"]:
+                    if key in x:
+                        val = x[key]
+                        if isinstance(val, bool):
+                            priority = 0 if val else 1
+                        elif isinstance(val, (int, float)):
+                            priority = val
+                        break
+                
+                # 尝试找到标识字段用于二级排序
+                identifier = ""
+                for key in ["name", "title", "id", "identifier"]:
+                    if key in x and x[key]:
+                        identifier = str(x[key])
+                        break
+                
+                return (priority, identifier)
+            
+            context.all_characters = sorted(characters_data, key=get_sort_key)
             
             # 获取当前章节使用的角色（如果需要且有当前章节）
             if need_chapter_characters and context.current_chapter:
@@ -259,25 +313,27 @@ class PromptContextService:
                     context.all_characters
                 )
         
-        # 4. 获取地点信息（如果需要）
+        # 4. 获取地点信息（如果需要）- 从 work_metadata 中读取
         if need_locations:
-            stmt = select(Location).where(
-                and_(
-                    Location.work_id == work_id,
-                    Location.is_active == True
-                )
-            )
-            result = await self.db.execute(stmt)
-            context.locations = list(result.scalars().all())
+            work_metadata = context.work.work_metadata or {}
+            context.locations = work_metadata.get("locations", [])
         
         # 5. 获取前文信息（如果需要且有当前章节）
         if need_previous_chapters and context.current_chapter:
+            # 确定需要获取的前文章节数量
+            prev_content_count = include_previous_content if include_previous_content is not None else include_previous_chapters
+            prev_outline_count = include_previous_outlines if include_previous_outlines is not None else include_previous_chapters
+            prev_detailed_outline_count = include_previous_detailed_outlines if include_previous_detailed_outlines is not None else include_previous_chapters
+            
             previous_chapters, previous_content, previous_outlines, previous_detailed_outlines = \
                 await self._get_previous_chapters_info(
                     work_id,
                     context.current_chapter.chapter_number,
                     context.current_chapter.volume_number,
-                    include_previous_chapters,
+                    include_previous_chapters,  # 基本信息数量
+                    prev_content_count,  # 正文数量
+                    prev_outline_count,  # 大纲数量
+                    prev_detailed_outline_count,  # 细纲数量
                     need_content=need_previous_content,
                     need_outlines=need_previous_outlines,
                     need_detailed_outlines=need_previous_detailed_outlines
@@ -299,8 +355,8 @@ class PromptContextService:
     async def _extract_chapter_characters(
         self,
         chapter: Chapter,
-        all_characters: List[Character]
-    ) -> List[Character]:
+        all_characters: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         """从章节内容中提取使用的角色"""
         try:
             # 从ShareDB获取章节内容
@@ -312,15 +368,26 @@ class PromptContextService:
             if not content:
                 return []
             
-            # 简单的角色匹配：检查角色名称是否出现在内容中
+            # 通用的角色匹配：检查角色数据中的字符串值是否出现在内容中
             used_characters = []
             for char in all_characters:
-                # 检查角色名称和显示名称
-                names_to_check = [char.name]
-                if char.display_name:
-                    names_to_check.append(char.display_name)
+                # 递归提取所有字符串值作为可能的匹配项
+                def extract_strings(obj, strings_set):
+                    """递归提取字典/列表中的所有字符串值"""
+                    if isinstance(obj, dict):
+                        for value in obj.values():
+                            extract_strings(value, strings_set)
+                    elif isinstance(obj, list):
+                        for item in obj:
+                            extract_strings(item, strings_set)
+                    elif isinstance(obj, str) and len(obj) > 1:  # 忽略单字符
+                        strings_set.add(obj)
                 
-                for name in names_to_check:
+                possible_names = set()
+                extract_strings(char, possible_names)
+                
+                # 检查是否有任何字符串出现在内容中
+                for name in possible_names:
                     if name and name in content:
                         used_characters.append(char)
                         break
@@ -335,24 +402,32 @@ class PromptContextService:
         work_id: int,
         current_chapter_number: int,
         current_volume_number: int,
-        count: int,
+        basic_count: int,  # 基本信息数量（用于摘要等）
+        content_count: int,  # 正文数量
+        outline_count: int,  # 大纲数量
+        detailed_outline_count: int,  # 细纲数量
         need_content: bool = True,
         need_outlines: bool = True,
         need_detailed_outlines: bool = True
     ) -> tuple[List[Chapter], List[str], List[Dict[str, Any]], List[Dict[str, Any]]]:
         """
-        获取前N章的信息（支持按需获取）
+        获取前N章的信息（支持分别设置大纲、细纲、正文的数量）
         
         Args:
             work_id: 作品ID
             current_chapter_number: 当前章节号
             current_volume_number: 当前卷号
-            count: 获取前N章
+            basic_count: 获取前N章的基本信息（用于摘要等）
+            content_count: 获取前N章的正文
+            outline_count: 获取前N章的大纲
+            detailed_outline_count: 获取前N章的细纲
             need_content: 是否需要获取前文内容
             need_outlines: 是否需要获取前文大纲
             need_detailed_outlines: 是否需要获取前文细纲
         """
-        # 获取前N章
+        # 获取前N章（取最大值，确保能获取到所有需要的信息）
+        max_count = max(basic_count, content_count, outline_count, detailed_outline_count)
+        
         stmt = select(Chapter).where(
             and_(
                 Chapter.work_id == work_id,
@@ -361,20 +436,22 @@ class PromptContextService:
             )
         ).order_by(
             Chapter.chapter_number.desc()
-        ).limit(count)
+        ).limit(max_count)
         
         result = await self.db.execute(stmt)
-        previous_chapters = list(result.scalars().all())
-        previous_chapters.reverse()  # 按章节号正序排列
+        all_previous_chapters = list(result.scalars().all())
+        all_previous_chapters.reverse()  # 按章节号正序排列
         
-        # 获取前文内容、大纲、细纲（按需）
+        # 分别截取需要数量的章节
+        previous_chapters = all_previous_chapters[:basic_count] if basic_count > 0 else []
+        chapters_for_content = all_previous_chapters[:content_count] if content_count > 0 else []
+        chapters_for_outline = all_previous_chapters[:outline_count] if outline_count > 0 else []
+        chapters_for_detailed_outline = all_previous_chapters[:detailed_outline_count] if detailed_outline_count > 0 else []
+        
+        # 获取前文内容（按content_count数量）
         previous_content = []
-        previous_outlines = []
-        previous_detailed_outlines = []
-        
-        for chapter in previous_chapters:
-            # 获取内容（如果需要）
-            if need_content:
+        if need_content:
+            for chapter in chapters_for_content:
                 try:
                     document = await self.sharedb_service.get_document(f"chapter_{chapter.id}")
                     if document:
@@ -384,20 +461,20 @@ class PromptContextService:
                         previous_content.append("")
                 except Exception:
                     previous_content.append("")
-            else:
-                previous_content.append("")
-            
-            # 获取大纲和细纲（如果需要）
-            metadata = chapter.chapter_metadata or {}
-            if need_outlines:
+        
+        # 获取前文大纲（按outline_count数量）
+        previous_outlines = []
+        if need_outlines:
+            for chapter in chapters_for_outline:
+                metadata = chapter.chapter_metadata or {}
                 previous_outlines.append(metadata.get("outline", {}))
-            else:
-                previous_outlines.append({})
-            
-            if need_detailed_outlines:
+        
+        # 获取前文细纲（按detailed_outline_count数量）
+        previous_detailed_outlines = []
+        if need_detailed_outlines:
+            for chapter in chapters_for_detailed_outline:
+                metadata = chapter.chapter_metadata or {}
                 previous_detailed_outlines.append(metadata.get("detailed_outline", {}))
-            else:
-                previous_detailed_outlines.append({})
         
         return previous_chapters, previous_content, previous_outlines, previous_detailed_outlines
     
@@ -551,30 +628,49 @@ class PromptContextService:
             "章节摘要": current_chapter.get("summary", ""),
         })
         
-        # 章节metadata对象（支持 {章节.xxx} 格式）
-        if context.current_chapter:
-            chapter_metadata = context.current_chapter.chapter_metadata or {}
-            vars_dict["章节"] = chapter_metadata
-            # 同时提供chapter_metadata作为英文键
-            vars_dict["chapter_metadata"] = chapter_metadata
-            
-            # 如果需要章节内容，自动从ShareDB获取
+        # 当前章节的正文、大纲、细纲
+        current_content = context_dict.get("current_chapter_content", "")
+        current_outline = context_dict.get("current_chapter_outline", {})
+        current_detailed_outline = context_dict.get("current_chapter_detailed_outline", {})
+        
+        # 如果context中没有内容，且additional_vars中也没有提供，尝试从ShareDB获取
+        if not current_content and context.current_chapter:
             if "content" not in (additional_vars or {}) and "章节内容" not in (additional_vars or {}):
                 try:
                     document = await self.sharedb_service.get_document(
                         f"chapter_{context.current_chapter.id}"
                     )
                     if document:
-                        content = document.get("content", "")
-                        vars_dict["content"] = content
-                        vars_dict["章节内容"] = content
-                    else:
-                        vars_dict["content"] = ""
-                        vars_dict["章节内容"] = ""
+                        current_content = document.get("content", "")
                 except Exception as e:
-                    logger.warning(f"获取章节内容失败: {e}")
-                    vars_dict["content"] = ""
-                    vars_dict["章节内容"] = ""
+                    logger.warning(f"获取当前章节内容失败: {e}")
+        
+        # 如果additional_vars中没有提供，使用context中的值
+        if "content" not in (additional_vars or {}) and "章节内容" not in (additional_vars or {}):
+            vars_dict["content"] = current_content
+            vars_dict["章节内容"] = current_content
+        
+        # 格式化当前章节的大纲和细纲
+        current_outline_str = json.dumps(current_outline, ensure_ascii=False, indent=2) if current_outline else "无"
+        current_detailed_outline_str = json.dumps(current_detailed_outline, ensure_ascii=False, indent=2) if current_detailed_outline else "无"
+        
+        vars_dict.update({
+            # 英文变量
+            "current_chapter_content": current_content,
+            "current_chapter_outline": current_outline_str,
+            "current_chapter_detailed_outline": current_detailed_outline_str,
+            # 中文变量
+            "当前章节内容": current_content,
+            "当前章节大纲": current_outline_str,
+            "当前章节细纲": current_detailed_outline_str,
+        })
+        
+        # 章节metadata对象（支持 {章节.xxx} 格式）
+        if context.current_chapter:
+            chapter_metadata = context.current_chapter.chapter_metadata or {}
+            vars_dict["章节"] = chapter_metadata
+            # 同时提供chapter_metadata作为英文键
+            vars_dict["chapter_metadata"] = chapter_metadata
         
         # 前文信息（英文和中文）
         previous_chapters = context_dict.get("previous_chapters", [])
@@ -600,17 +696,13 @@ class PromptContextService:
             "前文细纲": previous_detailed_outlines_str,
         })
         
-        # 如果当前章节有大纲，添加到变量中（用于细纲生成）
-        if context.current_chapter:
-            metadata = context.current_chapter.chapter_metadata or {}
-            outline = metadata.get("outline", {})
-            if outline:
-                outline_str = json.dumps(outline, ensure_ascii=False, indent=2)
-                vars_dict["outline"] = outline_str
-                vars_dict["大纲"] = outline_str
-            else:
-                vars_dict["outline"] = "无"
-                vars_dict["大纲"] = "无"
+        # 兼容旧变量名（用于细纲生成）
+        if current_outline:
+            vars_dict["outline"] = current_outline_str
+            vars_dict["大纲"] = current_outline_str
+        else:
+            vars_dict["outline"] = "无"
+            vars_dict["大纲"] = "无"
         
         # 地点相关变量（英文和中文）
         locations = context_dict.get("locations", [])
@@ -628,38 +720,32 @@ class PromptContextService:
         return template.format_prompt(**vars_dict)
     
     def _format_characters_list(self, characters: List[Dict[str, Any]]) -> str:
-        """格式化角色列表为字符串"""
+        """格式化角色列表为字符串（通用处理，不假设特定字段）"""
         if not characters:
             return "无"
         
         lines = []
-        for char in characters:
-            char_info = f"- {char.get('name', '')}"
-            if char.get('display_name'):
-                char_info += f" ({char.get('display_name')})"
-            if char.get('description'):
-                char_info += f": {char.get('description')}"
-            if char.get('personality'):
-                personality = char.get('personality', {})
-                if isinstance(personality, dict):
-                    traits = personality.get('traits', [])
-                    if traits:
-                        char_info += f" | 性格: {', '.join(traits)}"
-            lines.append(char_info)
+        for i, char in enumerate(characters):
+            # 尝试找到可能的标识字段（name, title, id 等）
+            char_id = char.get('name') or char.get('title') or char.get('id') or f"角色{i+1}"
+            # 直接输出 JSON 格式，让用户看到完整的数据结构
+            char_json = json.dumps(char, ensure_ascii=False, indent=2)
+            lines.append(f"- {char_id}:\n{char_json}")
         
         return "\n".join(lines)
     
     def _format_locations_list(self, locations: List[Dict[str, Any]]) -> str:
-        """格式化地点列表为字符串"""
+        """格式化地点列表为字符串（通用处理，不假设特定字段）"""
         if not locations:
             return "无"
         
         lines = []
-        for loc in locations:
-            loc_info = f"- {loc.get('name', '')}"
-            if loc.get('description'):
-                loc_info += f": {loc.get('description')}"
-            lines.append(loc_info)
+        for i, loc in enumerate(locations):
+            # 尝试找到可能的标识字段（name, title, id 等）
+            loc_id = loc.get('name') or loc.get('title') or loc.get('id') or f"地点{i+1}"
+            # 直接输出 JSON 格式，让用户看到完整的数据结构
+            loc_json = json.dumps(loc, ensure_ascii=False, indent=2)
+            lines.append(f"- {loc_id}:\n{loc_json}")
         
         return "\n".join(lines)
     
@@ -821,62 +907,80 @@ class PromptContextService:
                     # 假设整个对象就是一个角色
                     characters_data = [data]
             
-            created_characters = []
+            if not characters_data:
+                return {
+                    "success": True,
+                    "characters_count": 0,
+                    "characters": [],
+                }
+            
+            # 获取作品并更新 work_metadata
+            stmt = select(Work).where(Work.id == work_id)
+            result = await self.db.execute(stmt)
+            work = result.scalar_one_or_none()
+            
+            if not work:
+                raise ValueError(f"作品不存在: {work_id}")
+            
+            # 更新 work_metadata 中的角色信息
+            work_metadata = work.work_metadata or {}
+            existing_characters = work_metadata.get("characters", [])
+            
+            # 创建角色标识符到角色的映射，用于去重和更新（通用处理）
+            character_map = {}
+            for char in existing_characters:
+                # 尝试找到唯一标识符
+                char_id = None
+                for key in ["name", "id", "title", "identifier"]:
+                    if key in char and char[key]:
+                        char_id = str(char[key]).strip()
+                        break
+                if not char_id:
+                    # 如果没有标识符，使用索引
+                    char_id = f"char_{len(character_map)}"
+                character_map[char_id] = char
+            
+            # 处理新角色数据（通用处理，完全保留用户提供的数据结构）
             for char_data in characters_data:
-                char_name = char_data.get("name", "").strip()
-                if not char_name:
+                if not isinstance(char_data, dict):
                     continue
                 
-                # 检查角色是否已存在
-                stmt = select(Character).where(
-                    and_(
-                        Character.work_id == work_id,
-                        Character.name == char_name
-                    )
-                )
-                result = await self.db.execute(stmt)
-                existing_char = result.scalar_one_or_none()
+                # 尝试找到一个唯一标识符（name, id, title 等），如果没有则使用索引
+                char_id = None
+                for key in ["name", "id", "title", "identifier"]:
+                    if key in char_data and char_data[key]:
+                        char_id = str(char_data[key]).strip()
+                        break
                 
-                if existing_char:
-                    # 更新现有角色
-                    if char_data.get("description") and not existing_char.description:
-                        existing_char.description = char_data.get("description")
-                    if char_data.get("gender") and not existing_char.gender:
-                        existing_char.gender = char_data.get("gender")
-                    if char_data.get("age") and not existing_char.age:
-                        existing_char.age = char_data.get("age")
-                    
-                    # 合并其他字段
-                    if char_data.get("personality"):
-                        existing_personality = existing_char.personality or {}
-                        existing_personality.update(char_data.get("personality", {}))
-                        existing_char.personality = existing_personality
-                    
-                    created_characters.append(existing_char)
+                if not char_id:
+                    # 如果没有找到标识符，使用整个数据的哈希值或索引
+                    char_id = f"char_{len(character_map)}"
+                
+                if char_id in character_map:
+                    # 更新现有角色：深度合并数据
+                    existing_char = character_map[char_id]
+                    def deep_merge(target, source):
+                        """深度合并两个字典"""
+                        for key, value in source.items():
+                            if key in target and isinstance(target[key], dict) and isinstance(value, dict):
+                                deep_merge(target[key], value)
+                            else:
+                                target[key] = value
+                    deep_merge(existing_char, char_data)
                 else:
-                    # 创建新角色
-                    character = Character(
-                        work_id=work_id,
-                        name=char_name,
-                        display_name=char_data.get("display_name"),
-                        description=char_data.get("description"),
-                        gender=char_data.get("gender"),
-                        age=char_data.get("age"),
-                        personality=char_data.get("personality", {}),
-                        appearance=char_data.get("appearance", {}),
-                        background=char_data.get("background", {}),
-                        is_main_character=char_data.get("is_main_character", False),
-                        tags=char_data.get("tags", []),
-                    )
-                    self.db.add(character)
-                    created_characters.append(character)
+                    # 添加新角色：完全保留用户提供的数据结构
+                    character_map[char_id] = char_data.copy()
+            
+            # 更新 work_metadata
+            work_metadata["characters"] = list(character_map.values())
+            work.work_metadata = work_metadata
             
             await self.db.commit()
             
             return {
                 "success": True,
-                "characters_count": len(created_characters),
-                "characters": [char.to_dict() for char in created_characters],
+                "characters_count": len(character_map),
+                "characters": list(character_map.values()),
             }
         except Exception as e:
             logger.error(f"处理角色响应失败: {e}")

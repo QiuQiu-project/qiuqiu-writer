@@ -11,8 +11,6 @@ from sqlalchemy.future import select
 
 from memos.api.models.work import Work
 from memos.api.models.chapter import Chapter
-from memos.api.models.characters import Character
-from memos.api.models.location import Location
 from memos.api.models.prompt_template import PromptTemplate
 from memos.api.services.work_service import WorkService
 from memos.api.services.chapter_service import ChapterService
@@ -518,54 +516,22 @@ class BookAnalysisService:
             
             logger.info(f"✅ 创建作品成功: {work.id} - {work.title}")
             
-            # 2. 创建角色
+            # 2. 将角色和地点信息保存到 work_metadata
             characters_data = analysis_data.get("characters", [])
-            created_characters = []
-            for char_data in characters_data:
-                try:
-                    character = Character(
-                        work_id=work.id,
-                        name=char_data.get("name", ""),
-                        display_name=char_data.get("display_name"),
-                        description=char_data.get("description"),
-                        gender=char_data.get("gender"),
-                        age=char_data.get("age"),
-                        personality=char_data.get("personality", {}),
-                        appearance=char_data.get("appearance", {}),
-                        background=char_data.get("background", {}),
-                        is_main_character=char_data.get("is_main_character", False),
-                        tags=char_data.get("tags", []),
-                    )
-                    self.db.add(character)
-                    created_characters.append(character)
-                except Exception as e:
-                    logger.warning(f"创建角色失败: {e}")
-            
-            await self.db.commit()
-            logger.info(f"✅ 创建角色成功: {len(created_characters)} 个")
-            
-            # 3. 创建地点
             locations_data = analysis_data.get("locations", [])
-            created_locations = []
-            for loc_data in locations_data:
-                try:
-                    location = Location(
-                        work_id=work.id,
-                        name=loc_data.get("name", ""),
-                        display_name=loc_data.get("display_name"),
-                        description=loc_data.get("description"),
-                        location_type=loc_data.get("location_type"),
-                        is_important=loc_data.get("is_important", False),
-                        tags=loc_data.get("tags", []),
-                        location_metadata=loc_data.get("metadata", {}),
-                    )
-                    self.db.add(location)
-                    created_locations.append(location)
-                except Exception as e:
-                    logger.warning(f"创建地点失败: {e}")
             
-            await self.db.commit()
-            logger.info(f"✅ 创建地点成功: {len(created_locations)} 个")
+            if characters_data or locations_data:
+                # 更新 work_metadata
+                work_metadata = work.work_metadata or {}
+                if characters_data:
+                    work_metadata["characters"] = characters_data
+                    logger.info(f"✅ 保存角色信息到 work_metadata: {len(characters_data)} 个")
+                if locations_data:
+                    work_metadata["locations"] = locations_data
+                    logger.info(f"✅ 保存地点信息到 work_metadata: {len(locations_data)} 个")
+                
+                work.work_metadata = work_metadata
+                await self.db.commit()
             
             # 4. 创建章节
             chapters_data = analysis_data.get("chapters", [])
@@ -1103,7 +1069,149 @@ class BookAnalysisService:
             await self.db.rollback()
             raise
 
-
+    async def create_work_and_chapters_from_file(
+        self,
+        file_name: str,
+        chapters_data: List[Dict[str, Any]],
+        user_id: int
+    ) -> Dict[str, Any]:
+        """
+        直接从文件创建作品和章节（不进行AI分析）
+        
+        Args:
+            file_name: 文件名，用于查找或创建作品
+            chapters_data: 章节数据列表，每个元素包含 {chapter_number, title, content, volume_number}
+            user_id: 用户ID
+        
+        Returns:
+            包含作品和章节信息的字典
+        """
+        import traceback
+        try:
+            # 初始化ShareDB服务
+            await self.sharedb_service.initialize()
+            
+            # 1. 根据文件名查找或创建作品
+            work = await self.work_service.find_work_by_filename(file_name, user_id)
+            work_created = False
+            
+            if not work:
+                # 创建新作品（使用文件名作为标题，去掉扩展名）
+                import os
+                work_title = os.path.splitext(file_name)[0] or file_name
+                
+                work = await self.work_service.create_work(
+                    owner_id=user_id,
+                    title=work_title,
+                    work_type="novel",
+                    status="draft",
+                    work_metadata={
+                        "source_file": file_name,
+                        "split_mode": "file_based"
+                    }
+                )
+                work_created = True
+                logger.info(f"✅ 创建新作品: {work.id} - {work.title} (来源文件: {file_name})")
+            else:
+                logger.info(f"✅ 找到已存在作品: {work.id} - {work.title}")
+            
+            # 2. 创建章节
+            created_chapters = []
+            skipped_chapters = []
+            
+            for chapter_info in chapters_data:
+                chapter_number = chapter_info.get("chapter_number", 0)
+                volume_number = chapter_info.get("volume_number", 1)
+                title = chapter_info.get("title", f"第{chapter_number}章")
+                content = chapter_info.get("content", "")
+                
+                # 检查章节是否已存在
+                from sqlalchemy import and_
+                stmt = select(Chapter).where(
+                    and_(
+                        Chapter.work_id == work.id,
+                        Chapter.chapter_number == chapter_number,
+                        Chapter.volume_number == volume_number
+                    )
+                )
+                result = await self.db.execute(stmt)
+                existing_chapter = result.scalar_one_or_none()
+                
+                if existing_chapter:
+                    logger.warning(f"章节 {chapter_number} (卷 {volume_number}) 已存在，跳过创建")
+                    skipped_chapters.append({
+                        "chapter_id": existing_chapter.id,
+                        "chapter_number": chapter_number,
+                        "volume_number": volume_number,
+                        "title": existing_chapter.title
+                    })
+                    continue
+                
+                # 创建章节（不包含大纲和细纲，这些后续通过AI分析添加）
+                chapter = await self.chapter_service.create_chapter(
+                    work_id=work.id,
+                    title=title,
+                    chapter_number=chapter_number,
+                    volume_number=volume_number,
+                    summary="",
+                    chapter_metadata={},  # 初始为空，后续通过AI分析填充
+                )
+                
+                # 确保章节对象已刷新
+                await self.db.refresh(chapter)
+                
+                logger.info(f"✅ 创建章节成功: {chapter.id} - {chapter.title}")
+                
+                # 3. 在ShareDB中创建文档并保存章节内容
+                # 使用 work_{work_id}_chapter_{chapter_id} 格式，与前端保持一致
+                document_id = f"work_{work.id}_chapter_{chapter.id}"
+                await self.sharedb_service.create_document(
+                    document_id=document_id,
+                    initial_content={
+                        "title": title,
+                        "content": content,  # 章节完整内容
+                        "metadata": {
+                            "work_id": work.id,
+                            "chapter_number": chapter_number,
+                            "volume_number": volume_number,
+                        }
+                    }
+                )
+                
+                logger.info(f"✅ ShareDB文档创建成功: {document_id}")
+                
+                created_chapters.append({
+                    "chapter_id": chapter.id,
+                    "chapter_number": chapter_number,
+                    "volume_number": volume_number,
+                    "title": title
+                })
+            
+            # 4. 更新作品统计信息（使用实际创建的章节数量）
+            if created_chapters:
+                # 获取当前章节数量
+                from sqlalchemy import func
+                stmt = select(func.count(Chapter.id)).where(Chapter.work_id == work.id)
+                result = await self.db.execute(stmt)
+                current_count = result.scalar() or 0
+                
+                await self.work_service.update_work(
+                    work_id=work.id,
+                    chapter_count=current_count,
+                )
+            
+            return {
+                "work_id": work.id,
+                "work_title": work.title,
+                "work_created": work_created,
+                "chapters_created": len(created_chapters),
+                "chapters_skipped": len(skipped_chapters),
+                "created_chapters": created_chapters,
+                "skipped_chapters": skipped_chapters
+            }
+            
+        except Exception as e:
+            logger.error(f"创建作品和章节失败: {traceback.format_exc()}")
             await self.db.rollback()
             raise
 

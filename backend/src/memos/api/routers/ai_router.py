@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from memos.api.ai_models import (
     AnalyzeChapterRequest,
     AnalyzeChapterByFileRequest,
+    CreateWorkFromFileRequest,
     DefaultPromptData,
     DefaultPromptResponse,
     ErrorResponse,
@@ -796,4 +797,58 @@ async def analyze_chapter_by_file(
         raise
     except Exception as e:
         logger.error(f"Failed to analyze chapter by file: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")
+
+
+@router.post(
+    "/create-work-from-file",
+    summary="从文件直接创建作品和章节（不进行AI分析）",
+    description="直接将文件拆分的章节创建为作品和章节，不进行AI分析",
+    responses={
+        200: {"description": "创建成功"},
+        400: {"model": ErrorResponse, "description": "请求参数错误"},
+        500: {"model": ErrorResponse, "description": "服务器内部错误"},
+    },
+)
+async def create_work_from_file(
+    request: CreateWorkFromFileRequest,
+    db: AsyncSession = Depends(get_db_session),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    """
+    从文件直接创建作品和章节（不进行AI分析）
+    
+    工作流程：
+    1. 根据文件名查找或创建作品
+    2. 为每个章节创建章节记录
+    3. 将章节内容保存到ShareDB
+    4. 不进行AI分析，后续可在作品中通过按键进行分析
+    """
+    try:
+        book_analysis_service = BookAnalysisService(db)
+        
+        # 准备章节数据
+        chapters_data = [
+            {
+                "chapter_number": ch.chapter_number,
+                "title": ch.title,
+                "content": ch.content,
+                "volume_number": ch.volume_number
+            }
+            for ch in request.chapters
+        ]
+        
+        # 调用服务方法创建作品和章节
+        result = await book_analysis_service.create_work_and_chapters_from_file(
+            file_name=request.file_name,
+            chapters_data=chapters_data,
+            user_id=current_user_id
+        )
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"创建作品和章节失败: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")
