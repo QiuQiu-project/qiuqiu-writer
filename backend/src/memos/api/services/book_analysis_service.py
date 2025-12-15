@@ -658,13 +658,43 @@ class BookAnalysisService:
             if analysis_data is None:
                 raise ValueError("analysis_data不能为None，AI响应解析失败")
             
-            # 获取作品
-            stmt = select(Work).where(Work.id == work_id)
-            result = await self.db.execute(stmt)
-            work = result.scalar_one_or_none()
-            
-            if not work:
-                raise ValueError(f"作品 {work_id} 不存在")
+            # 获取作品（刷新会话以确保数据是最新的）
+            try:
+                # 先尝试直接查询
+                stmt = select(Work).where(Work.id == work_id)
+                result = await self.db.execute(stmt)
+                work = result.scalar_one_or_none()
+                
+                if not work:
+                    logger.warning(f"第一次查询未找到作品 {work_id}，尝试刷新会话")
+                    # 刷新会话，清除可能的过期对象
+                    await self.db.expire_all()
+                    result = await self.db.execute(stmt)
+                    work = result.scalar_one_or_none()
+                
+                if not work:
+                    logger.warning(f"刷新会话后仍未找到作品 {work_id}，尝试使用 WorkService")
+                    # 最后尝试：使用 WorkService 获取
+                    from memos.api.services.work_service import WorkService
+                    work_service = WorkService(self.db)
+                    work = await work_service.get_work_by_id(work_id)
+                
+                if not work:
+                    # 记录详细的错误信息
+                    logger.error(
+                        f"作品 {work_id} 不存在。"
+                        f"数据库会话状态: is_active={self.db.is_active if hasattr(self.db, 'is_active') else 'unknown'}, "
+                        f"bind={self.db.bind.url if hasattr(self.db, 'bind') and self.db.bind else 'unknown'}"
+                    )
+                    raise ValueError(f"作品 {work_id} 不存在")
+                
+                logger.debug(f"成功获取作品 {work_id}: {work.title}")
+            except ValueError:
+                # 重新抛出 ValueError
+                raise
+            except Exception as e:
+                logger.error(f"获取作品 {work_id} 失败: {e}", exc_info=True)
+                raise ValueError(f"获取作品 {work_id} 失败: {str(e)}")
             
             work_metadata = work.work_metadata or {}
             
@@ -767,7 +797,17 @@ class BookAnalysisService:
             }
             
         except Exception as e:
-            logger.error(f"渐进式插入失败: {e}")
+            error_msg = str(e)
+            logger.error(
+                f"渐进式插入失败: {error_msg}",
+                extra={
+                    "work_id": work_id,
+                    "user_id": user_id,
+                    "chapter_index": chapter_index,
+                    "error_type": type(e).__name__,
+                },
+                exc_info=True
+            )
             await self.db.rollback()
             raise
     

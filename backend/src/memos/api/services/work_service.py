@@ -4,7 +4,7 @@
 
 from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import and_, or_, desc, asc, func, outerjoin
+from sqlalchemy import and_, or_, desc, asc, func, outerjoin, cast, String
 from sqlalchemy.orm import selectinload
 from sqlalchemy.future import select
 
@@ -41,13 +41,12 @@ class WorkService:
 
     async def find_work_by_filename(self, file_name: str, user_id: int) -> Optional[Work]:
         """根据文件名查找作品（从work_metadata中查找source_file）"""
-        from sqlalchemy import and_
-        from sqlalchemy.dialects.postgresql import JSONB
-        
+        # 使用 cast 将 JSONB 字段转换为字符串进行比较
+        # PostgreSQL JSONB 使用 ->> 操作符提取文本值，在 SQLAlchemy 中使用 cast
         stmt = select(Work).where(
             and_(
                 Work.owner_id == user_id,
-                Work.work_metadata['source_file'].astext == file_name
+                cast(Work.work_metadata['source_file'], String) == file_name
             )
         )
         result = await self.db.execute(stmt)

@@ -1364,10 +1364,11 @@ async def create_work_from_file(
                 # 继续处理下一个章节
                 continue
         
-        # 更新作品统计
+        # 更新作品统计（累加新创建的章节数）
+        current_chapter_count = work.chapter_count or 0
         await work_service.update_work(
             work_id=work.id,
-            chapter_count=len(created_chapters)
+            chapter_count=current_chapter_count + len(created_chapters)
         )
         
         return {
