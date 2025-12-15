@@ -457,6 +457,7 @@
   opacity: 1;
 }
 
+.nav-chapter-analyze-btn,
 .nav-chapter-edit-btn,
 .nav-chapter-delete-btn {
   width: 24px;
@@ -474,10 +475,17 @@
   flex-shrink: 0;
 }
 
+.nav-chapter-item-wrapper.active .nav-chapter-analyze-btn,
 .nav-chapter-item-wrapper.active .nav-chapter-edit-btn,
 .nav-chapter-item-wrapper.active .nav-chapter-delete-btn {
   opacity: 1;
   color: var(--accent-primary);
+}
+
+.nav-chapter-analyze-btn:hover {
+  background: rgba(139, 92, 246, 0.1);
+  color: #8b5cf6;
+  transform: scale(1.1);
 }
 
 .nav-chapter-edit-btn:hover {

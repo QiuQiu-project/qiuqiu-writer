@@ -1146,8 +1146,13 @@ async def generate_chapter_outlines(
         )
         
         # 执行流式生成
+        # 注意：在异步生成器中创建独立的数据库会话，避免使用依赖注入的会话
+        # 这样可以防止会话生命周期冲突
         async def generate_outlines():
             """生成大纲和细纲响应"""
+            # 创建独立的数据库会话用于生成器内部操作
+            from memos.api.core.database import AsyncSessionLocal
+            async_session = AsyncSessionLocal()
             try:
                 import json
                 
@@ -1158,8 +1163,11 @@ async def generate_chapter_outlines(
                 })
                 yield f"data: {start_msg}\n\n"
                 
+                # 使用独立会话创建服务实例
+                book_analysis_service_internal = BookAnalysisService(async_session)
+                
                 # 逐章生成大纲和细纲
-                async for result in book_analysis_service.generate_outlines_for_all_chapters(
+                async for result in book_analysis_service_internal.generate_outlines_for_all_chapters(
                     work_id=work_id,
                     ai_service=ai_service,
                     prompt=prompt,
@@ -1192,6 +1200,9 @@ async def generate_chapter_outlines(
                         })
                         yield f"data: {success_msg}\n\n"
                 
+                # 提交所有更改
+                await async_session.commit()
+                
                 # 发送完成消息
                 done_msg = json.dumps({
                     "type": "done",
@@ -1201,11 +1212,23 @@ async def generate_chapter_outlines(
                 
             except Exception as e:
                 logger.error(f"生成大纲和细纲过程出错: {traceback.format_exc()}")
+                # 回滚事务
+                try:
+                    await async_session.rollback()
+                except Exception as rollback_error:
+                    logger.error(f"回滚事务失败: {rollback_error}")
+                
                 error_msg = json.dumps({
                     "type": "error",
                     "message": f"服务器错误: {str(e)}"
                 })
                 yield f"data: {error_msg}\n\n"
+            finally:
+                # 确保会话被正确关闭
+                try:
+                    await async_session.close()
+                except Exception as close_error:
+                    logger.error(f"关闭数据库会话失败: {close_error}")
         
         return StreamingResponse(
             generate_outlines(),

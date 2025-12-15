@@ -20,6 +20,7 @@ import { chaptersApi, type Chapter } from '../utils/chaptersApi';
 import { syncManager } from '../utils/syncManager';
 import { localCacheManager } from '../utils/localCacheManager';
 import { useIntelligentSync } from '../utils/intelligentSync';
+import { analyzeChapter } from '../utils/bookAnalysisApi';
 
 // 文档类型定义（从 sharedbClient 移过来）
 interface ShareDBDocument {
@@ -829,18 +830,15 @@ export default function NovelEditorPage(){
     }
   };
 
-  // 分析本书
+  // 分析本书（后台运行，不显示弹窗）
   const handleAnalyzeWork = async () => {
     if (!workId) {
-      alert('没有选择作品');
+      console.warn('没有选择作品');
       return;
     }
     
-    const confirmed = window.confirm(`确定要分析作品《${work?.title}》的所有章节吗？这将使用AI分析所有章节内容。`);
-    if (!confirmed) return;
-    
+    // 后台运行，不显示确认弹窗
     setIsAnalyzing(true);
-    setAnalysisProgress('准备分析...');
     
     try {
       // 调用后端接口，后端会自动获取所有章节内容并逐章处理
@@ -866,7 +864,7 @@ export default function NovelEditorPage(){
         throw new Error(`分析失败: ${response.status} ${response.statusText} - ${errorText}`);
       }
       
-      // 处理流式响应
+      // 处理流式响应（后台处理，不显示进度）
       const reader = response.body?.getReader();
       if (!reader) {
         throw new Error('无法获取响应流');
@@ -874,6 +872,8 @@ export default function NovelEditorPage(){
       
       const decoder = new TextDecoder();
       let buffer = '';
+      let analyzedCount = 0; // 统计分析的章节数
+      let totalChapters = 0; // 总章节数
       
       while (true) {
         const { done, value } = await reader.read();
@@ -888,33 +888,29 @@ export default function NovelEditorPage(){
             try {
               const data = JSON.parse(line.slice(6));
               if (data.type === 'start') {
-                setAnalysisProgress(data.message || '开始分析...');
-              } else if (data.type === 'chapter_start') {
-                setAnalysisProgress(`正在分析第 ${data.chapter_index}/${data.total_chapters} 章：${data.chapter_title || ''}`);
-              } else if (data.type === 'chunk' && data.content) {
-                // 显示部分内容作为进度提示
-                const preview = data.content.substring(0, 50);
-                if (preview) {
-                  setAnalysisProgress(`分析中... ${preview}...`);
-                }
+                // 记录开始信息
+                totalChapters = data.total_chapters || 0;
+                console.log(`开始分析作品，共 ${totalChapters} 章`);
               } else if (data.type === 'chapter_inserted') {
-                setAnalysisProgress(`✓ 第 ${data.chapter_index}/${data.total_chapters} 章《${data.chapter_title || ''}》分析完成并已插入作品`);
-              } else if (data.type === 'chapter_skipped') {
-                setAnalysisProgress(`⚠ 第 ${data.chapter_index} 章《${data.chapter_title || ''}》已跳过：${data.message || ''}`);
-              } else if (data.type === 'chapter_error') {
-                setAnalysisProgress(`✗ 第 ${data.chapter_index} 章处理失败：${data.message || ''}`);
+                // 统计成功分析的章节
+                analyzedCount++;
+                console.log(`✓ 第 ${data.chapter_index}/${totalChapters} 章分析完成`);
               } else if (data.type === 'all_chapters_complete') {
-                setAnalysisProgress('所有章节分析完成！');
-                setTimeout(() => {
-                  setIsAnalyzing(false);
-                  setAnalysisProgress('');
-                  alert('分析完成！角色、地点和章节信息已更新。');
-                  // 重新加载作品数据
-                  window.location.reload();
-                }, 1000);
+                // 分析完成，显示结果
+                setIsAnalyzing(false);
+                console.log(`分析完成！共分析了 ${analyzedCount} 章`);
+                // 显示简单的提示信息
+                alert(`分析完成！共分析了 ${analyzedCount} 章。`);
+                // 静默刷新数据（不刷新整个页面）
+                if (workId) {
+                  // 重新加载作品和章节数据
+                  const workData = await worksApi.getWork(Number(workId));
+                  setWork(workData);
+                  // 触发章节列表重新加载
+                  window.dispatchEvent(new Event('chapters-updated'));
+                }
               } else if (data.type === 'error' || data.type === 'chapter_insert_error') {
                 console.error('分析错误:', data.message);
-                setAnalysisProgress(`错误: ${data.message}`);
                 setIsAnalyzing(false);
                 alert(`分析失败: ${data.message}`);
               }
@@ -927,9 +923,8 @@ export default function NovelEditorPage(){
       }
     } catch (err) {
       console.error('分析失败:', err);
-      alert(err instanceof Error ? err.message : '分析失败');
       setIsAnalyzing(false);
-      setAnalysisProgress('');
+      alert(err instanceof Error ? err.message : '分析失败');
     }
   };
 
@@ -2277,6 +2272,103 @@ export default function NovelEditorPage(){
   };
 
   // 删除章节
+  // 分析章节（生成大纲和细纲）
+  const handleAnalyzeChapter = async (chapterId: string) => {
+    if (!workId) {
+      alert('没有选择作品');
+      return;
+    }
+
+    // 检查章节ID是否为数字（真实章节），草稿章节不能分析
+    const chapterIdNum = parseInt(chapterId);
+    if (isNaN(chapterIdNum)) {
+      alert('草稿章节无法分析，请先保存为正式章节');
+      return;
+    }
+
+    try {
+      console.log(`开始分析章节 ${chapterId}...`);
+      
+      // 调用分析API
+      const result = await analyzeChapter(
+        Number(workId),
+        chapterIdNum,
+        (progress) => {
+          console.log('分析进度:', progress);
+        }
+      );
+
+      console.log('分析结果:', result);
+
+      // 将结果保存到章节的 metadata 中
+      const updateData: any = {
+        chapter_metadata: {
+          outline: result.outline,
+          detailed_outline: result.detailed_outline,
+        }
+      };
+
+      // 如果 outline 是对象，转换为字符串格式
+      if (result.outline && typeof result.outline === 'object') {
+        const outlineObj = result.outline as any;
+        const parts: string[] = [];
+        if (outlineObj.core_function) {
+          parts.push(`核心功能：${outlineObj.core_function}`);
+        }
+        if (outlineObj.key_points && Array.isArray(outlineObj.key_points)) {
+          parts.push(`关键情节点：\n${outlineObj.key_points.map((p: string, i: number) => `${i + 1}. ${p}`).join('\n')}`);
+        }
+        if (outlineObj.visual_scenes && Array.isArray(outlineObj.visual_scenes)) {
+          parts.push(`画面感：\n${outlineObj.visual_scenes.map((s: string, i: number) => `${i + 1}. ${s}`).join('\n')}`);
+        }
+        if (outlineObj.atmosphere && Array.isArray(outlineObj.atmosphere)) {
+          parts.push(`氛围：${outlineObj.atmosphere.join('、')}`);
+        }
+        if (outlineObj.hook) {
+          parts.push(`结尾钩子：${outlineObj.hook}`);
+        }
+        updateData.chapter_metadata.outline = parts.join('\n\n');
+      }
+
+      // 如果 detailed_outline 是对象，转换为字符串格式
+      if (result.detailed_outline && typeof result.detailed_outline === 'object') {
+        const detailedObj = result.detailed_outline as any;
+        if (detailedObj.sections && Array.isArray(detailedObj.sections)) {
+          updateData.chapter_metadata.detailed_outline = detailedObj.sections.map((section: any) => {
+            const sectionNum = section.section_number || '';
+            const sectionTitle = section.title || '';
+            const sectionContent = section.content || '';
+            return `${sectionNum}. ${sectionTitle}\n${sectionContent}`;
+          }).join('\n\n');
+        } else {
+          updateData.chapter_metadata.detailed_outline = JSON.stringify(detailedObj, null, 2);
+        }
+      }
+
+      // 更新章节
+      await chaptersApi.updateChapter(chapterIdNum, updateData);
+
+      // 更新本地状态
+      const chapterData = chaptersData[chapterId];
+      if (chapterData) {
+        setChaptersData({
+          ...chaptersData,
+          [chapterId]: {
+            ...chapterData,
+            outline: updateData.chapter_metadata.outline || '',
+            detailOutline: updateData.chapter_metadata.detailed_outline || '',
+          }
+        });
+      }
+
+      alert('章节分析完成！大纲和细纲已保存到章节信息中。');
+    } catch (error) {
+      console.error('分析章节失败:', error);
+      alert(error instanceof Error ? error.message : '分析章节失败');
+      throw error;
+    }
+  };
+
   const handleDeleteChapter = async (chapterId: string) => {
     if (!workId) return;
 
@@ -2683,14 +2775,7 @@ export default function NovelEditorPage(){
             <button className="member-btn">开会员得蛙币</button>
           </div>
         </div>
-        {isAnalyzing && analysisProgress && (
-          <div className="analysis-progress-overlay">
-            <div className="analysis-progress-content">
-              <Loader2 size={24} className="spinner" />
-              <p>{analysisProgress}</p>
-            </div>
-          </div>
-        )}
+        {/* 分析进度已移除，改为后台运行，不显示弹窗 */}
       </header>
 
       <div className="novel-editor-body">
@@ -2706,11 +2791,13 @@ export default function NovelEditorPage(){
           }}
           onOpenChapterModal={handleOpenChapterModal}
           onChapterDelete={handleDeleteChapter}
+          onChapterAnalyze={handleAnalyzeChapter}
           drafts={drafts}
           onDraftsChange={setDrafts}
           volumes={volumes}
           onVolumesChange={setVolumes}
           workType={work?.work_type}
+          workId={workId}
         />
 
         {/* 主编辑区 */}

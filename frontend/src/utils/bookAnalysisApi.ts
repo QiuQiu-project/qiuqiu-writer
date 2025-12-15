@@ -923,6 +923,105 @@ export async function createWorkFromFile(
  * 测试 API 连接
  * 连接 memos 后端检查 AI 服务是否可用
  */
+/**
+ * 分析单个章节，生成大纲和细纲
+ * 
+ * @param workId 作品ID
+ * @param chapterId 章节ID
+ * @param onProgress 进度回调函数（可选）
+ * @param settings 分析设置（可选）
+ * @returns Promise<{ outline: any; detailed_outline: any }>
+ */
+export async function analyzeChapter(
+  workId: number,
+  chapterId: number,
+  onProgress?: (progress: { message?: string; status?: string }) => void,
+  settings?: AnalysisSettings
+): Promise<{
+  outline: any;
+  detailed_outline: any;
+}> {
+  try {
+    console.log(`📡 分析章节 ${chapterId}...`);
+    
+    const token = localStorage.getItem('access_token');
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}/ai/generate-chapter-outlines?work_id=${workId}&chapter_ids=${chapterId}`,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          settings: settings || {},
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API 调用失败: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    // 处理流式响应 (SSE)
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('无法获取响应流');
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let outline: any = null;
+    let detailed_outline: any = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.type === 'start') {
+              onProgress?.({ message: '开始分析章节...', status: 'start' });
+            } else if (data.type === 'chapter_complete') {
+              // 章节分析完成，获取大纲和细纲
+              outline = data.outline;
+              detailed_outline = data.detailed_outline;
+              onProgress?.({ message: '章节分析完成', status: 'complete' });
+            } else if (data.type === 'done') {
+              // 所有章节分析完成
+              onProgress?.({ message: '分析完成', status: 'done' });
+            } else if (data.type === 'error' || data.type === 'chapter_error') {
+              throw new Error(data.message || '分析失败');
+            }
+          } catch (e) {
+            console.warn('解析SSE消息失败:', e, line);
+          }
+        }
+      }
+    }
+
+    if (!outline || !detailed_outline) {
+      throw new Error('未能获取章节大纲和细纲');
+    }
+
+    return { outline, detailed_outline };
+  } catch (error) {
+    console.error('分析章节失败:', error);
+    throw error;
+  }
+}
+
 export async function testAPIConnection(): Promise<{
   success: boolean;
   message: string;

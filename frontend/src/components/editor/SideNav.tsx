@@ -1,4 +1,4 @@
-import { BookOpen, ChevronDown, ChevronRight, Plus, Settings, ArrowUpDown, Trash2 } from 'lucide-react';
+import { BookOpen, ChevronDown, ChevronRight, Plus, Settings, ArrowUpDown, Trash2, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import './SideNav.css';
 
@@ -51,17 +51,19 @@ interface SideNavProps {
   onChapterSelect?: (chapterId: string | null) => void;
   onOpenChapterModal?: (mode: 'create' | 'edit', volumeId: string, volumeTitle: string, chapterData?: ChapterFullData) => void;
   onChapterDelete?: (chapterId: string) => void;  // 删除章节回调
+  onChapterAnalyze?: (chapterId: string) => Promise<void>;  // 分析章节回调
   drafts?: Draft[];
   onDraftsChange?: (drafts: Draft[]) => void;
   volumes?: Volume[];
   onVolumesChange?: (volumes: Volume[]) => void;
   workType?: 'long' | 'short' | 'script' | 'video';  // 作品类型：长篇支持分卷，短篇不分卷
+  workId?: string | null;  // 作品ID，用于分析章节
 }
 
 // 导出 Chapter 和 Volume 类型供外部使用
 export type { Chapter, Volume };
 
-export default function SideNav({ activeNav, onNavChange, selectedChapter, onChapterSelect, onOpenChapterModal, onChapterDelete, drafts: externalDrafts, onDraftsChange, volumes: externalVolumes, onVolumesChange, workType = 'long' }: SideNavProps) {
+export default function SideNav({ activeNav, onNavChange, selectedChapter, onChapterSelect, onOpenChapterModal, onChapterDelete, onChapterAnalyze, drafts: externalDrafts, onDraftsChange, volumes: externalVolumes, onVolumesChange, workType = 'long', workId }: SideNavProps) {
   const [chaptersExpanded, setChaptersExpanded] = useState(true);
   const [draftsExpanded, setDraftsExpanded] = useState(false);
   const [isChaptersReversed, setIsChaptersReversed] = useState(false); // 章节排序状态
@@ -152,6 +154,29 @@ export default function SideNav({ activeNav, onNavChange, selectedChapter, onCha
     e.stopPropagation();
     if (window.confirm(`确定要删除章节"${chapter.title}"吗？此操作不可恢复。`)) {
       onChapterDelete?.(chapter.id);
+    }
+  };
+
+  // 分析章节
+  const handleAnalyzeChapter = async (chapter: Chapter, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!workId || !onChapterAnalyze) {
+      console.warn('无法分析章节：缺少 workId 或 onChapterAnalyze 回调');
+      return;
+    }
+    
+    // 检查章节ID是否为数字（真实章节），草稿章节不能分析
+    const chapterIdNum = parseInt(chapter.id);
+    if (isNaN(chapterIdNum)) {
+      alert('草稿章节无法分析，请先保存为正式章节');
+      return;
+    }
+    
+    try {
+      await onChapterAnalyze(chapter.id);
+    } catch (error) {
+      console.error('分析章节失败:', error);
+      alert(error instanceof Error ? error.message : '分析章节失败');
     }
   };
 
@@ -297,6 +322,15 @@ export default function SideNav({ activeNav, onNavChange, selectedChapter, onCha
                               }
                             </span>
                             <div className="nav-chapter-actions">
+                              {workId && onChapterAnalyze && !isNaN(parseInt(chapter.id)) && (
+                                <button
+                                  className="nav-chapter-analyze-btn"
+                                  onClick={(e) => handleAnalyzeChapter(chapter, e)}
+                                  title="分析本章（生成大纲和细纲）"
+                                >
+                                  <Sparkles size={12} />
+                                </button>
+                              )}
                               <button
                                 className="nav-chapter-edit-btn"
                                 onClick={(e) => handleEditChapter(chapter, volume.title, e)}
@@ -356,6 +390,15 @@ export default function SideNav({ activeNav, onNavChange, selectedChapter, onCha
                                   }
                                 </span>
                                 <div className="nav-chapter-actions">
+                                  {workId && onChapterAnalyze && !isNaN(parseInt(chapter.id)) && (
+                                    <button
+                                      className="nav-chapter-analyze-btn"
+                                      onClick={(e) => handleAnalyzeChapter(chapter, e)}
+                                      title="分析本章（生成大纲和细纲）"
+                                    >
+                                      <Sparkles size={12} />
+                                    </button>
+                                  )}
                                   <button
                                     className="nav-chapter-edit-btn"
                                     onClick={(e) => handleEditChapter(chapter, volume?.title || '未分卷', e)}
