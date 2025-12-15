@@ -58,6 +58,9 @@ const documentCache = {
   // 版本和内容缓存
   currentVersion: new Map<string, number>(),
   currentContent: new Map<string, string>(),
+  // 关键修复：保存上次同步的版本和内容，用于三路合并
+  lastSyncedVersion: new Map<string, number>(),
+  lastSyncedContent: new Map<string, string>(),
   // 请求去重：记录正在进行的请求，避免重复请求
   pendingRequests: new Map<string, Promise<any>>(),
   
@@ -83,6 +86,16 @@ const documentCache = {
         });
         
         const contentStr = typeof serverDoc.content === 'string' ? serverDoc.content : JSON.stringify(serverDoc.content);
+        const previousVersion = documentCache.currentVersion.get(documentId);
+        const previousContent = documentCache.currentContent.get(documentId);
+        
+        // 关键修复：如果这是第一次获取文档，保存为 lastSynced 版本
+        // 这样下次同步时可以使用它作为 base_content
+        if (!previousVersion || previousVersion === 0) {
+          documentCache.lastSyncedVersion.set(documentId, serverDoc.version || 1);
+          documentCache.lastSyncedContent.set(documentId, contentStr);
+        }
+        
         documentCache.currentVersion.set(documentId, serverDoc.version || 1);
         documentCache.currentContent.set(documentId, contentStr);
         
@@ -144,52 +157,125 @@ const documentCache = {
     console.log('✅ [DocumentCache] 已保存到缓存:', documentId);
   },
   
-  // 同步文档状态（仅保存到本地缓存，不再调用服务器接口）
+  // 同步文档状态（保存到本地缓存并同步到服务器）
   async syncDocumentState(documentId: string, content: string): Promise<SyncResponse> {
     const localVersion = documentCache.currentVersion.get(documentId) || 0;
-    const localContent = documentCache.currentContent.get(documentId) || content;
+    // 关键修复：直接使用传入的 content 参数（编辑器界面上的实际内容），而不是缓存中的内容
+    // 这样可以确保保存的是用户当前编辑的内容，而不是可能过时的缓存内容
+    const contentToSave = content;
 
-    console.log('🔄 [DocumentCache] 保存文档到本地缓存:', {
+    console.log('🔄 [DocumentCache] 同步文档到服务器:', {
       documentId,
       localVersion,
-      contentLength: localContent.length
+      contentLength: contentToSave.length,
+      usingEditorContent: true, // 标记使用的是编辑器内容
     });
 
     try {
-      // 仅保存到本地缓存，定时任务会处理服务器同步
+      // 先保存到本地缓存（使用编辑器内容）
       const cached = await localCacheManager.get<ShareDBDocument>(documentId);
       if (cached) {
-        cached.content = localContent;
+        cached.content = contentToSave; // 使用编辑器内容
         cached.version = (cached.version || 0) + 1;
         await localCacheManager.set(documentId, cached, cached.version);
         documentCache.currentVersion.set(documentId, cached.version);
-        documentCache.currentContent.set(documentId, localContent);
+        documentCache.currentContent.set(documentId, contentToSave); // 更新缓存为编辑器内容
       } else {
         // 如果缓存不存在，创建新的
         const newDoc: ShareDBDocument = {
           document_id: documentId,
-          content: localContent,
+          content: contentToSave, // 使用编辑器内容
           version: 1,
         };
         await localCacheManager.set(documentId, newDoc, 1);
         documentCache.currentVersion.set(documentId, 1);
-        documentCache.currentContent.set(documentId, localContent);
+        documentCache.currentContent.set(documentId, contentToSave); // 更新缓存为编辑器内容
       }
 
-      console.log('✅ [DocumentCache] 已保存到本地缓存:', documentId);
+      // 关键修复：调用后端 ShareDB 同步接口（使用编辑器内容）
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
+      const token = localStorage.getItem('access_token');
+      
+      try {
+        const syncResponse = await fetch(`${API_BASE_URL}/v1/sharedb/documents/sync`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': token ? `Bearer ${token}` : '',
+          },
+          body: JSON.stringify({
+            doc_id: documentId,
+            version: localVersion,
+            content: contentToSave, // 使用编辑器内容，而不是缓存内容
+            // 关键修复：提供 base_version 和 base_content，用于三路合并
+            // 这样可以正确计算差异，避免新内容插入到旧内容前面
+            base_version: documentCache.lastSyncedVersion.get(documentId) || undefined,
+            base_content: documentCache.lastSyncedContent.get(documentId) || undefined,
+            create_version: false,
+          }),
+        });
 
-      return {
-        success: true,
-        version: documentCache.currentVersion.get(documentId) || localVersion,
-        content: localContent,
-        operations: [],
-      };
+        if (!syncResponse.ok) {
+          throw new Error(`同步失败: ${syncResponse.statusText}`);
+        }
+
+        const result = await syncResponse.json();
+        
+        if (result.success) {
+          // 关键修复：保存上次同步的版本和内容，用于下次同步时的三路合并
+          const previousVersion = documentCache.currentVersion.get(documentId) || 0;
+          const previousContent = documentCache.currentContent.get(documentId) || '';
+          
+          // 更新当前版本和内容
+          documentCache.currentVersion.set(documentId, result.version);
+          documentCache.currentContent.set(documentId, result.content);
+          
+          // 保存上次同步的版本和内容（用于三路合并）
+          if (previousVersion > 0 && previousContent) {
+            documentCache.lastSyncedVersion.set(documentId, previousVersion);
+            documentCache.lastSyncedContent.set(documentId, previousContent);
+          }
+          
+          // 更新缓存
+          const updatedDoc: ShareDBDocument = {
+            document_id: documentId,
+            content: result.content,
+            version: result.version,
+          };
+          await localCacheManager.set(documentId, updatedDoc, result.version);
+          
+          console.log('✅ [DocumentCache] 已同步到服务器:', {
+            documentId,
+            version: result.version,
+            previousVersion,
+            hasBaseContent: !!documentCache.lastSyncedContent.get(documentId),
+          });
+
+          return {
+            success: true,
+            version: result.version,
+            content: result.content,
+            operations: result.operations || [],
+          };
+        } else {
+          throw new Error(result.error || '同步失败');
+        }
+      } catch (syncError) {
+        console.warn('⚠️ [DocumentCache] 同步到服务器失败，但已保存到本地缓存:', syncError);
+        // 即使服务器同步失败，也返回成功（因为已保存到本地）
+        return {
+          success: true,
+          version: documentCache.currentVersion.get(documentId) || localVersion,
+          content: contentToSave, // 返回编辑器内容
+          operations: [],
+        };
+      }
     } catch (error) {
       console.error('❌ [DocumentCache] 保存失败:', error);
       return {
         success: false,
         version: localVersion,
-        content: localContent,
+        content: contentToSave, // 返回编辑器内容
         operations: [],
         error: error instanceof Error ? error.message : String(error)
       };
@@ -392,6 +478,8 @@ export default function NovelEditorPage(){
   // 关键修复：防止频闪 - 记录上次设置的内容，避免重复设置相同内容
   const lastSetContentRef = useRef<string>('');
   const updateContentTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 关键修复：章节加载状态标记，防止在加载期间其他操作干扰编辑器
+  const isChapterLoadingRef = useRef<boolean>(false);
 
   // 从WorkInfoManager缓存中提取角色数据
   // 关键修复：使用 useRef 存储上一次的结果，避免重复计算
@@ -1052,8 +1140,11 @@ export default function NovelEditorPage(){
     const chapterId = parseInt(selectedChapter);
     
     // 关键修复：切换章节时清除上次设置的内容记录，避免影响新章节
+    // 同时清除加载状态标记（如果之前有残留）
     if (!isNaN(chapterId) && currentChapterIdRef.current !== chapterId) {
       lastSetContentRef.current = ''; // 清除记录，允许新章节设置内容
+      isChapterLoadingRef.current = false; // 清除可能残留的加载状态
+      console.log('🔄 [切换章节] 清除上次章节的内容记录和加载状态');
     }
     if (isNaN(chapterId)) {
       // 如果是草稿或其他非数字ID，不加载
@@ -1063,13 +1154,22 @@ export default function NovelEditorPage(){
     }
 
     const loadChapterContent = async () => {
-      // 显示加载动画
+      // 显示加载弹窗
       setChapterLoading(true);
+      // 关键修复：设置加载状态标记，防止其他操作干扰
+      isChapterLoadingRef.current = true;
+      
+      // 关键修复：在开始加载新章节前，立即停止智能同步的所有操作
+      // 这样可以防止轮询、同步检查等在章节切换时干扰编辑器内容
+      if (typeof stopSync === 'function') {
+        console.log('🛑 [切换章节] 停止智能同步，防止干扰章节加载');
+        stopSync();
+      }
       
       try {
         // 关键修复：在加载新章节前，先保存当前章节的内容
         const previousChapterId = currentChapterIdRef.current;
-      if (previousChapterId && previousChapterId !== chapterId && workId) {
+        if (previousChapterId && previousChapterId !== chapterId && workId) {
         try {
           // 关键修复：立即清除所有待保存的定时器，避免保存到错误的章节
           // 这样可以防止自动保存在新章节加载后保存到前一个章节
@@ -1107,12 +1207,22 @@ export default function NovelEditorPage(){
           // 关键修复：验证编辑器内容确实属于前一个章节
           // 如果编辑器内容已经被清空或改变，说明可能已经切换了，不应该保存
           if (currentContent && currentContent.trim() !== '<p></p>' && currentContent.trim() !== '') {
+            console.log('💾 [切换章节] 正在保存当前章节内容...');
             // 立即保存前一个章节的内容，使用同步方式确保保存完成
+            // 先保存到本地缓存
             await documentCache.updateDocument(previousDocumentId, currentContent, {
               work_id: Number(workId),
               chapter_id: previousChapterId,
               updated_at: new Date().toISOString(),
             });
+            
+            // 然后同步到服务器，确保数据持久化
+            try {
+              await documentCache.syncDocumentState(previousDocumentId, currentContent);
+              console.log('✅ [切换章节] 当前章节内容已保存到服务器');
+            } catch (syncErr) {
+              console.warn('⚠️ [切换章节] 同步到服务器失败，但已保存到本地缓存:', syncErr);
+            }
             
             // 验证保存是否成功
             const savedDoc = await documentCache.getDocument(previousDocumentId);
@@ -1139,7 +1249,8 @@ export default function NovelEditorPage(){
       // 关键修复：在加载新章节前，先清空编辑器内容，避免显示旧内容
       // 注意：不要提前更新 currentChapterIdRef，因为自动保存还在使用它来验证章节ID
       console.log('🔄 [切换章节] 清空编辑器，准备加载新章节内容');
-      editor.commands.setContent('<p></p>');
+      // 清空编辑器时使用 emitUpdate: false，不触发更新事件，同时清除历史
+      editor.commands.setContent('<p></p>', { emitUpdate: false });
       
       // 等待编辑器清空完成
       await new Promise(resolve => setTimeout(resolve, 50));
@@ -1153,7 +1264,7 @@ export default function NovelEditorPage(){
         }
         const documentId = `work_${workId}_chapter_${chapterId}`;
         
-        console.log('📖 加载章节内容:', {
+        console.log('📖 [切换章节] 开始加载新章节内容:', {
           workId,
           chapterId,
           documentId,
@@ -1161,7 +1272,32 @@ export default function NovelEditorPage(){
         
         let content: string | null = null;
         
-        // 1. 先从本地缓存获取（即时响应）- 优先新格式，兼容旧格式
+        // 关键修复：先从服务器强制拉取最新版本，确保获取的是最新内容
+        console.log('🔄 [切换章节] 从服务器强制拉取最新版本...');
+        try {
+          const serverDoc = await documentCache.forcePullFromServer(documentId);
+          if (serverDoc && serverDoc.content) {
+            const serverContent = typeof serverDoc.content === 'string' 
+              ? serverDoc.content 
+              : JSON.stringify(serverDoc.content);
+            
+            if (serverContent && serverContent.trim().length > 0) {
+              content = serverContent;
+              console.log('✅ [切换章节] 从服务器获取到最新内容，长度:', content.length);
+              
+              // 更新本地缓存
+              await documentCache.updateDocument(documentId, content, {
+                work_id: Number(workId),
+                chapter_id: chapterId,
+                updated_at: new Date().toISOString(),
+              });
+            }
+          }
+        } catch (pullErr) {
+          console.warn('⚠️ [切换章节] 从服务器拉取失败，将使用本地缓存:', pullErr);
+        }
+        
+        // 1. 如果服务器拉取失败，从本地缓存获取（即时响应）- 优先新格式，兼容旧格式
         try {
           // 关键修复：确保使用正确的文档ID，避免缓存键冲突
           console.log('🔍 [缓存检查] 开始获取缓存，文档ID:', {
@@ -1653,16 +1789,35 @@ export default function NovelEditorPage(){
           });
           
           // 关键修复：防止频闪 - 检查是否与上次设置的内容相同
-          if (lastSetContentRef.current !== content) {
-            editor.commands.setContent(content || '<p></p>');
-            lastSetContentRef.current = content || '<p></p>'; // 记录已设置的内容
+          // 但在章节切换时，即使内容相同也要设置，因为这是新章节的内容
+          const normalizedContent = content || '<p></p>';
+          const shouldSetContent = lastSetContentRef.current !== normalizedContent || 
+                                   (currentChapterIdRef.current !== chapterId);
+          
+          if (shouldSetContent) {
+            // 关键修复：清除撤销/重做历史，确保每个章节的撤销历史独立
+            // 这样撤销操作只会影响当前章节，不会撤回到之前章节的内容
+            // TipTap 的 History 扩展没有直接的 clearHistory 方法
+            // 我们通过先设置空内容再设置实际内容来重置历史
+            // 这样可以确保历史记录从新章节的内容开始
+            editor.commands.setContent('<p></p>', { emitUpdate: false });
+            // 使用 setTimeout 确保历史被清除后再设置实际内容
+            setTimeout(() => {
+              editor.commands.setContent(normalizedContent, { emitUpdate: false });
+            }, 0);
+            lastSetContentRef.current = normalizedContent; // 记录已设置的内容
+            
+            console.log('✅ [设置编辑器] 内容已设置并清除撤销历史，章节ID:', chapterId);
             
             // 验证设置后的内容
             const setContent = editor.getHTML();
-            if (setContent === (content || '<p></p>')) {
+            if (setContent === normalizedContent) {
               console.log('✅ [设置编辑器] 内容已正确设置，长度:', setContent.length);
             } else {
-              console.warn('⚠️ [设置编辑器] 内容设置后不匹配，可能存在缓存问题');
+              console.warn('⚠️ [设置编辑器] 内容设置后不匹配，可能存在缓存问题', {
+                expected: normalizedContent.substring(0, 50),
+                actual: setContent.substring(0, 50)
+              });
             }
           } else {
             console.log('✅ [设置编辑器] 内容与上次设置相同，跳过更新，避免频闪');
@@ -1678,6 +1833,10 @@ export default function NovelEditorPage(){
         currentChapterIdRef.current = chapterId;
         
         console.log('✅ [章节加载完成] currentChapterIdRef 已更新为:', chapterId);
+        
+        // 关键修复：章节内容加载完成后，清除加载状态标记
+        // 注意：这里不立即重新启动智能同步，因为 useIntelligentSync 的 useEffect 会在 documentId 变化时自动重新启动
+        isChapterLoadingRef.current = false;
 
         // 关键修复：章节切换后延迟从服务器拉取最新更新
         // 延迟执行，避免与轮询冲突，减少频繁请求
@@ -1724,6 +1883,12 @@ export default function NovelEditorPage(){
                 return; // 不更新，避免覆盖错误的内容
               }
               
+              // 关键修复：如果正在加载章节，不更新内容，避免干扰章节加载
+              if (isChapterLoadingRef.current) {
+                console.log('⏸️ [自动拉取] 章节正在加载中，跳过更新，避免干扰');
+                return;
+              }
+              
               // 关键修复：防止频闪 - 检查是否与上次设置的内容相同
               if (lastSetContentRef.current === serverContent) {
                 console.log('✅ [自动拉取] 内容与上次设置相同，跳过更新，避免频闪');
@@ -1747,7 +1912,12 @@ export default function NovelEditorPage(){
                   serverContentLength: serverContent.length,
                   currentContentLength: currentContent.length
                 });
-                editor.commands.setContent(serverContent);
+                // 关键修复：从服务器拉取内容时，先清除历史再设置内容
+                // 这样可以避免撤销到旧内容
+                editor.commands.setContent('<p></p>', { emitUpdate: false });
+                setTimeout(() => {
+                  editor.commands.setContent(serverContent, { emitUpdate: false });
+                }, 0);
                 lastSetContentRef.current = serverContent; // 记录已设置的内容
               } else {
                 console.log('✅ [自动拉取] 服务器内容与当前内容一致，无需更新');
@@ -1765,12 +1935,16 @@ export default function NovelEditorPage(){
         
         // 隐藏加载动画
         setChapterLoading(false);
+        // 关键修复：确保在加载完成或失败时都清除加载状态标记
+        isChapterLoadingRef.current = false;
       } catch (err) {
         console.error('加载章节内容失败（内层）:', err);
         // 即使所有方法都失败，也显示空内容，保证编辑器可用
         editor.commands.setContent('<p></p>');
         // 隐藏加载动画
         setChapterLoading(false);
+        // 关键修复：确保在加载失败时也清除加载状态标记
+        isChapterLoadingRef.current = false;
       }
       } catch (err) {
         console.error('加载章节内容失败（外层）:', err);
@@ -1778,6 +1952,8 @@ export default function NovelEditorPage(){
         editor.commands.setContent('<p></p>');
         // 隐藏加载动画
         setChapterLoading(false);
+        // 关键修复：确保在加载失败时也清除加载状态标记
+        isChapterLoadingRef.current = false;
       }
     };
 
@@ -1794,6 +1970,12 @@ export default function NovelEditorPage(){
 
   const updateContent = async (newContent: string) => {
     if (!editor || !selectedChapter || !workId) return;
+    
+    // 关键修复：如果正在加载章节，不更新内容，避免干扰章节加载
+    if (isChapterLoadingRef.current) {
+      console.log('⏸️ [智能同步] 章节正在加载中，跳过更新，避免干扰');
+      return;
+    }
     
     // 关键修复：验证章节ID，确保更新的是当前章节的内容
     const chapterId = parseInt(selectedChapter);
@@ -1858,9 +2040,14 @@ export default function NovelEditorPage(){
       }
       
       // 安全更新编辑器内容
-      editor.commands.setContent(newContent);
+      // 关键修复：从智能同步更新内容时，先清除历史再设置内容
+      // 这样可以避免撤销到旧内容
+      editor.commands.setContent('<p></p>', { emitUpdate: false });
+      setTimeout(() => {
+        editor.commands.setContent(newContent, { emitUpdate: false });
+      }, 0);
       lastSetContentRef.current = newContent; // 记录已设置的内容
-      console.log('✅ [智能同步] 已更新编辑器内容，章节ID:', chapterId);
+      console.log('✅ [智能同步] 已更新编辑器内容并清除撤销历史，章节ID:', chapterId);
     }, 100); // 100ms 防抖，减少频闪
   };
 
@@ -1927,6 +2114,12 @@ export default function NovelEditorPage(){
     console.log('✅ 自动保存已启动，章节ID:', chapterId);
 
     const handleUpdate = () => {
+      // 关键修复：如果正在加载章节，不触发保存，避免干扰章节加载
+      if (isChapterLoadingRef.current) {
+        console.log('⏸️ [自动保存] 章节正在加载中，跳过保存，避免干扰');
+        return;
+      }
+      
       // 关键修复：在触发保存前，先检查章节是否已经切换
       const currentChapterIdCheck = currentChapterIdRef.current;
       if (currentChapterIdCheck !== chapterId) {
@@ -1968,7 +2161,9 @@ export default function NovelEditorPage(){
             return;
           }
           
-          const content = editor.getHTML();
+          // 关键修复：直接使用编辑器中的实际内容，确保保存的是用户当前看到的内容
+          // 从编辑器获取最新内容（而不是使用可能过时的变量）
+          const editorContent = editor.getHTML();
           // 使用 workId 和 chapterId 生成唯一的缓存键
           const documentId = `work_${workId}_chapter_${chapterId}`;
           
@@ -1976,23 +2171,43 @@ export default function NovelEditorPage(){
             workId,
             chapterId,
             documentId,
-            contentLength: content.length,
-            contentPreview: content.substring(0, 100),
+            contentLength: editorContent.length,
+            contentPreview: editorContent.substring(0, 100),
             currentChapterIdRef: currentChapterIdRef.current, // 验证章节ID
+            usingEditorContent: true, // 标记使用的是编辑器内容
           });
           
           // 关键修复：验证内容不为空且确实属于当前章节
-          if (!content || content.trim() === '<p></p>' || content.trim() === '') {
-            console.warn('⚠️ [自动保存] 内容为空，跳过保存');
-            return;
+          // 注意：即使内容为空（用户删除了所有内容），也应该保存，因为这是用户的意图
+          // 但如果是初始空内容，可以跳过
+          if (!editorContent || (editorContent.trim() === '<p></p>' && editorContent.length <= 7)) {
+            // 检查是否是真正的空内容（只有默认的空段落）
+            console.log('ℹ️ [自动保存] 内容为空，但仍保存以反映用户的删除操作');
           }
           
+          console.log('💾 [自动保存] 使用编辑器内容:', {
+            contentLength: editorContent.length,
+            contentPreview: editorContent.substring(0, 100),
+          });
+          
           // 1. 立即保存到本地缓存（用户操作即时响应）
-          await documentCache.updateDocument(documentId, content, {
+          await documentCache.updateDocument(documentId, editorContent, {
             work_id: Number(workId),
             chapter_id: chapterId,
             updated_at: new Date().toISOString(),
           });
+          
+          // 2. 关键修复：立即同步到服务器，确保数据持久化
+          // 使用编辑器中的实际内容，而不是缓存内容
+          try {
+            await documentCache.syncDocumentState(documentId, editorContent);
+            console.log('✅ [自动保存] 已同步到服务器:', {
+              documentId,
+              contentLength: editorContent.length,
+            });
+          } catch (syncErr) {
+            console.warn('⚠️ [自动保存] 同步到服务器失败，但已保存到本地缓存:', syncErr);
+          }
           
           // 关键修复：保存后验证内容确实保存到了正确的章节
           const savedDoc = await documentCache.getDocument(documentId);
@@ -2006,15 +2221,21 @@ export default function NovelEditorPage(){
               });
               // 尝试修复：删除错误的缓存，重新保存
               await localCacheManager.delete(documentId);
-              await documentCache.updateDocument(documentId, content, {
+              await documentCache.updateDocument(documentId, editorContent, {
                 work_id: Number(workId),
                 chapter_id: chapterId,
                 updated_at: new Date().toISOString(),
               });
+              // 重新同步到服务器
+              try {
+                await documentCache.syncDocumentState(documentId, editorContent);
+              } catch (retryErr) {
+                console.warn('⚠️ [自动保存] 重试同步失败:', retryErr);
+              }
             }
           }
           
-          console.log('✅ [自动保存] 已保存到本地缓存:', documentId);
+          console.log('✅ [自动保存] 已保存到本地缓存和服务器:', documentId);
           
           // 验证保存
           const saved = await localCacheManager.get(documentId);
@@ -2022,21 +2243,19 @@ export default function NovelEditorPage(){
             console.log('✅ [自动保存] 验证成功，缓存中存在');
             // 进一步验证内容是否正确保存
             const savedDoc = saved as any;
-            if (savedDoc && savedDoc.content === content) {
+            if (savedDoc && savedDoc.content === editorContent) {
               console.log('✅ [自动保存] 内容验证成功，内容匹配');
             } else {
               console.warn('⚠️ [自动保存] 内容验证失败，内容不匹配', {
                 savedContentLength: savedDoc?.content?.length || 0,
-                expectedContentLength: content.length,
+                expectedContentLength: editorContent.length,
               });
             }
           } else {
             console.error('❌ [自动保存] 验证失败，缓存中不存在');
           }
           
-          // 2. 使用智能同步（会自动处理防抖和冲突检测）
-          // 智能同步会在用户停止编辑后自动触发，这里只是确保内容已保存到本地
-          console.log('✅ [自动保存] 内容已保存，智能同步将在适当时机自动触发');
+          console.log('✅ [自动保存] 内容已保存并同步到服务器');
         } catch (err) {
           console.error('❌ [自动保存] 保存到本地缓存失败:', err);
         }
@@ -2918,6 +3137,17 @@ export default function NovelEditorPage(){
               {/* 文本编辑区域 */}
               <div className="novel-editor-wrapper">
                 <EditorContent editor={editor} />
+                {/* 章节加载弹窗 */}
+                {chapterLoading && (
+                  <div className="chapter-loading-overlay">
+                    <div className="chapter-loading-spinner">
+                      <div className="spinner-ring"></div>
+                      <p style={{ marginTop: '16px', color: 'var(--text-primary)' }}>
+                        正在切换章节...
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

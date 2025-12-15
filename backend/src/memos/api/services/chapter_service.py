@@ -115,14 +115,7 @@ class ChapterService:
         # 更新字段
         for key, value in kwargs.items():
             if hasattr(chapter, key):
-                # 对于 chapter_metadata，需要合并而不是完全替换
-                if key == 'chapter_metadata' and isinstance(value, dict):
-                    current_metadata = chapter.chapter_metadata or {}
-                    # 合并新的 metadata 到现有的 metadata 中
-                    merged_metadata = {**current_metadata, **value}
-                    setattr(chapter, key, merged_metadata)
-                else:
-                    setattr(chapter, key, value)
+                setattr(chapter, key, value)
 
         await self.db.commit()
         await self.db.refresh(chapter)

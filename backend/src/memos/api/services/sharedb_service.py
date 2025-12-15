@@ -523,61 +523,57 @@ class ShareDBService:
             if base_block_text and base_block_text in server_text_to_block:
                 base_block_to_server_block[base_block_text] = server_text_to_block[base_block_text]
         
-        # 按照 base_content 的顺序构建合并结果
-        added_index = 0
-        for base_idx, base_block in enumerate(base_blocks):
-            base_block_text = get_block_text(base_block)
+        # 关键修复：改进合并逻辑，确保新内容不会插入到旧内容前面
+        # 策略：按照 client_content 的顺序构建合并结果，这样可以保持客户端编辑的顺序
+        # 1. 构建 client_content 的完整块列表（包括新增和保留的块）
+        client_block_map = {get_block_text(block): block for block in client_blocks if get_block_text(block)}
+        
+        # 2. 按照 client_content 的顺序处理块
+        for client_block in client_blocks:
+            client_block_text = get_block_text(client_block)
             
-            # 检查是否有新增块应该插入在这个位置之前
-            while added_index < len(added_blocks_with_position):
-                added_pos, added_block, added_text = added_blocks_with_position[added_index]
-                # 如果新增块在 client 中的位置小于等于当前 base 块的位置，插入它
-                if added_pos <= base_idx:
-                    if added_text not in seen_texts:
-                        merged_blocks.append(added_block)
-                        seen_texts.add(added_text)
-                        logger.debug(f"在位置 {base_idx} 之前插入新增块: {added_text[:50]}")
-                    added_index += 1
-                else:
-                    break
-            
-            # 处理当前 base 块
-            if not base_block_text:
-                # 空块也保留（可能是格式标记）
-                merged_blocks.append(base_block)
+            if not client_block_text:
+                # 空块也保留
+                if client_block not in merged_blocks:
+                    merged_blocks.append(client_block)
                 continue
             
-            # 检查是否被删除
-            if base_block_text in deleted_texts:
-                logger.debug(f"跳过删除的块: {base_block_text[:50]}")
+            # 如果是新增的块，直接添加
+            if client_block_text in added_texts:
+                if client_block_text not in seen_texts:
+                    merged_blocks.append(client_block)
+                    seen_texts.add(client_block_text)
+                    logger.debug(f"添加客户端新增块: {client_block_text[:50]}")
                 continue
             
-            # 如果服务器中有对应的块，使用服务器块；否则使用 base 块
-            if base_block_text in base_block_to_server_block:
-                server_block = base_block_to_server_block[base_block_text]
-                if base_block_text not in seen_texts:
-                    merged_blocks.append(server_block)
-                    seen_texts.add(base_block_text)
-            elif base_block_text not in seen_texts:
-                # 如果服务器中没有，但 base 中有，保留 base 块
-                merged_blocks.append(base_block)
-                seen_texts.add(base_block_text)
+            # 如果是保留的块（在 base 中也存在），检查服务器是否有更新
+            if client_block_text in base_texts:
+                # 检查是否被客户端删除（不应该发生，因为已经在 client_blocks 中）
+                if client_block_text in deleted_texts:
+                    logger.debug(f"跳过被删除的块: {client_block_text[:50]}")
+                    continue
+                
+                # 如果服务器中有对应的块，使用服务器块（可能被其他用户更新了）
+                if client_block_text in server_text_to_block:
+                    server_block = server_text_to_block[client_block_text]
+                    if client_block_text not in seen_texts:
+                        merged_blocks.append(server_block)
+                        seen_texts.add(client_block_text)
+                        logger.debug(f"使用服务器更新的块: {client_block_text[:50]}")
+                elif client_block_text not in seen_texts:
+                    # 如果服务器中没有，使用客户端块
+                    merged_blocks.append(client_block)
+                    seen_texts.add(client_block_text)
+                    logger.debug(f"使用客户端块: {client_block_text[:50]}")
         
-        # 添加剩余的新增块（在最后）
-        while added_index < len(added_blocks_with_position):
-            added_pos, added_block, added_text = added_blocks_with_position[added_index]
-            if added_text not in seen_texts:
-                merged_blocks.append(added_block)
-                seen_texts.add(added_text)
-                logger.debug(f"在末尾添加新增块: {added_text[:50]}")
-            added_index += 1
-        
-        # 添加服务器中独有的块（不在 base 中，也不在 client 中）
+        # 3. 添加服务器中独有的块（不在 base 中，也不在 client 中，是其他用户新增的）
+        # 这些块应该添加到末尾，因为它们是在服务器端新增的
         for server_block in server_blocks:
             server_block_text = get_block_text(server_block)
             if server_block_text and server_block_text not in seen_texts:
                 # 检查是否在 base 或 client 中
                 if server_block_text not in base_texts and server_block_text not in client_texts:
+                    # 服务器独有的块，添加到末尾
                     merged_blocks.append(server_block)
                     seen_texts.add(server_block_text)
                     logger.debug(f"添加服务器独有的块: {server_block_text[:50]}")
