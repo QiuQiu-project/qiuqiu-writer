@@ -15,6 +15,7 @@ from memos.api.ai_models import (
     AnalyzeChapterRequest,
     AnalyzeChapterByFileRequest,
     CreateWorkFromFileRequest,
+    GenerateChapterContentRequest,
     DefaultPromptData,
     DefaultPromptResponse,
     ErrorResponse,
@@ -1247,6 +1248,158 @@ async def generate_chapter_outlines(
         raise
     except Exception as e:
         logger.error(f"Failed to generate chapter outlines: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")
+
+
+@router.post(
+    "/generate-chapter-content",
+    summary="根据大纲和细纲生成章节内容",
+    description="根据章节大纲和细纲，使用AI生成完整的章节内容（流式响应）",
+    responses={
+        200: {"description": "生成成功，返回流式响应"},
+        400: {"model": ErrorResponse, "description": "请求参数错误"},
+        500: {"model": ErrorResponse, "description": "服务器内部错误"},
+        503: {"model": ErrorResponse, "description": "AI服务不可用"},
+    },
+)
+async def generate_chapter_content(
+    request: GenerateChapterContentRequest,
+):
+    """
+    根据大纲和细纲生成章节内容
+    
+    Args:
+        request: 生成请求，包含大纲、细纲等信息
+    
+    Returns:
+        StreamingResponse: 服务器发送事件流
+    """
+    try:
+        # 获取AI服务
+        ai_service = get_ai_service()
+        if not ai_service.is_healthy():
+            raise HTTPException(status_code=503, detail="AI服务不可用，请检查配置")
+        
+        # 获取分析设置
+        analysis_settings = {}
+        if request.settings:
+            analysis_settings = {
+                "model": request.settings.model,
+                "temperature": request.settings.temperature,
+                "max_tokens": request.settings.max_tokens,
+            }
+        
+        # 构建生成提示词
+        system_prompt = """# 角色
+你是一位经验丰富的小说创作专家，擅长根据大纲和细纲创作引人入胜的章节内容。你能够将抽象的情节框架转化为生动、具体、富有画面感的文字。
+
+# 任务
+根据提供的大纲和细纲，创作完整的章节内容。内容应该：
+1. 忠实于大纲和细纲的要求
+2. 语言流畅自然，富有文学性
+3. 情节发展合理，节奏适中
+4. 人物形象鲜明，对话生动
+5. 场景描写细致，画面感强
+6. 字数控制在3000-5000字左右（除非大纲有特殊要求）
+
+# 要求
+- 直接输出章节正文内容，不要添加标题、说明等额外文字
+- 使用段落分隔，每个段落之间用空行分隔
+- 对话使用引号标注
+- 保持一致的叙事风格和视角
+"""
+        
+        # 构建用户提示词
+        user_prompt_parts = []
+        if request.chapter_title:
+            user_prompt_parts.append(f"## 章节标题\n{request.chapter_title}\n")
+        
+        user_prompt_parts.append(f"## 章节大纲\n{request.outline}\n")
+        user_prompt_parts.append(f"## 章节细纲\n{request.detailed_outline}\n")
+        
+        if request.characters:
+            user_prompt_parts.append(f"## 出场人物\n{', '.join(request.characters)}\n")
+        
+        if request.locations:
+            user_prompt_parts.append(f"## 剧情地点\n{', '.join(request.locations)}\n")
+        
+        user_prompt_parts.append("\n请根据以上大纲和细纲，创作完整的章节内容。")
+        user_prompt = "\n".join(user_prompt_parts)
+        
+        logger.info(
+            f"开始生成章节内容: "
+            f"outline_length={len(request.outline)}, "
+            f"detailed_outline_length={len(request.detailed_outline)}, "
+            f"model={analysis_settings.get('model')}"
+        )
+        
+        # 执行流式生成
+        async def generate_content():
+            """生成章节内容响应"""
+            try:
+                import json
+                
+                # 发送开始消息
+                start_msg = json.dumps({
+                    "type": "start",
+                    "message": "开始生成章节内容..."
+                })
+                yield f"data: {start_msg}\n\n"
+                
+                # 流式生成内容
+                full_content = ""
+                async for message in ai_service.analyze_chapter_stream(
+                    content="",  # 这里不需要内容，因为我们在prompt中已经包含了所有信息
+                    prompt=user_prompt,
+                    system_prompt=system_prompt,
+                    model=analysis_settings.get("model"),
+                    temperature=analysis_settings.get("temperature", 0.7),
+                    max_tokens=analysis_settings.get("max_tokens", 8000),
+                ):
+                    # 转发AI服务的消息
+                    if message.startswith("data: "):
+                        try:
+                            data = json.loads(message[6:])
+                            if data.get("type") == "chunk":
+                                full_content += data.get("content", "")
+                        except:
+                            pass
+                    
+                    yield message
+                
+                # 发送完成消息
+                done_msg = json.dumps({
+                    "type": "done",
+                    "message": "章节内容生成完成",
+                    "content_length": len(full_content)
+                })
+                yield f"data: {done_msg}\n\n"
+                
+            except Exception as e:
+                logger.error(f"生成章节内容过程出错: {traceback.format_exc()}")
+                error_msg = json.dumps({
+                    "type": "error",
+                    "message": f"服务器错误: {str(e)}"
+                })
+                yield f"data: {error_msg}\n\n"
+        
+        return StreamingResponse(
+            generate_content(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Headers": "*",
+                "Access-Control-Allow-Methods": "*",
+            },
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to generate chapter content: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")
 
 

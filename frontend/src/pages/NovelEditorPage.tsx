@@ -2639,7 +2639,7 @@ export default function NovelEditorPage(){
                 onClick={() => setIsEditingTitle(true)}
                 title="点击编辑标题"
               >
-                {work.title}
+                {work?.title || ''}
               </h1>
             )}
             <div className="work-tags">
@@ -2938,6 +2938,23 @@ export default function NovelEditorPage(){
         availableLocations={hasLocationModule ? availableLocations : []}
         onClose={() => setIsChapterModalOpen(false)}
         onSave={handleSaveChapter}
+        onGenerateContent={async (content: string) => {
+          // 将生成的内容填充到编辑器中
+          if (editor) {
+            // 将纯文本转换为HTML格式
+            const htmlContent = content
+              .split('\n\n')
+              .map(para => para.trim())
+              .filter(para => para.length > 0)
+              .map(para => `<p>${para.replace(/\n/g, '<br>')}</p>`)
+              .join('');
+            
+            editor.commands.setContent(htmlContent || '<p></p>');
+            console.log('✅ 章节内容已填充到编辑器');
+          } else {
+            console.warn('编辑器未初始化，无法填充内容');
+          }
+        }}
       />
     </div>
   );

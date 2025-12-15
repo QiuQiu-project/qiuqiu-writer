@@ -1068,3 +1068,107 @@ export async function testAPIConnection(): Promise<{
   }
 }
 
+/**
+ * 根据大纲和细纲生成章节内容
+ * 
+ * @param outline 章节大纲
+ * @param detailedOutline 章节细纲
+ * @param chapterTitle 章节标题（可选）
+ * @param characters 出场人物列表（可选）
+ * @param locations 剧情地点列表（可选）
+ * @param onProgress 进度回调函数（可选）
+ * @param settings 生成设置（可选）
+ * @returns Promise<string> 生成的章节内容
+ */
+export async function generateChapterContent(
+  outline: string,
+  detailedOutline: string,
+  chapterTitle?: string,
+  characters?: string[],
+  locations?: string[],
+  onProgress?: (progress: { message?: string; text?: string; status?: string }) => void,
+  settings?: AnalysisSettings
+): Promise<string> {
+  try {
+    console.log(`📡 根据大纲和细纲生成章节内容...`);
+    
+    const token = localStorage.getItem('access_token');
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}/ai/generate-chapter-content`,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          outline,
+          detailed_outline: detailedOutline,
+          chapter_title: chapterTitle,
+          characters: characters || [],
+          locations: locations || [],
+          settings: settings || {},
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API 调用失败: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    // 处理流式响应 (SSE)
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('无法获取响应流');
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let content = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.type === 'start') {
+              onProgress?.({ message: '开始生成章节内容...', status: 'start' });
+            } else if (data.type === 'chunk') {
+              const chunkContent = data.content || '';
+              content += chunkContent;
+              onProgress?.({ text: chunkContent, status: 'generating' });
+            } else if (data.type === 'done') {
+              onProgress?.({ message: '章节内容生成完成', status: 'done' });
+            } else if (data.type === 'error') {
+              throw new Error(data.message || '生成失败');
+            }
+          } catch (e) {
+            console.warn('解析SSE消息失败:', e, line);
+          }
+        }
+      }
+    }
+
+    if (!content) {
+      throw new Error('未能生成章节内容');
+    }
+
+    return content;
+  } catch (error) {
+    console.error('生成章节内容失败:', error);
+    throw error;
+  }
+}
+

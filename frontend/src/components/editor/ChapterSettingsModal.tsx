@@ -36,6 +36,7 @@ interface ChapterSettingsModalProps {
   onSave: (data: ChapterData) => void;
   onGenerateOutline?: () => string;
   onGenerateDetailOutline?: () => string;
+  onGenerateContent?: (content: string) => void;  // 生成内容回调
 }
 
 export default function ChapterSettingsModal({
@@ -50,6 +51,7 @@ export default function ChapterSettingsModal({
   onSave,
   onGenerateOutline,
   onGenerateDetailOutline,
+  onGenerateContent,
 }: ChapterSettingsModalProps) {
   const [title, setTitle] = useState('');
   const [selectedCharacters, setSelectedCharacters] = useState<string[]>([]);
@@ -59,6 +61,7 @@ export default function ChapterSettingsModal({
   const [detailOutline, setDetailOutline] = useState('');
   const [isGeneratingOutline, setIsGeneratingOutline] = useState(false);
   const [isGeneratingDetail, setIsGeneratingDetail] = useState(false);
+  const [isGeneratingContent, setIsGeneratingContent] = useState(false);
   const [activeTab, setActiveTab] = useState<'basic' | 'outline'>('basic');
 
   // 使用传入的角色数据，如果没有则使用空数组
@@ -369,6 +372,51 @@ export default function ChapterSettingsModal({
                   rows={12}
                 />
               </div>
+
+              {/* 生成内容按钮 */}
+              {onGenerateContent && (
+                <div className="form-group">
+                  <button
+                    className={`ai-generate-content-btn ${isGeneratingContent ? 'generating' : ''}`}
+                    onClick={async () => {
+                      if (!outline.trim() || !detailOutline.trim()) {
+                        alert('请先填写大纲和细纲');
+                        return;
+                      }
+                      
+                      setIsGeneratingContent(true);
+                      try {
+                        const { generateChapterContent } = await import('../../utils/bookAnalysisApi');
+                        const content = await generateChapterContent(
+                          outline,
+                          detailOutline,
+                          title || undefined,
+                          selectedCharacters.map(id => {
+                            const char = availableCharacters.find(c => c.id === id);
+                            return char?.name || id;
+                          }),
+                          locations,
+                          (progress) => {
+                            console.log('生成进度:', progress);
+                          }
+                        );
+                        onGenerateContent(content);
+                        alert('章节内容生成完成！已填充到编辑器中。');
+                        onClose(); // 关闭弹窗
+                      } catch (error) {
+                        console.error('生成内容失败:', error);
+                        alert(error instanceof Error ? error.message : '生成内容失败');
+                      } finally {
+                        setIsGeneratingContent(false);
+                      }
+                    }}
+                    disabled={isGeneratingContent || !outline.trim() || !detailOutline.trim()}
+                  >
+                    <Sparkles size={16} />
+                    <span>{isGeneratingContent ? '生成中...' : '根据大纲和细纲生成章节内容'}</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

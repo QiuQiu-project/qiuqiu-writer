@@ -185,6 +185,42 @@ class DefaultPromptResponse(BaseResponse[DefaultPromptData]):
 # ─── 错误响应模型 ──────────────────────────────────────────────────────────────
 
 
+class GenerateChapterContentRequest(BaseModel):
+    """根据大纲和细纲生成章节内容请求模型"""
+
+    outline: str = Field(
+        ...,
+        min_length=1,
+        description="章节大纲",
+        json_schema_extra={"example": "核心功能：介绍主角...\n关键情节点：1. 主角出现 2. 遇到困难..."},
+    )
+    detailed_outline: str = Field(
+        ...,
+        min_length=1,
+        description="章节细纲",
+        json_schema_extra={"example": "1. 开场\n描述主角的日常生活..."},
+    )
+    chapter_title: str | None = Field(
+        None,
+        description="章节标题（可选）",
+        json_schema_extra={"example": "第一章 初遇"},
+    )
+    characters: List[str] = Field(
+        default_factory=list,
+        description="出场人物列表（可选）",
+        json_schema_extra={"example": ["张三", "李四"]},
+    )
+    locations: List[str] = Field(
+        default_factory=list,
+        description="剧情地点列表（可选）",
+        json_schema_extra={"example": ["学校", "图书馆"]},
+    )
+    settings: AnalysisSettings | None = Field(
+        default_factory=AnalysisSettings,
+        description="AI生成设置",
+    )
+
+
 class ErrorResponse(BaseResponse[None]):
     """错误响应模型"""
 
