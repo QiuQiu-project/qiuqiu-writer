@@ -30,6 +30,7 @@ async def get_db_session(db: AsyncSession = Depends(get_async_db)) -> AsyncSessi
     
     return db
 from memos.api.services.chapter_service import ChapterService
+from memos.api.services.work_service import WorkService
 from memos.api.services.sharedb_service import ShareDBService
 # Chapter schemas will be created later
 # from memos.api.schemas.chapter import (
@@ -56,6 +57,8 @@ class ChapterUpdate(BaseModel):
     title: Optional[str] = None
     content: Optional[str] = None
     status: Optional[str] = None
+    word_count: Optional[int] = None
+    word_count: Optional[int] = None
 
 class ChapterResponse(BaseModel):
     id: int
@@ -267,8 +270,10 @@ async def update_chapter(
 ) -> Dict[str, Any]:
     """
     更新章节元数据（不包含内容，内容通过ShareDB实时编辑）
+    如果更新了字数，会同时更新作品的总字数
     """
     chapter_service = ChapterService(db)
+    work_service = WorkService(db)
 
     # 检查章节是否存在
     chapter = await chapter_service.get_chapter_by_id(chapter_id)
@@ -288,11 +293,31 @@ async def update_chapter(
             detail="没有编辑该章节的权限"
         )
 
+    # 如果更新了字数，需要同时更新作品总字数
+    old_word_count = chapter.word_count or 0
+    new_word_count = chapter_update.word_count if chapter_update.word_count is not None else old_word_count
+    
     # 更新章节元数据
     updated_chapter = await chapter_service.update_chapter(
         chapter_id=chapter_id,
         **chapter_update.dict(exclude_unset=True)
     )
+    
+    # 如果字数发生变化，增量更新作品总字数
+    if chapter_update.word_count is not None and new_word_count != old_word_count:
+        word_count_diff = new_word_count - old_word_count
+        work = await work_service.get_work_by_id(chapter.work_id)
+        if work:
+            current_total_word_count = work.word_count or 0
+            new_total_word_count = current_total_word_count + word_count_diff
+            
+            # 更新作品总字数
+            await work_service.update_work(
+                work_id=chapter.work_id,
+                word_count=new_total_word_count
+            )
+            
+            logger.info(f"✅ [字数统计] PUT端点: 章节 {chapter_id} 字数: {old_word_count} -> {new_word_count}, 作品 {chapter.work_id} 总字数: {current_total_word_count} -> {new_total_word_count}")
 
     # 如果有标题更新，同时更新ShareDB文档
     # 优先使用新格式，兼容旧格式

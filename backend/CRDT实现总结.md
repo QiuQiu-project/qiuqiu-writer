@@ -183,3 +183,4 @@ import { CollaborativeEditor } from '@/components/editor/CollaborativeEditor'
 3. **保留ShareDB**: 作为备选方案，允许用户选择
 4. **监控性能**: 关注CRDT的性能开销，特别是大文档
 
+

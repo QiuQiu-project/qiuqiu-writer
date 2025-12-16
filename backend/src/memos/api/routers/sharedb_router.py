@@ -64,6 +64,8 @@ class SyncResponse(BaseModel):
     content: str
     operations: List[Dict[str, Any]] = []
     error: Optional[str] = None
+    work: Optional[Dict[str, Any]] = None  # 如果更新了字数，返回更新后的作品信息
+    chapter: Optional[Dict[str, Any]] = None  # 如果更新了字数，返回更新后的章节信息
 
 
 @router.get("/ping")

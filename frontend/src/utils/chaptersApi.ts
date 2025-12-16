@@ -5,6 +5,9 @@
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 
+// 导入 Work 类型
+import type { Work } from './worksApi';
+
 export interface Chapter {
   outline: any;
   detailed_outline: any;
@@ -37,12 +40,14 @@ export interface ChapterUpdate {
   title?: string;
   content?: string;
   status?: string;
+  word_count?: number;
   chapter_metadata?: {
     outline?: string;
     detailed_outline?: string;
     [key: string]: any;
   };
 }
+
 
 export interface ChapterListResponse {
   chapters: Chapter[];

@@ -1471,6 +1471,7 @@ async def create_work_from_file(
         # 3. 批量创建章节
         created_chapters = []
         skipped_chapters = []
+        total_new_word_count = 0  # 累计新创建章节的总字数
         
         for chapter_data in request.chapters:
             try:
@@ -1499,6 +1500,16 @@ async def create_work_from_file(
                     })
                     continue
                 
+                # 计算章节字数（去除HTML标签，统计纯文本字符数）
+                chapter_word_count = 0
+                if chapter_data.content:
+                    # 如果内容是HTML，需要提取纯文本
+                    import re
+                    # 简单的HTML标签去除
+                    text_content = re.sub(r'<[^>]+>', '', chapter_data.content)
+                    # 统计字符数（包括所有字符，与前端保持一致）
+                    chapter_word_count = len(text_content)
+                
                 # 创建章节
                 chapter = await chapter_service.create_chapter(
                     work_id=work.id,
@@ -1506,7 +1517,7 @@ async def create_work_from_file(
                     chapter_number=chapter_data.chapter_number,
                     volume_number=chapter_data.volume_number or 1,
                     status="draft",
-                    word_count=len(chapter_data.content) if chapter_data.content else 0,
+                    word_count=chapter_word_count,
                 )
                 
                 # 4. 将章节内容保存到 ShareDB
@@ -1533,19 +1544,28 @@ async def create_work_from_file(
                     "title": chapter_data.title
                 })
                 
-                logger.info(f"✅ 创建章节: {chapter.id} - 第{chapter_data.chapter_number}章 - {chapter_data.title}")
+                # 累加字数
+                total_new_word_count += chapter_word_count
+                
+                logger.info(f"✅ 创建章节: {chapter.id} - 第{chapter_data.chapter_number}章 - {chapter_data.title}, 字数: {chapter_word_count}")
                 
             except Exception as e:
                 logger.error(f"❌ 创建章节失败: {e}", exc_info=True)
                 # 继续处理下一个章节
                 continue
         
-        # 更新作品统计（累加新创建的章节数）
+        # 更新作品统计（累加新创建的章节数和总字数）
         current_chapter_count = work.chapter_count or 0
+        current_word_count = work.word_count or 0
+        
+        # 更新作品统计
         await work_service.update_work(
             work_id=work.id,
-            chapter_count=current_chapter_count + len(created_chapters)
+            chapter_count=current_chapter_count + len(created_chapters),
+            word_count=current_word_count + total_new_word_count
         )
+        
+        logger.info(f"✅ 作品统计已更新: 章节数={current_chapter_count + len(created_chapters)}, 总字数={current_word_count + total_new_word_count} (新增 {total_new_word_count} 字)")
         
         return {
             "work_id": work.id,

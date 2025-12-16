@@ -1683,6 +1683,91 @@ class ShareDBService:
 
                 logger.info(f"文档 {document_id} 已同步，版本: {document['version']}")
 
+                # 更新章节字数和作品总字数（如果 document_id 是章节文档）
+                # document_id 格式: work_{workId}_chapter_{chapterId}
+                if db_session is not None and document_id.startswith("work_") and "_chapter_" in document_id:
+                    try:
+                        import re
+                        from memos.api.services.chapter_service import ChapterService
+                        from memos.api.services.work_service import WorkService
+                        
+                        # 从 document_id 中提取 work_id 和 chapter_id
+                        match = re.match(r"work_(\d+)_chapter_(\d+)", document_id)
+                        if match:
+                            work_id = int(match.group(1))
+                            chapter_id = int(match.group(2))
+                            
+                            # 计算章节字数（去除HTML标签，统计纯文本字符数）
+                            import re as re_module
+                            text_content = re_module.sub(r'<[^>]+>', '', document["content"])
+                            # 统计字符数（包括所有字符，与前端保持一致）
+                            chapter_word_count = len(text_content)
+                            
+                            # 获取章节服务
+                            session = db_session
+                            if not hasattr(session, 'execute'):
+                                if hasattr(session, '__aiter__'):
+                                    try:
+                                        session = await session.__anext__()
+                                    except StopAsyncIteration:
+                                        session = None
+                            
+                            if session is not None:
+                                chapter_service = ChapterService(session)
+                                work_service = WorkService(session)
+                                
+                                # 获取章节的旧字数
+                                chapter = await chapter_service.get_chapter_by_id(chapter_id)
+                                if chapter:
+                                    old_word_count = chapter.word_count or 0
+                                    
+                                    # 更新章节字数
+                                    await chapter_service.update_chapter(
+                                        chapter_id=chapter_id,
+                                        word_count=chapter_word_count
+                                    )
+                                    
+                                    # 如果字数发生变化，增量更新作品总字数
+                                    if chapter_word_count != old_word_count:
+                                        word_count_diff = chapter_word_count - old_word_count
+                                        work = await work_service.get_work_by_id(work_id)
+                                        if work:
+                                            current_total_word_count = work.word_count or 0
+                                            new_total_word_count = current_total_word_count + word_count_diff
+                                            
+                                            # 更新作品总字数
+                                            await work_service.update_work(
+                                                work_id=work_id,
+                                                word_count=new_total_word_count
+                                            )
+                                            
+                                            logger.info(f"✅ [字数统计] 章节 {chapter_id} 字数: {old_word_count} -> {chapter_word_count}, 作品 {work_id} 总字数: {current_total_word_count} -> {new_total_word_count}")
+                                        
+                                    await session.commit()
+                                    
+                                    # 重新获取更新后的章节和作品数据，用于返回给前端
+                                    updated_chapter = await chapter_service.get_chapter_by_id(chapter_id)
+                                    updated_work = await work_service.get_work_by_id(work_id)
+                                    
+                                    # 将更新后的数据添加到返回响应中
+                                    response_data = {
+                                        "success": True,
+                                        "content": document["content"],  # 返回合并后的内容，不是客户端原始内容
+                                        "version": document["version"],
+                                        "operations": []
+                                    }
+                                    
+                                    # 总是返回更新后的章节和作品数据（如果存在）
+                                    if updated_chapter:
+                                        response_data["chapter"] = updated_chapter.to_dict()
+                                    if updated_work:
+                                        response_data["work"] = updated_work.to_dict()
+                                    
+                                    return response_data
+                    except Exception as word_count_error:
+                        # 字数更新失败不影响文档同步，只记录错误
+                        logger.warning(f"⚠️ [字数统计] 更新字数失败: {word_count_error}")
+
                 return {
                     "success": True,
                     "content": document["content"],  # 返回合并后的内容，不是客户端原始内容

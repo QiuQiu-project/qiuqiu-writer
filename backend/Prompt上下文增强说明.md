@@ -151,3 +151,4 @@ prompt = await prompt_service.format_prompt(
 
 ✅ **向后兼容**：保留旧变量名，不影响现有代码
 
+

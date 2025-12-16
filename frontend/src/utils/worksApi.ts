@@ -74,6 +74,7 @@ export interface WorkUpdate {
   genre?: string;
   status?: string;
   is_public?: boolean;
+  word_count?: number;
 }
 
 export interface WorkListResponse {

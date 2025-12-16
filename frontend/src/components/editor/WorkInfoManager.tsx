@@ -1478,26 +1478,26 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
       case 'text':
         return (
           <div className="comp-input-wrapper">
-            <input
-              type="text"
-              className="comp-input"
-              value={comp.value || ''}
-              onChange={(e) => updateValue(e.target.value)}
-              placeholder={comp.config.placeholder}
-            />
+          <input
+            type="text"
+            className="comp-input"
+            value={comp.value || ''}
+            onChange={(e) => updateValue(e.target.value)}
+            placeholder={comp.config.placeholder}
+          />
           </div>
         );
 
       case 'textarea':
         return (
           <div className="comp-textarea-wrapper">
-            <textarea
-              className="comp-textarea"
-              value={comp.value || ''}
-              onChange={(e) => updateValue(e.target.value)}
-              placeholder={comp.config.placeholder}
-              rows={4}
-            />
+          <textarea
+            className="comp-textarea"
+            value={comp.value || ''}
+            onChange={(e) => updateValue(e.target.value)}
+            placeholder={comp.config.placeholder}
+            rows={4}
+          />
           </div>
         );
 

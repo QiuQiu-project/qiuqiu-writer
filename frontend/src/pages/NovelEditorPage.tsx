@@ -22,6 +22,23 @@ import { localCacheManager } from '../utils/localCacheManager';
 import { useIntelligentSync } from '../utils/intelligentSync';
 import { analyzeChapter } from '../utils/bookAnalysisApi';
 
+// 计算文本字数（去除HTML标签，只统计中文字符和单词）
+function countCharacters(html: string): number {
+  if (!html) return 0;
+  
+  // 创建一个临时DOM元素来解析HTML
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = html;
+  
+  // 获取纯文本内容
+  const text = tempDiv.textContent || tempDiv.innerText || '';
+  
+  // 统计字符数（中文字符按1个字符计算，英文单词按单词数计算）
+  // 这里简化处理，直接统计所有字符（包括空格）
+  // 如果需要更精确的统计，可以分别处理中文和英文
+  return text.length;
+}
+
 // 文档类型定义（从 sharedbClient 移过来）
 interface ShareDBDocument {
   document_id: string;
@@ -51,6 +68,16 @@ interface SyncResponse {
     timestamp: string;
   }>;
   error?: string;
+  work?: {
+    id: number;
+    word_count: number;
+    [key: string]: any;
+  };
+  chapter?: {
+    id: number;
+    word_count: number;
+    [key: string]: any;
+  };
 }
 
 // 文档缓存和同步工具函数（在组件内使用）
@@ -263,6 +290,8 @@ const documentCache = {
             version: result.version,
             content: result.content,
             operations: result.operations || [],
+            work: result.work,  // 传递作品信息（如果存在）
+            chapter: result.chapter,  // 传递章节信息（如果存在）
           };
         } else {
           throw new Error(result.error || '同步失败');
@@ -487,6 +516,10 @@ export default function NovelEditorPage(){
   const updateContentTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 关键修复：章节加载状态标记，防止在加载期间其他操作干扰编辑器
   const isChapterLoadingRef = useRef<boolean>(false);
+  // 字数统计保存定时器
+  const wordCountSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 当前章节字数（用于实时显示）
+  const [currentChapterWordCount, setCurrentChapterWordCount] = useState(0);
 
   // 从WorkInfoManager缓存中提取角色数据
   // 关键修复：使用 useRef 存储上一次的结果，避免重复计算
@@ -1811,6 +1844,9 @@ export default function NovelEditorPage(){
             // 使用 setTimeout 确保历史被清除后再设置实际内容
             setTimeout(() => {
               editor.commands.setContent(normalizedContent, { emitUpdate: false });
+              // 更新字数显示
+              const wordCount = countCharacters(normalizedContent);
+              setCurrentChapterWordCount(wordCount);
             }, 0);
             lastSetContentRef.current = normalizedContent; // 记录已设置的内容
             
@@ -1833,6 +1869,7 @@ export default function NovelEditorPage(){
           // 如果 content 是 null（获取失败），设置空编辑器
           console.warn('⚠️ 内容获取失败，设置空编辑器');
           editor.commands.setContent('<p></p>');
+          setCurrentChapterWordCount(0);
         }
         
         // 在内容加载完成后，更新 currentChapterIdRef
@@ -2198,6 +2235,12 @@ export default function NovelEditorPage(){
     console.log('✅ 自动保存已启动，章节ID:', chapterId);
 
     const handleUpdate = () => {
+      // 实时更新字数显示
+      if (editor) {
+        const wordCount = countCharacters(editor.getHTML());
+        setCurrentChapterWordCount(wordCount);
+      }
+      
       // 关键修复：如果正在加载章节，不触发保存，避免干扰章节加载
       if (isChapterLoadingRef.current) {
         console.log('⏸️ [自动保存] 章节正在加载中，跳过保存，避免干扰');
@@ -2288,11 +2331,40 @@ export default function NovelEditorPage(){
           // 2. 关键修复：立即同步到服务器，确保数据持久化
           // 使用编辑器中的实际内容，同时提供 JSON 格式用于更精确的合并
           try {
-            await documentCache.syncDocumentState(documentId, editorContent, editorContentJson);
+            const syncResult = await documentCache.syncDocumentState(documentId, editorContent, editorContentJson);
             console.log('✅ [自动保存] 已同步到服务器:', {
               documentId,
               contentLength: editorContent.length,
             });
+            
+            // 如果 sync 接口返回了更新后的作品和章节信息，更新本地状态
+            if (syncResult.work || syncResult.chapter) {
+              // 如果返回了更新后的作品信息，更新本地状态
+              if (syncResult.work) {
+                setWork(prevWork => 
+                  prevWork ? { ...prevWork, word_count: syncResult.work!.word_count } : null
+                );
+                
+                console.log('✅ [字数统计] 作品总字数已更新（从 sync 接口返回）:', {
+                  workId,
+                  totalWordCount: syncResult.work.word_count,
+                });
+              }
+              
+              // 如果返回了更新后的章节信息，更新本地章节数据
+              if (syncResult.chapter) {
+                setAllChapters(prevChapters => 
+                  prevChapters.map(ch => 
+                    ch.id === chapterId ? { ...ch, word_count: syncResult.chapter!.word_count } : ch
+                  )
+                );
+                
+                console.log('✅ [字数统计] 章节字数已更新（从 sync 接口返回）:', {
+                  chapterId,
+                  wordCount: syncResult.chapter.word_count,
+                });
+              }
+            }
           } catch (syncErr) {
             console.warn('⚠️ [自动保存] 同步到服务器失败，但已保存到本地缓存:', syncErr);
           }
@@ -2344,6 +2416,7 @@ export default function NovelEditorPage(){
           }
           
           console.log('✅ [自动保存] 内容已保存并同步到服务器');
+          // 字数统计已在 sync 接口中处理，不需要单独更新
         } catch (err) {
           console.error('❌ [自动保存] 保存到本地缓存失败:', err);
         }
@@ -2361,6 +2434,10 @@ export default function NovelEditorPage(){
       // 清除更新内容的防抖定时器
       if (updateContentTimeoutRef.current) {
         clearTimeout(updateContentTimeoutRef.current);
+      }
+      // 清除字数统计保存定时器
+      if (wordCountSaveTimeoutRef.current) {
+        clearTimeout(wordCountSaveTimeoutRef.current);
       }
       // 清除全局引用
       if ((window as any).__chapterSaveTimeout) {
@@ -2654,7 +2731,7 @@ export default function NovelEditorPage(){
           ...chaptersData,
           [chapterId]: {
             ...chapterData,
-            outline: updateData.chapter_metadata.outline || '',
+            outline: updateData.chapter_metadata?.outline || chapterData.outline || '',
             detailOutline: updateData.chapter_metadata.detailed_outline || '',
           }
         });
@@ -2961,7 +3038,7 @@ export default function NovelEditorPage(){
         </div>
         <div className="header-center">
           <div className="word-count">
-            <span>本章字数: {editor ? editor.storage.characterCount?.characters() || 0 : 0}</span>
+            <span>本章字数: {currentChapterWordCount}</span>
             <span>总字数: {work?.word_count || 0}</span>
             <Info size={14} />
           </div>
