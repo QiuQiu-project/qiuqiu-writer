@@ -40,9 +40,11 @@ class DocumentSyncRequest(BaseModel):
     """文档同步请求"""
     doc_id: str
     version: int  # 客户端当前版本号
-    content: str  # 客户端当前内容
+    content: str  # 客户端当前内容（HTML 格式）
+    content_json: Optional[Dict[str, Any]] = None  # TipTap JSON 格式内容（用于更精确的段落级合并）
     base_version: Optional[int] = None  # 基于哪个版本做的更改（用于合并）
-    base_content: Optional[str] = None  # 上次同步的内容（用于计算差异，如果base_version不存在则使用）
+    base_content: Optional[str] = None  # 上次同步的内容（HTML 格式，用于计算差异）
+    base_content_json: Optional[Dict[str, Any]] = None  # 上次同步的内容（JSON 格式，用于更精确的合并）
     create_version: bool = False  # 是否创建版本快照
 
 
@@ -109,7 +111,9 @@ async def sync_document(
             version=request.version,
             content=request.content,
             base_version=request.base_version,  # 传递基础版本号
-            base_content=request.base_content,  # 传递基础内容用于差异计算
+            base_content=request.base_content,  # 传递基础内容（HTML 格式）用于差异计算
+            content_json=request.content_json,  # 传递 JSON 格式内容，用于更精确的段落级合并
+            base_content_json=request.base_content_json,  # 传递基础内容（JSON 格式）
             user_id=current_user_id,
             create_version=request.create_version,
             db_session=db

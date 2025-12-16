@@ -588,6 +588,144 @@ class ShareDBService:
         
         return merged_html
     
+    async def _merge_json_with_diff(
+        self,
+        base_content_json: Dict[str, Any],
+        client_content_json: Dict[str, Any],
+        server_content_json: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        基于 TipTap JSON 格式的段落级合并
+        使用 JSON 格式可以更精确地识别和合并段落
+        """
+        logger.info("开始基于 JSON 格式的段落级合并")
+        
+        # 提取段落内容
+        def extract_paragraphs(doc_json: Dict[str, Any]) -> List[Dict[str, Any]]:
+            """从 TipTap JSON 中提取所有段落"""
+            paragraphs = []
+            if doc_json.get("type") == "doc" and "content" in doc_json:
+                for item in doc_json["content"]:
+                    if item.get("type") == "paragraph":
+                        # 提取段落文本
+                        text_content = ""
+                        if "content" in item:
+                            for text_node in item["content"]:
+                                if text_node.get("type") == "text":
+                                    text_content += text_node.get("text", "")
+                        paragraphs.append({
+                            "node": item,
+                            "text": text_content.strip(),
+                            "full_node": item
+                        })
+            return paragraphs
+        
+        base_paragraphs = extract_paragraphs(base_content_json)
+        client_paragraphs = extract_paragraphs(client_content_json)
+        server_paragraphs = extract_paragraphs(server_content_json)
+        
+        logger.info(f"JSON 合并：base {len(base_paragraphs)} 个段落，client {len(client_paragraphs)} 个段落，server {len(server_paragraphs)} 个段落")
+        
+        # 创建文本到段落的映射
+        base_text_to_para = {para["text"]: para for para in base_paragraphs if para["text"]}
+        client_text_to_para = {para["text"]: para for para in client_paragraphs if para["text"]}
+        server_text_to_para = {para["text"]: para for para in server_paragraphs if para["text"]}
+        
+        # 找出客户端删除的段落（在 base 中但不在 client 中）
+        base_texts = set(base_text_to_para.keys())
+        client_texts = set(client_text_to_para.keys())
+        deleted_texts = base_texts - client_texts
+        
+        # 找出客户端新增的段落（在 client 中但不在 base 中）
+        added_texts = client_texts - base_texts
+        
+        logger.info(f"客户端删除: {len(deleted_texts)} 个段落，新增: {len(added_texts)} 个段落")
+        
+        # 按照 client_content_json 的顺序构建合并结果
+        merged_content_items = []
+        seen_texts = set()
+        
+        # 1. 按照 client_content_json 的顺序处理段落
+        for client_para in client_paragraphs:
+            client_text = client_para["text"]
+            
+            if not client_text:
+                # 空段落也保留
+                if client_para["full_node"] not in [item.get("full_node") for item in merged_content_items]:
+                    merged_content_items.append(client_para["full_node"])
+                continue
+            
+            # 如果是新增的段落，直接添加
+            if client_text in added_texts:
+                if client_text not in seen_texts:
+                    merged_content_items.append(client_para["full_node"])
+                    seen_texts.add(client_text)
+                    logger.debug(f"添加客户端新增段落: {client_text[:50]}")
+                continue
+            
+            # 如果是保留的段落（在 base 中也存在），检查服务器是否有更新
+            if client_text in base_texts:
+                # 如果服务器中有对应的段落，使用服务器段落（可能被其他用户更新了）
+                if client_text in server_text_to_para:
+                    server_para = server_text_to_para[client_text]
+                    if client_text not in seen_texts:
+                        merged_content_items.append(server_para["full_node"])
+                        seen_texts.add(client_text)
+                        logger.debug(f"使用服务器更新的段落: {client_text[:50]}")
+                elif client_text not in seen_texts:
+                    # 如果服务器中没有，使用客户端段落
+                    merged_content_items.append(client_para["full_node"])
+                    seen_texts.add(client_text)
+                    logger.debug(f"使用客户端段落: {client_text[:50]}")
+        
+        # 2. 添加服务器中独有的段落（不在 base 中，也不在 client 中，是其他用户新增的）
+        for server_para in server_paragraphs:
+            server_text = server_para["text"]
+            if server_text and server_text not in seen_texts:
+                if server_text not in base_texts and server_text not in client_texts:
+                    # 服务器独有的段落，添加到末尾
+                    merged_content_items.append(server_para["full_node"])
+                    seen_texts.add(server_text)
+                    logger.debug(f"添加服务器独有的段落: {server_text[:50]}")
+        
+        # 构建合并后的 JSON 文档
+        merged_json = {
+            "type": "doc",
+            "content": merged_content_items
+        }
+        
+        logger.info(f"✅ JSON 合并完成：合并后 {len(merged_content_items)} 个段落")
+        
+        return merged_json
+    
+    async def _json_to_html(self, json_content: Dict[str, Any]) -> str:
+        """
+        将 TipTap JSON 格式转换为 HTML
+        这是一个简化版本，实际应该使用 TipTap 的转换逻辑
+        """
+        html_parts = []
+        
+        if json_content.get("type") == "doc" and "content" in json_content:
+            for item in json_content["content"]:
+                if item.get("type") == "paragraph":
+                    # 提取段落文本
+                    text_content = ""
+                    if "content" in item:
+                        for text_node in item["content"]:
+                            if text_node.get("type") == "text":
+                                text_content += text_node.get("text", "")
+                    html_parts.append(f"<p>{text_content}</p>")
+                elif item.get("type") == "heading":
+                    level = item.get("attrs", {}).get("level", 1)
+                    text_content = ""
+                    if "content" in item:
+                        for text_node in item["content"]:
+                            if text_node.get("type") == "text":
+                                text_content += text_node.get("text", "")
+                    html_parts.append(f"<h{level}>{text_content}</h{level}>")
+        
+        return ''.join(html_parts) if html_parts else "<p></p>"
+    
     async def _merge_text_with_diff(
         self,
         base_content: str,
@@ -1074,7 +1212,9 @@ class ShareDBService:
         version: int, 
         content: str,
         base_version: Optional[int] = None,  # 基于哪个版本做的更改
-        base_content: Optional[str] = None,  # 上次同步的内容（用于计算差异）
+        base_content: Optional[str] = None,  # 上次同步的内容（HTML 格式，用于计算差异）
+        content_json: Optional[Dict[str, Any]] = None,  # TipTap JSON 格式内容（用于更精确的段落级合并）
+        base_content_json: Optional[Dict[str, Any]] = None,  # 上次同步的内容（JSON 格式，用于更精确的合并）
         user_id: Optional[int] = None,
         create_version: bool = False,
         db_session: Optional[Any] = None
@@ -1118,6 +1258,14 @@ class ShareDBService:
                         "updated_at": datetime.utcnow().isoformat(),
                         "last_editor_id": user_id
                     }
+                    # 如果提供了 JSON 格式，也保存到文档中
+                    if content_json:
+                        try:
+                            # content_json 现在已经是字典对象，直接序列化为字符串存储
+                            document["content_json"] = json.dumps(content_json) if isinstance(content_json, dict) else content_json
+                            logger.info("已保存 JSON 格式内容到新文档")
+                        except Exception as json_err:
+                            logger.warning(f"保存 JSON 格式失败: {json_err}")
                     merge_strategy = "create"
                     logger.info(f"📝 [同步] 创建新文档: {document_id}, 版本: {new_version}")
                 else:
@@ -1254,11 +1402,50 @@ class ShareDBService:
                         logger.info(f"base内容预览: {actual_base_content[:100]}...")
                         logger.info(f"client内容预览: {content[:100]}...")
                         logger.info(f"server内容预览: {server_content[:100]}...")
-                        merged_content = await self._merge_with_diff(
-                            base_content=actual_base_content,
-                            client_content=content,
-                            server_content=server_content
-                        )
+                        
+                        # 关键修复：如果提供了 JSON 格式，使用 JSON 格式进行更精确的段落级合并
+                        if content_json and base_content_json:
+                            try:
+                                # content_json 和 base_content_json 现在已经是字典对象，不需要解析
+                                client_json = content_json
+                                base_json = base_content_json
+                                
+                                # 尝试从服务器文档中获取 JSON 格式
+                                server_json_str = document.get("content_json")
+                                if server_json_str:
+                                    # 服务器存储的是字符串，需要解析
+                                    server_json = json.loads(server_json_str) if isinstance(server_json_str, str) else server_json_str
+                                    logger.info("使用 JSON 格式进行段落级合并")
+                                    merged_json = await self._merge_json_with_diff(
+                                        base_content_json=base_json,
+                                        client_content_json=client_json,
+                                        server_content_json=server_json
+                                    )
+                                    # 保存 JSON 格式到文档（存储为字符串）
+                                    document["content_json"] = json.dumps(merged_json) if isinstance(merged_json, dict) else merged_json
+                                    # 同时更新 HTML 内容（从 JSON 转换）
+                                    merged_content = await self._json_to_html(merged_json)
+                                else:
+                                    # 如果没有服务器 JSON，使用 HTML 合并
+                                    merged_content = await self._merge_with_diff(
+                                        base_content=actual_base_content,
+                                        client_content=content,
+                                        server_content=server_content
+                                    )
+                            except Exception as json_err:
+                                logger.warning(f"JSON 合并失败，回退到 HTML 合并: {json_err}")
+                                merged_content = await self._merge_with_diff(
+                                    base_content=actual_base_content,
+                                    client_content=content,
+                                    server_content=server_content
+                                )
+                        else:
+                            # 没有 JSON 格式，使用 HTML 合并
+                            merged_content = await self._merge_with_diff(
+                                base_content=actual_base_content,
+                                client_content=content,
+                                server_content=server_content
+                            )
                         document["content"] = merged_content
                         # 关键修复：版本号应该是服务器最新版本 + 1，确保版本号严格递增
                         document["version"] = server_version + 1

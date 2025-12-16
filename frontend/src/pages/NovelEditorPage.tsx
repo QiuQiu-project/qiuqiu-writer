@@ -158,7 +158,8 @@ const documentCache = {
   },
   
   // 同步文档状态（保存到本地缓存并同步到服务器）
-  async syncDocumentState(documentId: string, content: string): Promise<SyncResponse> {
+  // contentJson: 可选的 TipTap JSON 格式内容，用于更精确的段落级合并
+  async syncDocumentState(documentId: string, content: string, contentJson?: any): Promise<SyncResponse> {
     const localVersion = documentCache.currentVersion.get(documentId) || 0;
     // 关键修复：直接使用传入的 content 参数（编辑器界面上的实际内容），而不是缓存中的内容
     // 这样可以确保保存的是用户当前编辑的内容，而不是可能过时的缓存内容
@@ -197,22 +198,28 @@ const documentCache = {
       const token = localStorage.getItem('access_token');
       
       try {
+        // 关键修复：同时提供 HTML 和 JSON 格式，后端可以使用 JSON 格式进行更精确的段落级合并
+        const requestBody: any = {
+          doc_id: documentId,
+          version: localVersion,
+          content: contentToSave, // HTML 格式（用于兼容）
+          // 如果提供了 JSON 格式，直接以对象形式发送给后端（不转换为字符串）
+          content_json: contentJson || undefined,
+          // 关键修复：提供 base_version 和 base_content，用于三路合并
+          // 这样可以正确计算差异，避免新内容插入到旧内容前面
+          base_version: documentCache.lastSyncedVersion.get(documentId) || undefined,
+          base_content: documentCache.lastSyncedContent.get(documentId) || undefined,
+          base_content_json: undefined, // 如果 base_content 是 JSON 格式，这里可以传入
+          create_version: false,
+        };
+        
         const syncResponse = await fetch(`${API_BASE_URL}/v1/sharedb/documents/sync`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': token ? `Bearer ${token}` : '',
           },
-          body: JSON.stringify({
-            doc_id: documentId,
-            version: localVersion,
-            content: contentToSave, // 使用编辑器内容，而不是缓存内容
-            // 关键修复：提供 base_version 和 base_content，用于三路合并
-            // 这样可以正确计算差异，避免新内容插入到旧内容前面
-            base_version: documentCache.lastSyncedVersion.get(documentId) || undefined,
-            base_content: documentCache.lastSyncedContent.get(documentId) || undefined,
-            create_version: false,
-          }),
+          body: JSON.stringify(requestBody),
         });
 
         if (!syncResponse.ok) {
@@ -2241,6 +2248,8 @@ export default function NovelEditorPage(){
           // 关键修复：直接使用编辑器中的实际内容，确保保存的是用户当前看到的内容
           // 从编辑器获取最新内容（而不是使用可能过时的变量）
           const editorContent = editor.getHTML();
+          // 关键修复：同时获取 JSON 格式，用于更精确的段落级合并
+          const editorContentJson = editor.getJSON();
           // 使用 workId 和 chapterId 生成唯一的缓存键
           const documentId = `work_${workId}_chapter_${chapterId}`;
           
@@ -2250,6 +2259,7 @@ export default function NovelEditorPage(){
             documentId,
             contentLength: editorContent.length,
             contentPreview: editorContent.substring(0, 100),
+            hasJson: !!editorContentJson,
             currentChapterIdRef: currentChapterIdRef.current, // 验证章节ID
             usingEditorContent: true, // 标记使用的是编辑器内容
           });
@@ -2265,6 +2275,7 @@ export default function NovelEditorPage(){
           console.log('💾 [自动保存] 使用编辑器内容:', {
             contentLength: editorContent.length,
             contentPreview: editorContent.substring(0, 100),
+            hasJson: !!editorContentJson,
           });
           
           // 1. 立即保存到本地缓存（用户操作即时响应）
@@ -2275,9 +2286,9 @@ export default function NovelEditorPage(){
           });
           
           // 2. 关键修复：立即同步到服务器，确保数据持久化
-          // 使用编辑器中的实际内容，而不是缓存内容
+          // 使用编辑器中的实际内容，同时提供 JSON 格式用于更精确的合并
           try {
-            await documentCache.syncDocumentState(documentId, editorContent);
+            await documentCache.syncDocumentState(documentId, editorContent, editorContentJson);
             console.log('✅ [自动保存] 已同步到服务器:', {
               documentId,
               contentLength: editorContent.length,
