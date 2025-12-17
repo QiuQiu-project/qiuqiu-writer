@@ -106,16 +106,16 @@ export default function ImportWorkModal({ isOpen, onClose, onSuccess }: ImportWo
                 if (enNum) {
                   chapterNumber = parseInt(enNum, 10);
                 } else if (cnNum) {
-                  if (/[一二三四五六七八九十百千零]/.test(cnNum)) {
-                    chapterNumber = convertChineseNumberToArabic(cnNum);
-                  } else {
-                    chapterNumber = parseInt(cnNum, 10);
-                  }
+            if (/[一二三四五六七八九十百千零]/.test(cnNum)) {
+              chapterNumber = convertChineseNumberToArabic(cnNum);
+            } else {
+              chapterNumber = parseInt(cnNum, 10);
+            }
                 }
                 volumeNumber = currentVolumeNumber;
                 // 保存原始章节号，用于后续排序和修正
                 originalChapterNumber = chapterNumber;
-              } else {
+          } else {
                 // 特殊章节（序章、楔子等）
                 volumeNumber = currentVolumeNumber;
                 chapterNumber = 0; // 特殊章节编号为0
@@ -306,7 +306,6 @@ export default function ImportWorkModal({ isOpen, onClose, onSuccess }: ImportWo
 
       // 拆分章节
       const chapters = await splitTextToChapters(content);
-      console.log(`✅ 拆分完成，共 ${chapters.length} 章`);
 
       setProgress(`正在创建作品和 ${chapters.length} 个章节...`);
       setStatus('creating');
@@ -319,12 +318,6 @@ export default function ImportWorkModal({ isOpen, onClose, onSuccess }: ImportWo
         volume_number: ch.volumeNumber || 1 // 使用解析出的卷号
       }));
       
-      console.log('📚 章节数据预览:', chaptersData.slice(0, 5).map(ch => ({
-        章节号: ch.chapter_number,
-        卷号: ch.volume_number,
-        标题: ch.title.substring(0, 20)
-      })));
-
       // 调用创建接口
       const result = await createWorkFromFile(file.name, chaptersData);
 

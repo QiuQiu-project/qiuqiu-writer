@@ -105,7 +105,7 @@ except ImportError:
 // 测试Yjs
 try {
   const Y = await import('yjs')
-  console.log('✅ Yjs 安装成功')
+  
 } catch (e) {
   console.error('❌ Yjs 未安装', e)
 }
@@ -113,7 +113,7 @@ try {
 // 测试Automerge
 try {
   const Automerge = await import('@automerge/automerge')
-  console.log('✅ Automerge 安装成功')
+  
 } catch (e) {
   console.error('❌ Automerge 未安装', e)
 }

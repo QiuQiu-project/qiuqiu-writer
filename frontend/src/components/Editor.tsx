@@ -86,7 +86,6 @@ export default function Editor({ docId, onDocChange: _onDocChange }: EditorProps
   const saveDocument = async (id: string, content: string) => {
     try {
       await apiClient.updateDocument(id, DEFAULT_USER_ID, { content });
-      console.log('Document saved successfully');
     } catch (error) {
       console.error('Failed to save document:', error);
     }

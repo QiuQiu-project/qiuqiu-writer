@@ -36,18 +36,18 @@ export function ExampleEditor({ documentId }: { documentId: string }) {
       syncCheckInterval: 3000,      // 每 3 秒检查一次是否需要同步
       enablePolling: true,          // 启用轮询
       onSyncSuccess: (content, version) => {
-        console.log('同步成功:', { version, contentLength: content.length });
+        
       },
       onSyncError: (error) => {
         console.error('同步失败:', error);
       },
       onCollaborativeUpdate: (hasUpdates) => {
         if (hasUpdates) {
-          console.log('检测到协作更新');
+          
         }
       },
       onContentChange: (synced) => {
-        console.log('内容变化，已同步:', synced);
+        
       },
     }
   );

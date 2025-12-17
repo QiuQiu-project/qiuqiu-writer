@@ -70,8 +70,8 @@ import { YjsClient } from '@/utils/yjsClient'
 const client = new YjsClient({
   documentId: 'work_4_chapter_6',
   userId: 123,
-  onConnect: () => console.log('已连接'),
-  onUpdate: (update, origin) => console.log('文档已更新')
+  onConnect: () => ,
+  onUpdate: (update, origin) => 
 })
 
 client.connect()
@@ -94,8 +94,8 @@ import { AutomergeClient } from '@/utils/automergeClient'
 const client = new AutomergeClient({
   documentId: 'work_4_chapter_6',
   userId: 123,
-  onConnect: () => console.log('已连接'),
-  onUpdate: (doc) => console.log('文档已更新', doc)
+  onConnect: () => ,
+  onUpdate: (doc) => 
 })
 
 client.connect()

@@ -96,7 +96,6 @@ export default function CharacterRelations({ data, onChange }: CharacterRelation
       const x = centerX + radius * Math.cos(angle);
       const y = centerY + radius * Math.sin(angle);
       
-      console.log(`Node ${char.name} initial position:`, { x, y, angle: (angle * 180) / Math.PI });
       
       return {
         id: char.id,
@@ -162,7 +161,6 @@ export default function CharacterRelations({ data, onChange }: CharacterRelation
       const timer = setTimeout(() => {
         width = container.offsetWidth || 800;
         height = container.offsetHeight || 600;
-        console.log('Retrying with size:', { width, height });
         if (width > 0 && height > 0) {
           initializeGraph(width, height, data);
         }
@@ -173,7 +171,6 @@ export default function CharacterRelations({ data, onChange }: CharacterRelation
     initializeGraph(width, height, data);
 
     function initializeGraph(width: number, height: number, data: GraphData) {
-      console.log('Initializing G6 graph with:', { width, height, nodes: data.nodes?.length || 0, edges: data.edges?.length || 0 });
 
     // 如果图已存在，先销毁
     if (graphRef.current) {
@@ -262,12 +259,6 @@ export default function CharacterRelations({ data, onChange }: CharacterRelation
         }
       });
 
-      console.log('G6 graph initialized successfully');
-      console.log('Nodes data:', data.nodes?.map(n => ({ 
-        id: n.id, 
-        x: (n.style as any)?.x, 
-        y: (n.style as any)?.y 
-      })));
     }
 
     // 窗口大小改变时调整图大小

@@ -49,7 +49,7 @@ export class AutomergeClient {
     this.ws.onopen = () => {
       this.connected = true
       this.reconnectAttempts = 0
-      console.log('✅ [Automerge] 连接成功')
+      
       
       if (this.options.onConnect) {
         this.options.onConnect()
@@ -79,7 +79,7 @@ export class AutomergeClient {
         try {
           const message = JSON.parse(event.data)
           if (message.type === 'automerge_connected') {
-            console.log('✅ [Automerge] 已连接到服务器')
+            
           } else if (message.type === 'pong') {
             // 心跳响应
           }
@@ -98,7 +98,7 @@ export class AutomergeClient {
     }
 
     this.ws.onclose = () => {
-      console.log('🔌 [Automerge] 连接关闭')
+      
       this.connected = false
       if (this.options.onDisconnect) {
         this.options.onDisconnect()
@@ -108,7 +108,7 @@ export class AutomergeClient {
       if (this.reconnectAttempts < this.maxReconnectAttempts) {
         this.reconnectAttempts++
         setTimeout(() => {
-          console.log(`🔄 [Automerge] 尝试重连 (${this.reconnectAttempts}/${this.maxReconnectAttempts})`)
+          
           this.connect()
         }, this.reconnectDelay * this.reconnectAttempts)
       }

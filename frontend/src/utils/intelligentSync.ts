@@ -247,7 +247,7 @@ export function useIntelligentSync(
         .sort((a, b) => b - a)
         .slice(0, 10);
       appliedVersions.current = new Set(versionsToKeep);
-      console.log('[IntelligentSync] 清理旧版本记录，保留:', versionsToKeep);
+      
     }
   }, []);
 
@@ -256,20 +256,20 @@ export function useIntelligentSync(
    */
   const performSync = useCallback(async () => {
     if (syncInProgress.current) {
-      console.log('[IntelligentSync] 同步已在进行中，跳过');
+      
       return;
     }
 
     const currentContent = getCurrentContent();
     if (!currentContent || currentContent === lastSyncedContent.current) {
-      console.log('[IntelligentSync] 内容未变化，跳过同步');
+      
       return;
     }
 
     syncInProgress.current = true;
 
     try {
-      console.log('[IntelligentSync] 开始同步，内容长度:', currentContent.length);
+      
       
       // 使用 documentCache 的同步方法
       const result = await documentCache.syncDocumentState(documentId, currentContent);
@@ -280,7 +280,7 @@ export function useIntelligentSync(
         
         // 关键：检查版本是否已应用，避免重复应用
         if (appliedVersions.current.has(result.version)) {
-          console.log('⚠️ [IntelligentSync] 版本已应用，跳过:', result.version);
+          
           lastSyncedContent.current = syncedContent;
           lastSyncedVersion.current = result.version;
           return; // 避免重复应用
@@ -301,13 +301,13 @@ export function useIntelligentSync(
           
           if (!userIsEditing) {
             // 用户没有在编辑，更新内容
-            console.log('✅ [IntelligentSync] 更新内容');
+            
             updateContent(syncedContent);
             lastSyncedContent.current = syncedContent;
             appliedVersions.current.add(result.version); // 标记版本已应用
           } else {
             // 用户正在编辑，保留用户当前编辑的内容
-            console.log('⏸️ [IntelligentSync] 用户正在编辑，保留当前内容');
+            
             // 仍然更新 lastSyncedContent，但保留用户当前编辑的内容
             lastSyncedContent.current = syncedContent;
             appliedVersions.current.add(result.version); // 标记版本已应用
@@ -326,7 +326,7 @@ export function useIntelligentSync(
 
         onSyncSuccess?.(syncedContent, result.version);
         onContentChange?.(true);
-        console.log('[IntelligentSync] 同步成功，版本:', result.version);
+        
       } else {
         console.error('[IntelligentSync] 同步失败:', result.error);
         onSyncError?.(new Error(result.error || '同步失败'));
@@ -346,19 +346,19 @@ export function useIntelligentSync(
    */
   const pollForUpdates = useCallback(async () => {
     if (!documentId) {
-      console.log('[IntelligentSync] 文档ID为空，跳过轮询');
+      
       return;
     }
 
     if (syncInProgress.current) {
-      console.log('[IntelligentSync] 同步进行中，跳过轮询');
+      
       return;
     }
 
     try {
       // 关键修复：验证 documentId 格式，确保是当前章节的文档
       if (!documentId || documentId.trim() === '') {
-        console.log('[IntelligentSync] 文档ID为空，跳过轮询');
+        
         return;
       }
       
@@ -373,12 +373,12 @@ export function useIntelligentSync(
         expectedChapterId = parseInt(documentId.replace('chapter_', ''));
       }
       
-      console.log('[IntelligentSync] 开始轮询，文档ID:', documentId, '章节ID:', expectedChapterId);
+      
       // 获取服务器最新状态
       const serverDoc = await documentCache.getDocument(documentId);
       
       if (!serverDoc) {
-        console.log('[IntelligentSync] 服务器文档不存在:', documentId);
+        
         return;
       }
 
@@ -395,31 +395,21 @@ export function useIntelligentSync(
         }
       }
 
-      console.log('[IntelligentSync] 获取到服务器文档:', {
-        documentId,
-        version: serverDoc.version,
-        contentLength: typeof serverDoc.content === 'string' ? serverDoc.content.length : JSON.stringify(serverDoc.content).length
-      });
+
 
       const serverVersion = serverDoc.version || 0;
       const currentVersion = documentStateRef.current?.version || lastSyncedVersion.current;
 
-      console.log('[IntelligentSync] 版本比较:', {
-        serverVersion,
-        currentVersion,
-        documentStateVersion: documentStateRef.current?.version,
-        lastSyncedVersion: lastSyncedVersion.current
-      });
 
       // 只有版本真正更新时才处理
       if (serverVersion > currentVersion) {
         // 关键：检查版本是否已应用，避免重复应用
         if (appliedVersions.current.has(serverVersion)) {
-          console.log('⚠️ [IntelligentSync] 轮询检测到版本已应用，跳过:', serverVersion);
+          
           return;
         }
         
-        console.log('[IntelligentSync] 检测到新版本，立即更新缓存:', serverVersion);
+        
 
         const serverContent = typeof serverDoc.content === 'string' 
           ? serverDoc.content 
@@ -453,23 +443,17 @@ export function useIntelligentSync(
             lastSyncedContent.current = serverContent;
             lastSyncedVersion.current = serverVersion;
             appliedVersions.current.add(serverVersion); // 标记版本已应用
-            console.log('[IntelligentSync] 应用协作更新');
+            
           } else {
             // 用户正在编辑，标记有协作更新但不立即应用
-            console.log('[IntelligentSync] 用户正在编辑，延迟协作更新');
+            
             onCollaborativeUpdate?.(true);
             appliedVersions.current.add(serverVersion); // 标记版本已应用，避免重复
           }
         }
 
         onContentChange?.(true);
-      } else {
-        console.log('[IntelligentSync] 轮询完成，版本无变化:', {
-          serverVersion,
-          currentVersion,
-          serverContentLength: typeof serverDoc.content === 'string' ? serverDoc.content.length : JSON.stringify(serverDoc.content).length
-        });
-      }
+      } 
     } catch (error) {
       console.error('[IntelligentSync] 轮询失败:', error);
       onContentChange?.(false);
@@ -501,7 +485,7 @@ export function useIntelligentSync(
 
         // 只在用户停止编辑2秒后且内容有变化时同步
         if (timeSinceLastInput > 2000 && contentDiff > 0) {
-          console.log('[IntelligentSync] 内容变化且用户停止编辑，开始同步');
+          
           performSync().finally(() => {
             // 同步完成后，重新启动检查
             startSyncCheck();
@@ -569,27 +553,27 @@ export function useIntelligentSync(
     // 关键修复：同时检查 enablePolling 和 documentId
     // 如果 documentId 为空，不启动轮询
     if (!enablePolling) {
-      console.log('[IntelligentSync] 轮询被禁用');
+      
       return;
     }
 
     if (!documentId || documentId.trim() === '') {
-      console.log('[IntelligentSync] 文档ID为空，跳过轮询:', documentId);
+      
       return;
     }
 
     // 关键修复：清理之前的定时器，避免重复创建
     if (pollTimer.current) {
-      console.log('[IntelligentSync] 清理旧的轮询定时器');
+      
       clearInterval(pollTimer.current);
       pollTimer.current = undefined;
     }
 
-    console.log('[IntelligentSync] 🚀 启动轮询，间隔:', pollInterval, 'ms, 文档ID:', documentId);
+    
     
     // 延迟执行第一次轮询，避免与章节加载冲突
     const firstPollDelay = setTimeout(() => {
-      console.log('[IntelligentSync] 执行第一次轮询...');
+      
       pollForUpdatesRef.current().catch(error => {
         console.error('[IntelligentSync] 第一次轮询失败:', error);
       });
@@ -598,21 +582,21 @@ export function useIntelligentSync(
     // 设置固定间隔轮询（轮询是主要更新方式）
     pollTimer.current = setInterval(() => {
       if (!documentId || documentId.trim() === '') {
-        console.log('[IntelligentSync] 文档ID为空，停止轮询');
+        
         if (pollTimer.current) {
           clearInterval(pollTimer.current);
           pollTimer.current = undefined;
         }
         return;
       }
-      console.log('[IntelligentSync] 🔄 轮询检查远程更新...', documentId);
+      
       pollForUpdatesRef.current().catch(error => {
         console.error('[IntelligentSync] 轮询失败:', error);
       });
     }, pollInterval); // 使用正常的轮询间隔
 
     return () => {
-      console.log('[IntelligentSync] 🛑 清理轮询定时器和延迟任务');
+      
       clearTimeout(firstPollDelay);
       if (pollTimer.current) {
         clearInterval(pollTimer.current);
@@ -637,7 +621,7 @@ export function useIntelligentSync(
     const initTimer = setTimeout(() => {
       const initialContent = getCurrentContent();
       if (initialContent && initialContent !== lastSyncedContent.current) {
-        console.log('[IntelligentSync] 初始同步');
+        
         performSync();
       }
     }, 1000);

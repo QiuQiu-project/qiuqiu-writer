@@ -121,7 +121,6 @@ export async function analyzeChapterContent(
   settings?: AnalysisSettings
 ): Promise<string> {
   try {
-    console.log('📡 调用后端 AI 分析接口...');
     
     // 获取认证token
     const token = localStorage.getItem('access_token');
@@ -182,7 +181,6 @@ export async function analyzeChapterContent(
 
             switch (msgType) {
               case 'start':
-                console.log('✅', parsed.message);
                 // 传递开始时的元数据
                 if (parsed.metadata && onProgress) {
                   onProgress({ metadata: parsed.metadata });
@@ -197,14 +195,14 @@ export async function analyzeChapterContent(
                   onProgress?.({ text: chunkContent });
                   // 调试：每100个字符打印一次
                   if (result.length % 500 === 0) {
-                    console.log(`📝 已累积 ${result.length} 字符`);
+                    
                   }
                 }
                 break;
               
               case 'done':
-                console.log('✅', parsed.message);
-                console.log(`📊 最终内容长度: ${result.length} 字符`);
+                
+                
                 // 传递完成时的元数据
                 if (parsed.metadata && onProgress) {
                   onProgress({ metadata: parsed.metadata });
@@ -232,7 +230,7 @@ export async function analyzeChapterContent(
       throw new Error('未收到任何分析结果');
     }
 
-    console.log('✅ 章节分析完成');
+    
     return result;
 
   } catch (error) {
@@ -319,7 +317,7 @@ export async function analyzeBookEnhanced(
   settings?: AnalysisSettings
 ): Promise<string> {
   try {
-    console.log('📡 调用后端增强拆书分析接口...');
+    
     
     // 获取认证token
     const token = localStorage.getItem('access_token');
@@ -380,7 +378,7 @@ export async function analyzeBookEnhanced(
 
             switch (msgType) {
               case 'start':
-                console.log('✅', parsed.message);
+                
                 if (parsed.metadata && onProgress) {
                   onProgress({ metadata: parsed.metadata });
                 }
@@ -395,14 +393,14 @@ export async function analyzeBookEnhanced(
                 break;
               
               case 'done':
-                console.log('✅', parsed.message);
+                
                 if (parsed.metadata && onProgress) {
                   onProgress({ metadata: parsed.metadata });
                 }
                 break;
               
               case 'work_created':
-                console.log('✅ 作品创建成功:', parsed.data);
+                
                 workResult = parsed.data;
                 onProgress?.({ 
                   text: `作品创建成功: ${parsed.data.work_title}`,
@@ -436,7 +434,7 @@ export async function analyzeBookEnhanced(
       throw new Error('未收到任何分析结果');
     }
 
-    console.log('✅ 增强拆书分析完成');
+    
     return result;
 
   } catch (error) {
@@ -472,7 +470,7 @@ export async function analyzeChaptersIncremental(
   settings?: AnalysisSettings
 ): Promise<void> {
   try {
-    console.log('📡 调用后端逐章渐进式分析接口...');
+    
     
     // 获取认证token
     const token = localStorage.getItem('access_token');
@@ -534,14 +532,14 @@ export async function analyzeChaptersIncremental(
 
             switch (msgType) {
               case 'start':
-                console.log('✅', parsed.message);
+                
                 if (parsed.metadata && onProgress) {
                   onProgress({ metadata: parsed.metadata });
                 }
                 break;
               
               case 'chapter_start':
-                console.log(`📖 开始分析第 ${parsed.chapter_index} 章`);
+                
                 onProgress?.({
                   text: `开始分析第 ${parsed.chapter_index} 章`,
                   chapterIndex: parsed.chapter_index,
@@ -557,14 +555,14 @@ export async function analyzeChaptersIncremental(
                 break;
               
               case 'done':
-                console.log('✅', parsed.message);
+                
                 if (parsed.metadata && onProgress) {
                   onProgress({ metadata: parsed.metadata });
                 }
                 break;
               
               case 'chapter_inserted':
-                console.log(`✅ 第 ${parsed.chapter_index} 章已插入作品`);
+                
                 onProgress?.({
                   text: `第 ${parsed.chapter_index} 章分析完成并已插入作品`,
                   chapterIndex: parsed.chapter_index,
@@ -581,7 +579,7 @@ export async function analyzeChaptersIncremental(
                 break;
               
               case 'all_chapters_complete':
-                console.log('✅ 所有章节分析完成');
+                
                 onProgress?.({
                   text: `所有章节分析完成，共 ${parsed.total_chapters} 章`,
                 });
@@ -604,7 +602,7 @@ export async function analyzeChaptersIncremental(
       }
     }
 
-    console.log('✅ 逐章渐进式分析完成');
+    
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : '分析请求失败';
@@ -650,7 +648,7 @@ export async function analyzeChapterByFile(
   work_created: boolean;
 }> {
   try {
-    console.log('📡 调用后端基于文件名的章节分析接口...');
+    
     
     // 获取认证token
     const token = localStorage.getItem('access_token');
@@ -719,7 +717,7 @@ export async function analyzeChapterByFile(
 
             switch (msgType) {
               case 'start':
-                console.log('✅', parsed.message);
+                
                 if (parsed.metadata && onProgress) {
                   onProgress({ metadata: parsed.metadata });
                 }
@@ -734,7 +732,7 @@ export async function analyzeChapterByFile(
                 break;
               
               case 'done':
-                console.log('✅', parsed.message);
+                
                 // 从 done 消息的 data 中更新 workResult
                 if (parsed.data) {
                   if (parsed.data.work_id) {
@@ -753,7 +751,7 @@ export async function analyzeChapterByFile(
                 break;
               
               case 'work_created':
-                console.log('✅ 作品创建成功:', parsed);
+                
                 workResult.work_id = parsed.work_id;
                 workResult.work_title = parsed.work_title;
                 workResult.work_created = true;
@@ -766,7 +764,7 @@ export async function analyzeChapterByFile(
                 break;
               
               case 'work_found':
-                console.log('✅ 找到已存在作品:', parsed);
+                
                 workResult.work_id = parsed.work_id;
                 workResult.work_title = parsed.work_title;
                 workResult.work_created = false;
@@ -779,7 +777,7 @@ export async function analyzeChapterByFile(
                 break;
               
               case 'chapter_inserted':
-                console.log('✅ 章节插入成功:', parsed);
+                
                 workResult.work_id = parsed.work_id || workResult.work_id;
                 workResult.work_title = parsed.work_title || workResult.work_title;
                 workResult.chapter_id = parsed.chapter_id;
@@ -792,7 +790,7 @@ export async function analyzeChapterByFile(
                 break;
               
               case 'chapter_skipped':
-                console.log('⚠️ 章节已存在，跳过创建:', parsed);
+                
                 workResult.work_id = parsed.work_id || workResult.work_id;
                 workResult.work_title = parsed.work_title || workResult.work_title;
                 workResult.chapter_id = parsed.chapter_id;
@@ -825,7 +823,7 @@ export async function analyzeChapterByFile(
       throw new Error('未收到完整的分析结果（缺少作品ID或章节ID）');
     }
 
-    console.log('✅ 基于文件名的章节分析完成');
+    
     return {
       work_id: workResult.work_id!,
       work_title: workResult.work_title || fileName,
@@ -879,7 +877,7 @@ export async function createWorkFromFile(
   }>;
 }> {
   try {
-    console.log('📡 调用后端创建作品和章节接口...');
+    
     
     const token = localStorage.getItem('access_token');
     const headers: HeadersInit = {
@@ -911,7 +909,7 @@ export async function createWorkFromFile(
     }
 
     const result = await response.json();
-    console.log('✅ 作品和章节创建成功:', result);
+    
     return result;
   } catch (error) {
     console.error('❌ 创建作品和章节失败:', error);
@@ -942,7 +940,7 @@ export async function analyzeChapter(
   detailed_outline: any;
 }> {
   try {
-    console.log(`📡 分析章节 ${chapterId}...`);
+    
     
     const token = localStorage.getItem('access_token');
     const headers: HeadersInit = {
@@ -1028,7 +1026,7 @@ export async function testAPIConnection(): Promise<{
   models?: string[];
 }> {
   try {
-    console.log('🔍 测试 AI 服务连接...');
+    
     
     const response = await fetch(`${API_BASE_URL}/ai/health`, {
       method: 'GET',
@@ -1041,7 +1039,7 @@ export async function testAPIConnection(): Promise<{
       const result = await response.json();
       const data = result.data;
       
-      console.log('✅ AI 服务连接成功', data);
+      
       
       return {
         success: data.status === 'healthy',
@@ -1090,7 +1088,7 @@ export async function generateChapterContent(
   settings?: AnalysisSettings
 ): Promise<string> {
   try {
-    console.log(`📡 根据大纲和细纲生成章节内容...`);
+    
     
     const token = localStorage.getItem('access_token');
     const headers: HeadersInit = {

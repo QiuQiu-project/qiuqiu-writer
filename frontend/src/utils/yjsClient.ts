@@ -60,7 +60,7 @@ export class YjsClient {
     )
 
     this.provider.on('status', (event: { status: string }) => {
-      console.log('🔌 [Yjs] 连接状态:', event.status)
+      
       
       if (event.status === 'connected') {
         this.connected = true
@@ -75,7 +75,7 @@ export class YjsClient {
       }
     })
 
-    console.log('✅ [Yjs] 客户端已初始化，文档ID:', this.options.documentId)
+    
   }
 
   /**
@@ -86,7 +86,7 @@ export class YjsClient {
       this.provider.destroy()
       this.provider = null
       this.connected = false
-      console.log('🔌 [Yjs] 已断开连接')
+      
     }
   }
 

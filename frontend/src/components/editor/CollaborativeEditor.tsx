@@ -27,9 +27,7 @@ export function CollaborativeEditor({
     documentId,
     userId,
     type: 'yjs',
-    onContentChange: (content) => {
-      console.log('📝 内容已更新:', content.length, '字符')
-    }
+
   })
 
   const editor = useEditor({

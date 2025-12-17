@@ -74,14 +74,6 @@ export default function ChapterSettingsModal({
   useEffect(() => {
     if (isOpen) {
       if (initialData) {
-        console.log('📝 [ChapterSettingsModal] 初始化数据:', {
-          hasInitialData: !!initialData,
-          title: initialData.title,
-          outline: initialData.outline,
-          detailOutline: initialData.detailOutline,
-          outlineLength: initialData.outline?.length || 0,
-          detailOutlineLength: initialData.detailOutline?.length || 0,
-        });
         setTitle(initialData.title || '');
         setSelectedCharacters(initialData.characters || []);
         setLocations(initialData.locations || []);
@@ -89,7 +81,6 @@ export default function ChapterSettingsModal({
         setDetailOutline(initialData.detailOutline || '');
       } else {
         // 新建章节时重置
-        console.log('📝 [ChapterSettingsModal] 新建章节，重置数据');
         setTitle('');
         setSelectedCharacters([]);
         setLocations([]);
@@ -396,9 +387,6 @@ export default function ChapterSettingsModal({
                             return char?.name || id;
                           }),
                           locations,
-                          (progress) => {
-                            console.log('生成进度:', progress);
-                          }
                         );
                         onGenerateContent(content);
                         alert('章节内容生成完成！已填充到编辑器中。');

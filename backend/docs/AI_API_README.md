@@ -258,13 +258,13 @@ async function analyzeChapter(content: string) {
         
         switch (data.type) {
           case 'start':
-            console.log('开始分析:', data.message);
+            
             break;
           case 'chunk':
-            console.log('内容:', data.content);
+            
             break;
           case 'done':
-            console.log('分析完成:', data.message);
+            
             break;
           case 'error':
             console.error('错误:', data.message);

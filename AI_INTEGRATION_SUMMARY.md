@@ -162,7 +162,7 @@ const result = await testAPIConnection();
 const analysis = await analyzeChapterContent(
   chapterContent,
   (progress) => {
-    console.log(progress.text); // 实时显示分析进度
+     // 实时显示分析进度
   },
   {
     model: 'codedrive-chat',

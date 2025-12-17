@@ -193,7 +193,7 @@ async function analyzeChapter(content: string) {
       if (line.startsWith('data: ')) {
         const data = JSON.parse(line.slice(6));
         if (data.type === 'chunk') {
-          console.log(data.content);
+          
         }
       }
     }

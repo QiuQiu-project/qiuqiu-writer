@@ -58,7 +58,7 @@ const appliedVersions = useRef<Set<number>>(new Set()); // 记录已应用的版
 
 // 在应用更新前检查
 if (appliedVersions.current.has(version)) {
-  console.log('⚠️ [IntelligentSync] 版本已应用，跳过:', version);
+  
   return;
 }
 
@@ -146,7 +146,7 @@ const cleanupOldVersions = useCallback(() => {
 在浏览器控制台执行：
 ```javascript
 // 查看已应用的版本
-console.log(appliedVersions.current);
+
 ```
 
 ## 关键改进点

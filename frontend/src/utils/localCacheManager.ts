@@ -52,17 +52,11 @@ class LocalCacheManager {
    * 获取缓存项
    */
   async get<T>(key: string): Promise<T | null> {
-    console.log('🔍 [Cache] 获取缓存:', key);
+    
     
     // 1. 先从内存缓存获取
     const memoryItem = this.memoryCache.get(key);
     if (memoryItem) {
-      console.log('✅ [Cache] 从内存缓存获取:', {
-        key,
-        version: memoryItem.version,
-        dataType: typeof memoryItem.data,
-        hasData: !!memoryItem.data,
-      });
       // 更新访问信息
       memoryItem.lastAccessed = Date.now();
       memoryItem.accessCount++;
@@ -72,18 +66,11 @@ class LocalCacheManager {
     // 2. 从 localStorage 获取
     const localItem = this.getFromLocalStorage<T>(key);
     if (localItem) {
-      console.log('✅ [Cache] 从 localStorage 获取:', {
-        key,
-        version: localItem.version,
-        dataType: typeof localItem.data,
-        hasData: !!localItem.data,
-      });
       // 提升到内存缓存
       this.setToMemory(key, localItem.data, localItem.version, localItem.synced);
       return localItem.data;
     }
 
-    console.log('❌ [Cache] 缓存中未找到:', key);
     return null;
   }
 
@@ -103,7 +90,6 @@ class LocalCacheManager {
     // 3. 标记为待同步
     this.syncQueue.add(key);
     
-    console.log('✅ [Cache] 缓存已设置:', key);
   }
 
   /**

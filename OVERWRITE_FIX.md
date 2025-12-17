@@ -57,7 +57,7 @@ serverDoc = await Promise.race([fetchPromise, timeoutPromise]);
 // 如果获取失败，使用更保守的版本号，强制后端合并
 if (fetchFailed) {
   syncVersion = Math.max(0, currentVersion - 1);
-  console.log('⚠️ [同步] 使用保守版本号，强制后端合并检查:', syncVersion);
+  
 }
 ```
 

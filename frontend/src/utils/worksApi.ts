@@ -296,21 +296,21 @@ class WorksApiClient {
    */
   async deleteWork(workId: number): Promise<void> {
     const url = `${this.baseUrl}/api/v1/works/${workId}`;
-    console.log('删除作品请求URL:', url);
+    
     
     const response = await fetch(url, {
       method: 'DELETE',
       headers: this.getAuthHeaders(),
     });
 
-    console.log('删除作品响应状态:', response.status, response.statusText);
-    console.log('删除作品响应头:', Object.fromEntries(response.headers.entries()));
+    
+    
 
     if (!response.ok) {
       let errorData: any = {};
       try {
         const text = await response.text();
-        console.log('删除作品错误响应体:', text);
+        
         if (text) {
           errorData = JSON.parse(text);
         }
@@ -329,13 +329,13 @@ class WorksApiClient {
       const text = await response.text();
       if (text) {
         const data = JSON.parse(text);
-        console.log('删除作品成功响应:', data);
+        
       } else {
-        console.log('删除作品成功（空响应）');
+        
       }
     } catch (parseErr) {
       // 如果解析失败，可能是空响应，也视为成功
-      console.log('删除作品成功（无法解析响应，可能是空响应）');
+      
     }
   }
 

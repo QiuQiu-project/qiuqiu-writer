@@ -159,8 +159,8 @@ tail -f backend.log | grep "同步\|合并"
 #### 查看前端控制台：
 ```javascript
 // 在浏览器控制台执行，查看当前状态
-console.log('currentContent:', sharedbClient.currentContent);
-console.log('currentVersion:', sharedbClient.currentVersion);
+
+
 ```
 
 ### 6. 如果问题仍然存在

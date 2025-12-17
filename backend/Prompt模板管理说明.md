@@ -64,8 +64,8 @@ import { getDefaultPromptTemplate } from '@/utils/bookAnalysisApi';
 // 获取默认的章节分析模板
 const template = await getDefaultPromptTemplate('chapter_analysis');
 if (template) {
-  console.log('模板名称:', template.name);
-  console.log('模板内容:', template.prompt_content);
+  
+  
 }
 ```
 
@@ -76,7 +76,7 @@ import { getPromptTemplates } from '@/utils/bookAnalysisApi';
 // 获取所有章节分析模板
 const templates = await getPromptTemplates('chapter_analysis', true);
 templates.forEach(t => {
-  console.log(`${t.name} (${t.is_default ? '默认' : ''})`);
+  
 });
 ```
 

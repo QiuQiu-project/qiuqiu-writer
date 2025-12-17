@@ -37,7 +37,7 @@ class OperationTracker {
     this.baseVersion = baseVersion;
     this.operations = [];
     this.isTracking = true;
-    console.log('[OperationTracker] 开始跟踪操作:', documentId);
+    
   }
 
   /**
@@ -46,7 +46,7 @@ class OperationTracker {
   stopTracking(): void {
     this.isTracking = false;
     this.operations = [];
-    console.log('[OperationTracker] 停止跟踪操作');
+    
   }
 
   /**
@@ -61,7 +61,7 @@ class OperationTracker {
     this.operations.push(...ops);
     this.lastContent = newContent;
     
-    console.log('[OperationTracker] 捕获操作:', ops.length, '个操作');
+    
     return ops;
   }
 

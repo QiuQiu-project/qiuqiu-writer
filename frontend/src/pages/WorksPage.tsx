@@ -131,12 +131,12 @@ export default function WorksPage() {
       setLoading(true);
       setError(null);
       
-      console.log('开始删除作品，ID:', workId);
+      
       
       // 调用删除API
       await worksApi.deleteWork(Number(workId));
       
-      console.log('删除作品API调用成功');
+      
       
       // 显示成功提示
       alert(`作品《${workTitle}》已成功删除`);
@@ -165,13 +165,13 @@ export default function WorksPage() {
 
   // 处理菜单项点击
   const handleMenuAction = async (action: string, workId: string, format?: string) => {
-    console.log('handleMenuAction 被调用:', { action, workId, format });
+    
     
     // 先执行操作，再关闭菜单，避免菜单关闭导致事件丢失
     try {
       switch (action) {
         case 'delete':
-          console.log('执行删除操作，workId:', workId);
+          
           await handleDeleteWork(workId);
           // 删除成功后关闭菜单
           setOpenMenuId(null);
@@ -179,7 +179,7 @@ export default function WorksPage() {
           break;
         case 'export':
           // TODO: 实现导出功能
-          console.log(`导出作品 ${workId} 为 ${format} 格式`);
+          
           break;
         case 'copy-link':
           // 生成作品链接
@@ -232,7 +232,7 @@ export default function WorksPage() {
           }
           break;
         default:
-          console.log(`Action: ${action}, Work ID: ${workId}, Format: ${format || 'N/A'}`);
+          
       }
     } catch (err) {
       console.error('操作失败:', err);
@@ -453,24 +453,24 @@ export default function WorksPage() {
                           onMouseDown={(e) => {
                             e.stopPropagation();
                             e.preventDefault();
-                            console.log('删除按钮 onMouseDown，作品ID:', work.id);
+                            
                           }}
                           onClick={(e) => {
-                            console.log('=== 删除按钮 onClick 事件触发 ===');
-                            console.log('事件对象:', e);
-                            console.log('事件类型:', e.type);
-                            console.log('作品ID:', work.id);
-                            console.log('当前菜单状态:', openMenuId);
+                            
+                            
+                            
+                            
+                            
                             
                             e.stopPropagation();
                             e.preventDefault();
                             
                             const workIdToDelete = String(work.id);
-                            console.log('准备删除作品，ID:', workIdToDelete);
+                            
                             
                             // 不立即关闭菜单，先执行删除操作
                             handleDeleteWork(workIdToDelete).then(() => {
-                              console.log('删除完成，关闭菜单');
+                              
                               setOpenMenuId(null);
                               setOpenSubMenu(null);
                             }).catch((error) => {
@@ -481,7 +481,7 @@ export default function WorksPage() {
                           }}
                           onMouseUp={(e) => {
                             e.stopPropagation();
-                            console.log('删除按钮 onMouseUp');
+                            
                           }}
                         >
                           <Trash2 size={16} />

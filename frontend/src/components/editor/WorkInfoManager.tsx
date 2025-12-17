@@ -108,7 +108,6 @@ const loadFromCache = (workId: string | null, templateId?: string): CacheData | 
       const cached = localStorage.getItem(templateKey);
       if (cached) {
         const data = JSON.parse(cached);
-        console.log('✅ 从模板特定缓存加载:', templateKey);
         return data;
       }
     } catch (e) {
@@ -136,7 +135,6 @@ const saveToCache = (data: CacheData, workId: string | null, templateId?: string
     const templateKey = workId ? `wawawriter_workinfo_cache_${workId}_${templateId}` : `wawawriter_workinfo_cache_${templateId}`;
     try {
       localStorage.setItem(templateKey, JSON.stringify(data));
-      console.log('✅ 已保存到模板特定缓存:', templateKey);
     } catch (e) {
       console.warn('Failed to save template-specific cache:', e);
     }
@@ -544,7 +542,7 @@ function TabsComponent({ tabs, moduleId, tabsComponentId, renderComponent, onUpd
                         <button 
                           className="comp-generate-btn" 
                           onClick={() => {
-                            console.log('生成内容:', subComp.label, subComp.generatePrompt);
+                            
                           }}
                           title={subComp.generatePrompt || '生成内容'}
                         >
@@ -713,16 +711,16 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
       try {
         // 尝试从数据库加载
         const response = await templatesApi.getWorkTemplateConfig(Number(workId));
-        console.log('初始加载模板配置响应:', response);
+        
         
         if (response.template_config && 
             response.template_config.templateId && 
             response.template_config.modules &&
             Array.isArray(response.template_config.modules)) {
           // 从数据库加载成功
-          console.log('✅ 从数据库加载模板配置成功');
-          console.log('templateId:', response.template_config.templateId);
-          console.log('modules数量:', response.template_config.modules.length);
+          
+          
+          
           
           // 尝试找到对应的预设模板或数据库模板
           let baseTemplate = presetTemplates.find(t => t.id === response.template_config!.templateId);
@@ -735,7 +733,7 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
                 const dbTemplateId = parseInt(response.template_config!.templateId.replace('db-', ''));
                 const dbTemplate = userTemplates.find(t => t.id === dbTemplateId);
                 if (dbTemplate && response.template_config) {
-                  console.log('✅ 找到匹配的数据库模板，更新模板信息');
+                  
                   setTemplate({
                     id: `db-${dbTemplate.id}`,
                     name: dbTemplate.name,
@@ -766,7 +764,7 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
             lastModified: Date.now()
           }, workId, response.template_config.templateId);
         } else {
-          console.log('⚠️ 数据库中没有模板配置，尝试从本地缓存加载');
+          
           // 数据库中没有，尝试从本地缓存加载（尝试加载最近使用的模板）
           // 先尝试从通用缓存加载
           const cached = loadFromCache(workId);
@@ -825,7 +823,7 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
       // 保存到本地缓存（使用模板ID作为key的一部分）
       try {
         saveToCache(templateData, workId || null, template.id);
-        console.log('✅ 模板配置已保存到本地缓存');
+        
       } catch (error) {
         console.error('保存到本地缓存失败:', error);
       }
@@ -834,7 +832,7 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
       if (workId) {
         try {
           const response = await templatesApi.saveWorkTemplateConfig(Number(workId), templateData);
-          console.log('✅ 模板配置已保存到数据库:', response);
+          
       setHasUnsavedChanges(false);
         } catch (error) {
           console.error('❌ 保存模板配置到数据库失败:', error);
@@ -903,8 +901,8 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
           work_type: 'novel',
           include_fields: false
         });
-        console.log('加载的模板列表:', templates);
-        console.log('模板数量:', templates?.length || 0);
+        
+        
         setUserTemplates(templates || []);
       } catch (error) {
         console.error('加载模板列表失败:', error);
@@ -932,7 +930,7 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
               const dbTemplateId = parseInt(response.template_config.templateId.replace('db-', ''));
               const dbTemplate = userTemplates.find(t => t.id === dbTemplateId);
               if (dbTemplate) {
-                console.log('✅ 找到匹配的数据库模板，更新模板信息');
+                
                 setTemplate({
                   id: `db-${dbTemplate.id}`,
                   name: dbTemplate.name,
@@ -952,7 +950,7 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
 
   // 应用模板
   const applyTemplate = async (t: TemplateConfig) => {
-    console.log('应用模板:', t);
+    
     
     // 如果有 workId，先保存当前编辑的内容
     if (workId && template && template.modules) {
@@ -963,7 +961,7 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
           lastModified: Date.now()
         };
         await templatesApi.saveWorkTemplateConfig(Number(workId), currentTemplateData);
-        console.log('✅ 切换模板前已保存当前内容');
+        
       } catch (error) {
         console.error('切换模板前保存失败:', error);
         // 即使保存失败，也继续切换模板
@@ -971,7 +969,7 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
     }
     
     const newTemplate = JSON.parse(JSON.stringify(t));
-    console.log('深拷贝后的模板:', newTemplate);
+    
     
     // 确保 modules 是数组
     if (!Array.isArray(newTemplate.modules)) {
@@ -983,9 +981,9 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
     if (workId) {
       try {
         const response = await templatesApi.getWorkTemplateConfig(Number(workId));
-        console.log('加载模板配置响应:', response);
-        console.log('当前模板ID:', newTemplate.id);
-        console.log('保存的模板ID:', response.template_config?.templateId);
+        
+        
+        
         
         if (response.template_config && 
             response.template_config.templateId === newTemplate.id &&
@@ -993,12 +991,12 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
             Array.isArray(response.template_config.modules) &&
             response.template_config.modules.length > 0) {
           // 如果数据库中有该模板的保存内容，使用保存的内容
-          console.log('✅ 从数据库加载保存的模板内容，modules数量:', response.template_config.modules.length);
+          
           newTemplate.modules = response.template_config.modules;
         } else {
-          console.log('⚠️ 没有找到匹配的保存内容，使用模板默认内容');
+          
           if (response.template_config) {
-            console.log('保存的templateId:', response.template_config.templateId, '当前templateId:', newTemplate.id);
+            
           }
         }
       } catch (error) {
@@ -1011,13 +1009,13 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
     setActiveModuleIndex(0);
     setShowTemplateSelector(false);
     
-    console.log('模板已应用，当前模板:', newTemplate);
+    
   };
 
   // 应用数据库模板
   const applyDatabaseTemplate = async (dbTemplate: any) => {
     try {
-      console.log('应用数据库模板，原始数据:', dbTemplate);
+      
       
       // 如果有 workId，先保存当前编辑的内容
       if (workId && template && template.modules) {
@@ -1028,7 +1026,7 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
             lastModified: Date.now()
           };
           await templatesApi.saveWorkTemplateConfig(Number(workId), currentTemplateData);
-          console.log('✅ 切换模板前已保存当前内容');
+          
         } catch (error) {
           console.error('切换模板前保存失败:', error);
           // 即使保存失败，也继续切换模板
@@ -1037,7 +1035,7 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
       
       // 从数据库模板的 template_config 中提取配置
       const templateConfig = dbTemplate.template_config || {};
-      console.log('template_config:', templateConfig);
+      
       
       // 确保 modules 存在且是数组
       let modules = [];
@@ -1051,7 +1049,7 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
         modules = [];
       }
       
-      console.log('提取的 modules:', modules);
+      
       
       const newTemplate: TemplateConfig = {
         id: `db-${dbTemplate.id}`,
@@ -1060,7 +1058,7 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
         modules: modules
       };
       
-      console.log('应用的新模板:', newTemplate);
+      
       
       // 如果有 workId，尝试从本地缓存加载该模板的保存内容
       if (workId) {
@@ -1068,14 +1066,14 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
           // 优先从本地缓存加载（每个模板独立保存）
           const cached = loadFromCache(workId, newTemplate.id);
           if (cached && cached.modules && Array.isArray(cached.modules) && cached.modules.length > 0) {
-            console.log('✅ 从本地缓存加载保存的模板内容，modules数量:', cached.modules.length);
+            
             newTemplate.modules = cached.modules;
           } else {
             // 如果本地缓存没有，尝试从数据库加载
             const response = await templatesApi.getWorkTemplateConfig(Number(workId));
-            console.log('加载数据库模板配置响应:', response);
-            console.log('当前模板ID:', newTemplate.id);
-            console.log('保存的模板ID:', response.template_config?.templateId);
+            
+            
+            
             
             if (response.template_config && 
                 response.template_config.templateId === newTemplate.id &&
@@ -1083,7 +1081,7 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
                 Array.isArray(response.template_config.modules) &&
                 response.template_config.modules.length > 0) {
               // 如果数据库中有该模板的保存内容，使用保存的内容
-              console.log('✅ 从数据库加载保存的模板内容，modules数量:', response.template_config.modules.length);
+              
               newTemplate.modules = response.template_config.modules;
               // 同时保存到本地缓存
               saveToCache({
@@ -1092,9 +1090,9 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
                 lastModified: Date.now()
               }, workId, newTemplate.id);
             } else {
-              console.log('⚠️ 没有找到匹配的保存内容，使用模板默认内容');
+              
               if (response.template_config) {
-                console.log('保存的templateId:', response.template_config.templateId, '当前templateId:', newTemplate.id);
+                
               }
             }
           }
@@ -1117,7 +1115,7 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
       setActiveModuleIndex(0);
       setShowTemplateSelector(false);
       
-      console.log('模板已应用，当前模板:', copiedTemplate);
+      
     } catch (error) {
       console.error('应用数据库模板失败:', error);
       alert('应用模板失败: ' + (error instanceof Error ? error.message : '未知错误'));
@@ -2399,15 +2397,15 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
               className="save-btn" 
               onClick={async () => {
                 try {
-                  console.log('手动保存，当前模板:', template);
+                  
                   const templateData = {
                     templateId: template.id,
                     modules: template.modules,
                     lastModified: Date.now()
                   };
-                  console.log('保存的数据:', templateData);
+                  
                   const response = await templatesApi.saveWorkTemplateConfig(Number(workId), templateData);
-                  console.log('保存响应:', response);
+                  
                   setHasUnsavedChanges(false);
                   alert('保存成功！');
                 } catch (error) {
@@ -2448,7 +2446,7 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
               <div className="template-loading">加载中...</div>
             ) : userTemplates.length > 0 ? (
               userTemplates.map(dbTemplate => {
-                console.log('渲染模板:', dbTemplate);
+                
                 return (
                   <button 
                     key={`db-${dbTemplate.id}`} 
@@ -2618,7 +2616,7 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
                             className="comp-generate-btn" 
                             onClick={() => {
                               // TODO: 调用 AI 生成
-                              console.log('生成内容:', comp.label, comp.generatePrompt);
+                              
                             }}
                             title={comp.generatePrompt || '生成内容'}
                           >
