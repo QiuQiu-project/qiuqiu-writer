@@ -72,3 +72,4 @@ echo "3. 验证配置："
 echo "   curl http://localhost:8001/ai/health"
 echo ""
 
+

@@ -36,7 +36,8 @@ interface ChapterSettingsModalProps {
   onSave: (data: ChapterData) => void;
   onGenerateOutline?: () => string;
   onGenerateDetailOutline?: () => string;
-  onGenerateContent?: (content: string) => void;  // 生成内容回调
+  // content: 当前已生成的完整文本；isFinal: 是否为最终完成（可用于结束后保存等）
+  onGenerateContent?: (content: string, isFinal?: boolean) => void;  // 生成内容回调（支持流式）
 }
 
 export default function ChapterSettingsModal({
@@ -374,11 +375,12 @@ export default function ChapterSettingsModal({
                         alert('请先填写大纲和细纲');
                         return;
                       }
-                      
                       setIsGeneratingContent(true);
                       try {
                         const { generateChapterContent } = await import('../../utils/bookAnalysisApi');
-                        const content = await generateChapterContent(
+                        let fullContent = '';
+
+                        await generateChapterContent(
                           outline,
                           detailOutline,
                           title || undefined,
@@ -387,9 +389,24 @@ export default function ChapterSettingsModal({
                             return char?.name || id;
                           }),
                           locations,
+                          // 流式回调：每次追加新片段，并实时通知外层填充到编辑器
+                          (progress) => {
+                            if (progress.text) {
+                              fullContent += progress.text;
+                              // 过程中不断把当前完整内容推送给外层，实时更新界面
+                              onGenerateContent(fullContent, false);
+                            }
+                            if (progress.status === 'done') {
+                              // 结束时再推送一次，标记为最终内容，方便外层做保存等处理
+                              onGenerateContent(fullContent, true);
+                            }
+                          },
+                          {
+                            // 可根据需要传入模型等设置，这里先使用默认配置
+                          },
                         );
-                        onGenerateContent(content);
-                        alert('章节内容生成完成！已填充到编辑器中。');
+
+                        alert('章节内容生成完成！已流式填充到编辑器中。');
                         onClose(); // 关闭弹窗
                       } catch (error) {
                         console.error('生成内容失败:', error);

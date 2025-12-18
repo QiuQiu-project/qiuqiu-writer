@@ -25,58 +25,7 @@ DEFAULT_SYSTEM_PROMPT = """
 
 # 默认章节分析提示词
 DEFAULT_ANALYSIS_PROMPT = """
- 章节内容
-{content}
 
-# 任务
-基于上述章节内容，你必须仔细阅读并深入理解这些章节，然后以严格的JSON格式分析和提取章节信息。
-
-# 关键要求
-1. **必须只输出有效的JSON格式**，不要使用Markdown代码块，不要添加任何解释性文字，JSON前后不要有任何其他文字
-2. **所有字符串字段必须填写** - 如果信息不可用，使用空字符串 ""，字符串字段永远不要使用 null
-3. **所有数组字段必须是数组** - 如果没有项目，使用空数组 []，永远不要使用 null
-4. 章节号必须是整数（数字），不能是字符串
-5. 为内容中的每一章提取 chapter_number、title、outline 和 detailed_outline
-
-# 字段详细要求
-
-## "chapters" 数组 - 必需
-每个章节对象必须包含所有四个必需字段：
-[
-  {{
-    "chapter_number": "整数（必需）- 章节号必须是整数，不能是字符串。从内容中提取（例如：'第1章' -> 1, 'Chapter 2' -> 2），如果找不到则使用 0",
-    "title": "字符串（必需）- 从内容中提取的章节标题，如果找不到则使用空字符串 ''",
-    "outline": "字符串（必需）- 章节大纲，必须是文本描述格式（纯文本字符串）大纲是章节的概要信息，用自然语言描述章节的核心功能、关键情节点、画面感、氛围和结尾钩子等概括性内容。应该是一段连贯的文本描述，清晰简洁地概括章节的整体结构和主要信息。如果找不到则使用空字符串 ''",
-    "detailed_outline": "字符串（必需）- 章节细纲，必须是文本描述格式（纯文本字符串）。细纲是章节的具体情节信息，用自然语言详细描述每个小节的具体内容、情节发展、人物行动、对话要点等细节。应该是一段或多段详细的文本描述，深入描述章节的具体情节展开。如果找不到则使用空字符串 ''"
-  }}
-]
-
-# 重要说明
-- **大纲（outline）**：是章节的概要信息，用自然语言文本描述章节的核心功能、关键情节点、画面感、氛围和结尾钩子等概括性内容，用于快速了解章节的整体结构和主要信息。必须是纯文本格式。
-- **细纲（detailed_outline）**：是章节的具体情节信息，用自然语言文本详细描述每个小节的具体内容、情节发展、人物行动、对话要点等细节，用于深入了解章节的具体情节展开。必须是纯文本格式。
-
-# 输出格式 - 严格JSON格式
-你必须只输出以下JSON结构，不要添加任何其他文字，不要使用Markdown代码块，不要添加解释：
-
-{{
-  "chapters": [
-    {{
-      "chapter_number": 0,
-      "title": "",
-      "outline": "",
-      "detailed_outline": ""
-    }}
-  ]
-}}
-
-# 最终提醒
-- 只输出上述JSON对象，只包含 "chapters" 数组
-- 每个章节必须包含 chapter_number（整数）、title（字符串）、outline（文本）、detailed_outline（文本）
-- 用适当的值或空字符串填充所有字段
-- JSON前后不要有任何文字
-- 不要使用Markdown代码块标记（```json 或 ```）
-- 不要添加解释或注释
-- 直接以 {{ 开始，以 }} 结束
 """
 
 
@@ -85,9 +34,9 @@ class AIService:
 
     def __init__(self):
         """初始化AI服务"""
-        self.api_key = os.getenv("OPENAI_API_KEY")
-        self.base_url = os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1")
-        self.default_model = os.getenv("DEFAULT_AI_MODEL", "gpt-3.5-turbo")
+        self.api_key = os.getenv("OPENAI_API_KEY","sk-5b8dc562ef4647738b008c011bbf4acc")
+        self.base_url = os.getenv("OPENAI_API_BASE", "https://api.deepseek.com/v1")
+        self.default_model = os.getenv("DEFAULT_AI_MODEL", "deepseek-chat")
 
         if not self.api_key:
             logger.warning("OPENAI_API_KEY not set, AI service may not work properly")
@@ -100,15 +49,7 @@ class AIService:
 
         # 可用的模型列表（包含默认模型）
         self.available_models = [
-            "gpt-3.5-turbo",
-            "gpt-4",
-            "gpt-4-turbo-preview",
-            "gpt-4o",
             "deepseek-chat",  # DeepSeek 通用对话模型
-            "deepseek-reasoner",  # DeepSeek 推理模型
-            "claude-3-sonnet",
-            "claude-3-opus",
-            "codedrive-chat",  # 添加自定义模型
         ]
         
         # 确保默认模型在可用列表中
@@ -165,13 +106,16 @@ class AIService:
                 yield f"data: {error_msg}\n\n"
                 return
 
+            # 如果没有显式传入模型，使用服务的默认模型，避免向接口发送 null
+            model_name = model or self.default_model
+
             # 发送开始消息（包含配置信息）
             start_time = datetime.now(timezone.utc)
             start_msg = json.dumps({
                 "type": "start", 
                 "message": "开始分析章节内容...",
                 "metadata": {
-                    "model": model,
+                    "model": model_name,
                     "temperature": temperature,
                     "max_tokens": max_tokens,
                     "start_time": start_time.isoformat()
@@ -188,14 +132,14 @@ class AIService:
             user_content = user_prompt.replace("{content}", content)
 
             logger.info(
-                f"Starting chapter analysis with model: {model}, "
+                f"Starting chapter analysis with model: {model_name}, "
                 f"temperature: {temperature}, max_tokens: {max_tokens}"
             )
             logger.debug(f"System prompt length: {len(system_content)}, User prompt length: {len(user_content)}")
 
-            # 调用OpenAI API进行流式生成
+            # 调用OpenAI/DeepSeek 兼容 API 进行流式生成
             response = await self.client.chat.completions.create(
-                model=model,
+                model=model_name,
                 messages=[
                     {
                         "role": "system",
@@ -207,10 +151,12 @@ class AIService:
                 max_tokens=max_tokens,
                 stream=True,
             )
-
+            print(response)
             # 用于统计
             total_tokens = 0
             completion_tokens = 0
+            # 收集完整内容，方便调试 DeepSeek 返回格式问题
+            full_text = ""
             
             # 流式返回生成的内容
             async for chunk in response:
@@ -220,6 +166,7 @@ class AIService:
                         chunk_msg = json.dumps({"type": "chunk", "content": delta.content})
                         yield f"data: {chunk_msg}\n\n"
                         completion_tokens += 1  # 粗略估算
+                        full_text += delta.content
                 
                 # 尝试获取usage信息（部分API会在最后一个chunk返回）
                 if hasattr(chunk, 'usage') and chunk.usage:
@@ -229,12 +176,20 @@ class AIService:
             end_time = datetime.now(timezone.utc)
             duration = (end_time - start_time).total_seconds()
 
+            # 调试日志：打印完整的 AI 返回内容（截断避免过长）
+            if full_text:
+                preview = full_text[:2000]
+                logger.info(
+                    f"Full AI response text (truncated to 2000 chars): {preview}"
+                )
+                print(preview)
+
             # 发送完成消息（包含统计信息）
             done_msg = json.dumps({
                 "type": "done", 
                 "message": "分析完成",
                 "metadata": {
-                    "model": model,
+                    "model": model_name,
                     "temperature": temperature,
                     "max_tokens": max_tokens,
                     "duration": round(duration, 2),

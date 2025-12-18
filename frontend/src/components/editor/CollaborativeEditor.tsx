@@ -55,7 +55,7 @@ export function CollaborativeEditor({
     }
   })
 
-  // Yjs会自动同步，不需要手动更新
+      // Yjs会自动同步，不需要手动更新
   // Collaboration 扩展会自动处理 Yjs 文档的同步
 
   if (!editor) {

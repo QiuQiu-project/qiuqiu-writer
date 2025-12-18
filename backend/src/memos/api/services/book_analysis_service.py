@@ -319,13 +319,24 @@ class BookAnalysisService:
             
             # 解析JSON
             data = json.loads(json_str)
+
+            # 兼容两种结构：
+            # 1）单章节对象：{ "chapter_number": ..., "title": ..., "outline": ..., "detailed_outline": ... }
+            # 2）包装对象：{ "chapters": [ { ...单章节对象... } ] }
+            if "chapters" in data and isinstance(data["chapters"], list) and data["chapters"]:
+                chapter_data = data["chapters"][0] or {}
+                if not isinstance(chapter_data, dict):
+                    logger.warning("AI响应中 chapters[0] 不是对象，无法解析为单章节数据")
+                    return None
+            else:
+                chapter_data = data
             
-            # 验证必需字段
-            if "chapter_number" not in data:
-                logger.warning("AI响应中缺少 chapter_number 字段")
-                return None
+            # 验证必需字段：如果缺少 chapter_number，记录告警但使用默认值 0，而不是直接失败
+            if "chapter_number" not in chapter_data:
+                logger.warning("AI响应中缺少 chapter_number 字段，将使用 0 作为默认章节号")
+                chapter_data["chapter_number"] = 0
             
-            return data
+            return chapter_data
             
         except json.JSONDecodeError as e:
             logger.error(f"JSON解析失败: {e}")
