@@ -28,7 +28,7 @@ export default function HomeSideNav() {
             >
               <Icon size={18} />
               <span>{item.label}</span>
-              {item.badge && <span className="badge">New</span>}
+              {/* 如果以后需要 badge，可以给 navItems 增加 badge 字段并扩展类型 */}
             </Link>
           );
         })}

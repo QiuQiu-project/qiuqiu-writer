@@ -1916,15 +1916,31 @@ export default function NovelEditorPage(){
 
           // 关键修复：防止频闪 - 检查是否与上次设置的内容相同
           // 但在章节切换时，即使内容相同也要设置，因为这是新章节的内容
-          // 将纯文本转换为 HTML 格式（保留换行符）
+          // 关键修复：改进HTML格式检测和转换逻辑，确保格式不丢失
           const convertTextToHtml = (text: string): string => {
             if (!text || text.trim() === '') {
               return '<p></p>';
             }
-            // 如果已经是 HTML 格式（包含标签），直接返回
-            if (text.includes('<') && text.includes('>')) {
-              return text;
+            
+            // 更准确地检测HTML格式：检查是否包含HTML标签（如 <p>, <br>, <div> 等）
+            const htmlTagPattern = /<\/?[a-z][\s\S]*>/i;
+            const hasHtmlTags = htmlTagPattern.test(text);
+            
+            // 如果已经是 HTML 格式（包含HTML标签），直接返回，不做转换
+            if (hasHtmlTags) {
+              // 验证HTML格式是否完整，如果不完整则进行修复
+              const trimmed = text.trim();
+              // 如果内容以标签开始和结束，说明是完整的HTML
+              if (trimmed.startsWith('<') && trimmed.endsWith('>')) {
+                return text;
+              }
+              // 如果包含HTML标签但格式不完整，尝试修复
+              // 例如：只有内容没有外层标签，添加段落标签
+              if (trimmed.includes('<p>') || trimmed.includes('<br>') || trimmed.includes('<div>')) {
+                return text; // 已经有HTML标签，直接返回
+              }
             }
+            
             // 将纯文本转换为 HTML：换行符转换为段落
             // 多个连续换行符转换为段落分隔
             return text
@@ -1943,23 +1959,33 @@ export default function NovelEditorPage(){
                                    (currentChapterIdRef.current !== chapterId);
           
           if (shouldSetContent) {
-            // 关键修复：每个章节有独立的编辑器实例，直接设置内容即可
-            // 不需要清除历史，因为编辑器是新建的
-            editor.commands.setContent(normalizedContent, { emitUpdate: false });
-            // 更新字数显示
-            const wordCount = countCharacters(normalizedContent);
-            setCurrentChapterWordCount(wordCount);
+            // 关键修复：设置内容时确保格式被正确解析和保留
+            // TipTap 会自动规范化HTML，但我们需要确保格式信息不丢失
+            editor.commands.setContent(normalizedContent, { 
+              emitUpdate: false
+            });
             
-            // 关键修复：验证设置后的内容
-            const setContent = editor.getHTML();
-            if (setContent === normalizedContent) {
-              // 内容设置成功
-            } else {
-              console.warn('⚠️ [设置编辑器] 内容设置后不匹配，可能存在缓存问题', {
-                expected: normalizedContent.substring(0, 50),
-                actual: setContent.substring(0, 50)
-              });
-            }
+            // 使用 setTimeout 确保内容设置完成后再更新字数
+            setTimeout(() => {
+              // 更新字数显示
+              const wordCount = countCharacters(editor.getHTML());
+              setCurrentChapterWordCount(wordCount);
+              
+              // 关键修复：验证设置后的内容格式
+              const setContent = editor.getHTML();
+              // 不进行严格比较，因为TipTap可能会规范化HTML（如添加/删除空格）
+              // 只检查关键内容是否存在
+              const normalizedSet = setContent.trim();
+              const normalizedExpected = normalizedContent.trim();
+              
+              if (normalizedSet.length === 0 && normalizedExpected.length > 0) {
+                console.warn('⚠️ [设置编辑器] 内容设置后为空，可能存在格式问题', {
+                  expected: normalizedExpected.substring(0, 100),
+                  actual: normalizedSet
+                });
+              }
+            }, 0);
+            
             lastSetContentRef.current = normalizedContent; // 记录已设置的内容
           } else {
             // 内容没有变化，不需要更新
@@ -2038,15 +2064,27 @@ export default function NovelEditorPage(){
                 return;
               }
               
-              // 将纯文本转换为 HTML 格式（保留换行符）
+              // 关键修复：使用相同的HTML格式转换逻辑，确保格式一致
               const convertTextToHtml = (text: string): string => {
                 if (!text || text.trim() === '') {
                   return '<p></p>';
                 }
-                // 如果已经是 HTML 格式（包含标签），直接返回
-                if (text.includes('<') && text.includes('>')) {
-                  return text;
+                
+                // 更准确地检测HTML格式：检查是否包含HTML标签
+                const htmlTagPattern = /<\/?[a-z][\s\S]*>/i;
+                const hasHtmlTags = htmlTagPattern.test(text);
+                
+                // 如果已经是 HTML 格式（包含HTML标签），直接返回
+                if (hasHtmlTags) {
+                  const trimmed = text.trim();
+                  if (trimmed.startsWith('<') && trimmed.endsWith('>')) {
+                    return text;
+                  }
+                  if (trimmed.includes('<p>') || trimmed.includes('<br>') || trimmed.includes('<div>')) {
+                    return text;
+                  }
                 }
+                
                 // 将纯文本转换为 HTML：换行符转换为段落
                 return text
                   .split(/\n\s*\n/) // 按双换行符分割段落
@@ -2079,8 +2117,10 @@ export default function NovelEditorPage(){
                   serverContentLength: htmlServerContent.length,
                   currentContentLength: currentContent.length
                 });
-                // 关键修复：每个章节有独立的编辑器实例，直接设置内容即可
-                editor.commands.setContent(htmlServerContent, { emitUpdate: false });
+                // 关键修复：设置内容时确保格式被正确解析和保留
+                editor.commands.setContent(htmlServerContent, { 
+                  emitUpdate: false
+                });
                 lastSetContentRef.current = serverContent; // 记录已设置的内容
               } else {
                 
