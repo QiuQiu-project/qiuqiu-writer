@@ -180,7 +180,28 @@ class WorkService:
         # 更新字段
         for key, value in kwargs.items():
             if hasattr(work, key):
-                setattr(work, key, value)
+                # 对于 metadata 字段，进行深度合并而不是完全替换
+                if key == "metadata" and isinstance(value, dict):
+                    current_metadata = work.work_metadata or {}
+                    # 深度合并 metadata
+                    def deep_merge(target: dict, source: dict):
+                        """深度合并两个字典"""
+                        for k, v in source.items():
+                            # 特殊处理：如果源值是空数组，且目标值已有数据，则保留目标值
+                            if k == "characters" and isinstance(v, list) and len(v) == 0:
+                                if k in target and isinstance(target[k], list) and len(target[k]) > 0:
+                                    # 保留现有的角色数据，不覆盖为空数组
+                                    continue
+                            if k in target and isinstance(target[k], dict) and isinstance(v, dict):
+                                deep_merge(target[k], v)
+                            else:
+                                target[k] = v
+                        return target
+                    
+                    merged_metadata = deep_merge(current_metadata.copy(), value)
+                    setattr(work, "work_metadata", merged_metadata)
+                else:
+                    setattr(work, key, value)
 
         await self.db.commit()
         await self.db.refresh(work)

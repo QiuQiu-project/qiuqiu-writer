@@ -84,6 +84,15 @@ export interface WorkUpdate {
   status?: string;
   is_public?: boolean;
   word_count?: number;
+  metadata?: {
+    characters?: Array<{
+      name: string;
+      display_name?: string;
+      description?: string;
+      [key: string]: any;
+    }>;
+    [key: string]: any;
+  };
 }
 
 export interface WorkListResponse {
@@ -227,14 +236,6 @@ class WorksApiClient extends BaseApiClient {
     include_collaborators?: boolean,
     include_chapters?: boolean
   ): Promise<Work> {
-    const queryParams = new URLSearchParams();
-    if (include_collaborators !== undefined) {
-      queryParams.append('include_collaborators', String(include_collaborators));
-    }
-    if (include_chapters !== undefined) {
-      queryParams.append('include_chapters', String(include_chapters));
-    }
-    const query = queryParams.toString();
     const response = await this.get<any>(`/api/v1/works/${workId}`, {
       include_collaborators,
       include_chapters,

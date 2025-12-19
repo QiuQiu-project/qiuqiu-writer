@@ -713,6 +713,25 @@ class MOSProduct(MOSCore):
                 user_id=user_id, mem_cube_id=cube_id, query=clean_response, label=ANSWER_LABEL
             )
 
+            # 确保 cube_id 有效，如果为 None 或不存在，使用用户的默认 cube
+            actual_cube_id = cube_id
+            if not actual_cube_id or actual_cube_id not in self.mem_cubes:
+                # 获取用户的默认 cube
+                accessible_cubes = self.user_manager.get_user_cubes(user_id)
+                if accessible_cubes:
+                    actual_cube_id = accessible_cubes[0].cube_id
+                    # 如果默认 cube 还没有加载，尝试加载它
+                    if actual_cube_id not in self.mem_cubes:
+                        self._load_user_cubes(user_id, self.default_cube_config)
+                else:
+                    logger.warning(f"用户 {user_id} 没有可用的 cube，跳过保存聊天记录")
+                    return
+
+            # 再次检查 cube 是否已加载
+            if actual_cube_id not in self.mem_cubes:
+                logger.error(f"MemCube '{actual_cube_id}' 仍然未加载，无法保存聊天记录")
+                return
+
             self.add(
                 user_id=user_id,
                 messages=[
@@ -727,7 +746,7 @@ class MOSProduct(MOSCore):
                         "chat_time": str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
                     },
                 ],
-                mem_cube_id=cube_id,
+                mem_cube_id=actual_cube_id,
             )
 
             logger.info(f"Post-chat processing completed for user {user_id}")

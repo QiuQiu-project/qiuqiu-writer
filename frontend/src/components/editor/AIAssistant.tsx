@@ -31,10 +31,11 @@ interface Mention {
 }
 
 interface MentionOption {
-  type: 'chapter' | 'character';
+  type: 'chapter' | 'character' | 'command';
   id: number | string; // 角色可能使用name作为id
   name: string;
   subtitle?: string;
+  isCommand?: boolean; // 是否为指令选项
 }
 
 interface CharacterFromMetadata {
@@ -154,38 +155,117 @@ export default function AIAssistant({ workId }: AIAssistantProps) {
       } else {
         const query = textAfterAt.toLowerCase();
         
+        // 检测是否是角色关键词（character、cha、角色等）
+        // 支持前缀匹配：cha 匹配 character，chap 匹配 chapter
+        const characterKeywords = ['character', 'cha', '角色', 'juese', 'js'];
+        const chapterKeywords = ['chapter', 'chap', '章节', 'zhangjie', 'zj'];
+        
+        // 检查查询是否匹配关键词（支持前缀匹配）
+        const isCharacterKeyword = characterKeywords.some(keyword => {
+          return keyword.toLowerCase().startsWith(query) || 
+                 query.startsWith(keyword.toLowerCase());
+        });
+        const isChapterKeyword = chapterKeywords.some(keyword => {
+          return keyword.toLowerCase().startsWith(query) || 
+                 query.startsWith(keyword.toLowerCase());
+        });
+        
         // 构建提及选项
         const options: MentionOption[] = [];
         
-        // 添加章节选项
-        chapters
-          .filter(ch => ch.title.toLowerCase().includes(query) || 
-                   ch.chapter_number.toString().includes(query))
-          .forEach(ch => {
-            options.push({
-              type: 'chapter',
-              id: ch.id,
-              name: ch.title,
-              subtitle: `第${ch.chapter_number}章`,
-            });
-          });
+        // 检查是否已经输入了完整的指令（chapter 或 character）
+        const hasChapterCommand = /^chapter\s*$|^chap\s*$|^章节\s*$|^zj\s*$/i.test(query);
+        const hasCharacterCommand = /^character\s*$|^cha\s*$|^角色\s*$|^js\s*$/i.test(query);
+        const hasPartialChapterCommand = /^(chapter|chap|章节|zj)/i.test(query) && !hasChapterCommand;
+        const hasPartialCharacterCommand = /^(character|cha|角色|js)/i.test(query) && !hasCharacterCommand;
         
-        // 添加角色选项（从作品metadata中获取）
-        characters
-          .filter(char => {
-            const name = char.name || '';
-            const displayName = char.display_name || '';
-            return name.toLowerCase().includes(query) || 
-                   displayName.toLowerCase().includes(query);
-          })
-          .forEach((char, index) => {
-            options.push({
-              type: 'character',
-              id: char.name || `character_${index}`, // 使用name作为唯一标识
-              name: char.display_name || char.name || '未命名角色',
-              subtitle: char.description ? char.description.substring(0, 30) : undefined,
-            });
+        // 如果查询为空，先显示指令选项
+        if (!query) {
+          options.push({
+            type: 'command',
+            id: 'chapter',
+            name: 'chapter',
+            subtitle: '选择章节',
+            isCommand: true,
           });
+          options.push({
+            type: 'command',
+            id: 'character',
+            name: 'character',
+            subtitle: '选择角色',
+            isCommand: true,
+          });
+        }
+        // 如果输入了完整的指令，显示对应的内容列表
+        else if (hasChapterCommand || hasPartialChapterCommand) {
+          // 显示章节列表
+          const remainingQuery = query.replace(/^(chapter|chap|章节|zj)\s*/i, '').trim();
+          chapters
+            .filter(ch => {
+              if (!remainingQuery) return true;
+              return ch.title.toLowerCase().includes(remainingQuery) || 
+                     ch.chapter_number.toString().includes(remainingQuery);
+            })
+            .forEach(ch => {
+              options.push({
+                type: 'chapter',
+                id: ch.id,
+                name: ch.title,
+                subtitle: `第${ch.chapter_number}章`,
+              });
+            });
+        }
+        else if (hasCharacterCommand || hasPartialCharacterCommand) {
+          // 显示角色列表
+          const remainingQuery = query.replace(/^(character|cha|角色|js)\s*/i, '').trim();
+          characters
+            .filter(char => {
+              if (!remainingQuery) return true;
+              const name = char.name || '';
+              const displayName = char.display_name || '';
+              return name.toLowerCase().includes(remainingQuery) || 
+                     displayName.toLowerCase().includes(remainingQuery);
+            })
+            .forEach((char, index) => {
+              // 构建角色详细信息作为副标题
+              const subtitleParts: string[] = [];
+              if (char.type) subtitleParts.push(char.type);
+              if (char.gender) subtitleParts.push(char.gender);
+              if (char.description) {
+                subtitleParts.push(char.description.substring(0, 30));
+              }
+              const subtitle = subtitleParts.length > 0 ? subtitleParts.join(' · ') : undefined;
+              
+              options.push({
+                type: 'character',
+                id: char.name || `character_${index}`,
+                name: char.display_name || char.name || '未命名角色',
+                subtitle: subtitle,
+              });
+            });
+        }
+        // 如果输入的是部分指令关键词，显示匹配的指令选项
+        else {
+          // 检查是否匹配指令关键词的前缀
+          if (chapterKeywords.some(k => k.toLowerCase().startsWith(query))) {
+            options.push({
+              type: 'command',
+              id: 'chapter',
+              name: 'chapter',
+              subtitle: '选择章节',
+              isCommand: true,
+            });
+          }
+          if (characterKeywords.some(k => k.toLowerCase().startsWith(query))) {
+            options.push({
+              type: 'command',
+              id: 'character',
+              name: 'character',
+              subtitle: '选择角色',
+              isCommand: true,
+            });
+          }
+        }
         
         setMentionOptions(options);
         setSelectedMentionIndex(0);
@@ -258,6 +338,77 @@ export default function AIAssistant({ workId }: AIAssistantProps) {
       }
     }
     
+    // 即使菜单没有显示，如果输入了 @ 并且有匹配项，Tab 键也能自动补全
+    if (e.key === 'Tab' && !showMentionMenu && textareaRef.current) {
+      const textarea = textareaRef.current;
+      const cursorPos = textarea.selectionStart;
+      const textBeforeCursor = message.substring(0, cursorPos);
+      const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+      
+      if (lastAtIndex !== -1) {
+        const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
+        // 检查是否有部分输入且没有空格或换行
+        if (textAfterAt && !textAfterAt.includes(' ') && !textAfterAt.includes('\n')) {
+          const query = textAfterAt.toLowerCase();
+          
+          // 快速查找匹配项
+          const characterKeywords = ['character', 'cha', '角色', 'juese', 'js'];
+          const chapterKeywords = ['chapter', 'chap', '章节', 'zhangjie', 'zj'];
+          
+          const isCharacterKeyword = characterKeywords.some(keyword => 
+            keyword.toLowerCase().startsWith(query) || query.startsWith(keyword.toLowerCase())
+          );
+          const isChapterKeyword = chapterKeywords.some(keyword => 
+            keyword.toLowerCase().startsWith(query) || query.startsWith(keyword.toLowerCase())
+          );
+          
+          // 查找匹配的选项
+          let matchedOption: MentionOption | null = null;
+          
+          if (isCharacterKeyword || !isChapterKeyword) {
+            // 优先查找角色
+            const matchedChar = characters.find(char => {
+              if (isCharacterKeyword) return true;
+              const name = char.name || '';
+              const displayName = char.display_name || '';
+              return name.toLowerCase().startsWith(query) || 
+                     displayName.toLowerCase().startsWith(query);
+            });
+            if (matchedChar) {
+              matchedOption = {
+                type: 'character',
+                id: matchedChar.name || '',
+                name: matchedChar.display_name || matchedChar.name || '未命名角色',
+              };
+            }
+          }
+          
+          if (!matchedOption && (isChapterKeyword || !isCharacterKeyword)) {
+            // 查找章节
+            const matchedChapter = chapters.find(ch => {
+              if (isChapterKeyword) return true;
+              return ch.title.toLowerCase().startsWith(query) || 
+                     ch.chapter_number.toString().startsWith(query);
+            });
+            if (matchedChapter) {
+              matchedOption = {
+                type: 'chapter',
+                id: matchedChapter.id,
+                name: matchedChapter.title,
+                subtitle: `第${matchedChapter.chapter_number}章`,
+              };
+            }
+          }
+          
+          if (matchedOption) {
+            e.preventDefault();
+            handleSelectMention(matchedOption);
+            return;
+          }
+        }
+      }
+    }
+    
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       handleSend();
@@ -273,25 +424,50 @@ export default function AIAssistant({ workId }: AIAssistantProps) {
     const lastAtIndex = textBeforeCursor.lastIndexOf('@');
     
     if (lastAtIndex !== -1) {
-      // 使用ID格式：@chapter:123 或 @character:角色名称
-      const mentionText = option.type === 'chapter' 
-        ? `@chapter:${option.id}`
-        : `@character:${option.name}`; // 角色使用名称作为标识
-      
-      const newMessage = 
-        message.substring(0, lastAtIndex) + 
-        mentionText + ' ' + 
-        message.substring(cursorPos);
-      
-      setMessage(newMessage);
-      setShowMentionMenu(false);
-      
-      // 设置光标位置
-      setTimeout(() => {
-        const newCursorPos = lastAtIndex + mentionText.length + 1;
-        textarea.setSelectionRange(newCursorPos, newCursorPos);
-        textarea.focus();
-      }, 0);
+      // 如果选择的是指令，则插入指令名称并继续显示对应的内容列表
+      if (option.isCommand) {
+        const commandText = `@${option.name} `;
+        const newMessage = 
+          message.substring(0, lastAtIndex) + 
+          commandText + 
+          message.substring(cursorPos);
+        
+        setMessage(newMessage);
+        
+        // 设置光标位置并手动触发输入处理以显示内容列表
+        setTimeout(() => {
+          const newCursorPos = lastAtIndex + commandText.length;
+          textarea.setSelectionRange(newCursorPos, newCursorPos);
+          textarea.focus();
+          
+          // 手动触发输入处理逻辑
+          const syntheticEvent = {
+            target: textarea,
+            currentTarget: textarea,
+          } as React.ChangeEvent<HTMLTextAreaElement>;
+          handleInputChange(syntheticEvent);
+        }, 0);
+      } else {
+        // 如果选择的是内容，则插入完整的提及格式
+        const mentionText = option.type === 'chapter' 
+          ? `@chapter:${option.id}`
+          : `@character:${option.name}`; // 角色使用名称作为标识
+        
+        const newMessage = 
+          message.substring(0, lastAtIndex) + 
+          mentionText + ' ' + 
+          message.substring(cursorPos);
+        
+        setMessage(newMessage);
+        setShowMentionMenu(false);
+        
+        // 设置光标位置
+        setTimeout(() => {
+          const newCursorPos = lastAtIndex + mentionText.length + 1;
+          textarea.setSelectionRange(newCursorPos, newCursorPos);
+          textarea.focus();
+        }, 0);
+      }
     }
   };
 
@@ -353,11 +529,31 @@ export default function AIAssistant({ workId }: AIAssistantProps) {
         }
 
         if (mention) {
+          // 获取角色详细信息用于提示
+          let tooltip = '';
+          if (mention.type === 'character') {
+            const character = characters.find(char => 
+              char.name === identifier || char.display_name === identifier
+            );
+            if (character) {
+              const parts = [];
+              if (character.description) parts.push(`简介：${character.description}`);
+              if (character.gender) parts.push(`性别：${character.gender}`);
+              if (character.type) parts.push(`类型：${character.type}`);
+              tooltip = parts.join('\n') || '角色信息';
+            } else {
+              tooltip = '角色信息';
+            }
+          } else {
+            const chapter = chapters.find(ch => ch.id === parseInt(identifier, 10));
+            tooltip = chapter ? `章节：${chapter.title}` : '章节信息';
+          }
+          
           parts.push(
             <span 
               key={match.index}
               className={`mention-tag mention-${mention.type}`}
-              title={mention.type === 'chapter' ? '章节' : '角色'}
+              title={tooltip}
             >
               {mention.type === 'chapter' ? '📖' : '👤'} {mention.name}
             </span>
@@ -413,11 +609,30 @@ export default function AIAssistant({ workId }: AIAssistantProps) {
           name = character ? (character.display_name || character.name) : identifier;
         }
 
+        // 获取详细信息用于提示
+        let tooltip = '';
+        if (type === 'character') {
+          const character = characters.find(char => 
+            char.name === identifier || char.display_name === identifier
+          );
+          if (character) {
+            const parts = [];
+            if (character.description) parts.push(`简介：${character.description}`);
+            if (character.gender) parts.push(`性别：${character.gender}`);
+            if (character.type) parts.push(`类型：${character.type}`);
+            tooltip = parts.join('\n') || '角色信息';
+          } else {
+            tooltip = '角色信息';
+          }
+        } else {
+          tooltip = name;
+        }
+
         parts.push(
           <span 
             key={match.index}
             className={`mention-tag mention-${type}`}
-            title={type === 'chapter' ? '章节' : '角色'}
+            title={tooltip}
           >
             {type === 'chapter' ? '📖' : '👤'} {name}
           </span>
@@ -726,7 +941,9 @@ export default function AIAssistant({ workId }: AIAssistantProps) {
                                 onMouseEnter={() => setSelectedMentionIndex(idx)}
                               >
                                 <div className="mention-option-icon">
-                                  {option.type === 'chapter' ? (
+                                  {option.isCommand ? (
+                                    <span style={{ fontSize: '16px' }}>⚡</span>
+                                  ) : option.type === 'chapter' ? (
                                     <BookOpen size={16} />
                                   ) : (
                                     <User size={16} />
@@ -739,13 +956,19 @@ export default function AIAssistant({ workId }: AIAssistantProps) {
                                   )}
                                 </div>
                                 <div className="mention-option-type">
-                                  {option.type === 'chapter' ? '章节' : '角色'}
+                                  {option.isCommand ? '指令' : option.type === 'chapter' ? '章节' : '角色'}
                                 </div>
                               </div>
                             ))}
                           </div>
                           <div className="mention-menu-footer">
-                            <span>↑↓ 选择，Enter 确认，Esc 取消</span>
+                            <span>↑↓ 选择</span>
+                            <kbd>Tab</kbd>
+                            <span>/</span>
+                            <kbd>Enter</kbd>
+                            <span>补全</span>
+                            <kbd>Esc</kbd>
+                            <span>取消</span>
                           </div>
                         </>
                       ) : (

@@ -9,6 +9,7 @@ import {
 import CharacterRelations from './CharacterRelations';
 import type { CharacterRelationsData } from './CharacterRelations';
 import { templatesApi } from '../../utils/templatesApi';
+import { worksApi } from '../../utils/worksApi';
 import './WorkInfoManager.css';
 
 // 势力数据类型
@@ -696,53 +697,50 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
       if (!workId) {
         // 如果没有 workId，从本地缓存加载
         const cached = loadFromCache(null);
-    if (cached) {
-      const baseTemplate = presetTemplates.find(t => t.id === cached.templateId) || presetTemplates[0];
-      setTemplate({
-        ...baseTemplate,
-        modules: cached.modules
-      });
-    } else {
-      setTemplate(JSON.parse(JSON.stringify(presetTemplates[0])));
-    }
+        if (cached) {
+          const baseTemplate = presetTemplates.find(t => t.id === cached.templateId) || presetTemplates[0];
+          setTemplate({
+            ...baseTemplate,
+            modules: cached.modules
+          });
+        } else {
+          setTemplate(JSON.parse(JSON.stringify(presetTemplates[0])));
+        }
         return;
       }
 
       try {
-        // 尝试从数据库加载
-        const response = await templatesApi.getWorkTemplateConfig(Number(workId));
+        // 从作品的 metadata 字段加载模板配置
+        const workData = await worksApi.getWork(Number(workId));
+        const templateConfig = workData.metadata?.template_config;
         
-        
-        if (response.template_config && 
-            response.template_config.templateId && 
-            response.template_config.modules &&
-            Array.isArray(response.template_config.modules)) {
-          // 从数据库加载成功
+        if (templateConfig && 
+            templateConfig.templateId && 
+            templateConfig.modules &&
+            Array.isArray(templateConfig.modules)) {
+          // 从作品 metadata 加载成功
           
           
           
           
           // 尝试找到对应的预设模板或数据库模板
-          let baseTemplate = presetTemplates.find(t => t.id === response.template_config!.templateId);
+          let baseTemplate = presetTemplates.find(t => t.id === templateConfig.templateId);
           
           // 如果不是预设模板，尝试从数据库模板列表中找到（需要等待 userTemplates 加载）
-          if (!baseTemplate && response.template_config.templateId.startsWith('db-')) {
+          if (!baseTemplate && templateConfig.templateId.startsWith('db-')) {
             // 延迟加载，等待 userTemplates 加载完成
-            if (response.template_config) {
-              setTimeout(() => {
-                const dbTemplateId = parseInt(response.template_config!.templateId.replace('db-', ''));
-                const dbTemplate = userTemplates.find(t => t.id === dbTemplateId);
-                if (dbTemplate && response.template_config) {
-                  
-                  setTemplate({
-                    id: `db-${dbTemplate.id}`,
-                    name: dbTemplate.name,
-                    description: dbTemplate.description || '',
-                    modules: response.template_config.modules
-                  });
-                }
-              }, 500);
-            }
+            setTimeout(() => {
+              const dbTemplateId = parseInt(templateConfig.templateId.replace('db-', ''));
+              const dbTemplate = userTemplates.find(t => t.id === dbTemplateId);
+              if (dbTemplate) {
+                setTemplate({
+                  id: `db-${dbTemplate.id}`,
+                  name: dbTemplate.name,
+                  description: dbTemplate.description || '',
+                  modules: templateConfig.modules
+                });
+              }
+            }, 500);
             // 先使用默认模板结构
             baseTemplate = presetTemplates[0];
           }
@@ -754,15 +752,15 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
           
           setTemplate({
             ...baseTemplate,
-            modules: response.template_config.modules
+            modules: templateConfig.modules
           });
           
           // 同时更新本地缓存（使用模板ID作为key的一部分）
           saveToCache({
-            templateId: response.template_config.templateId,
-            modules: response.template_config.modules,
+            templateId: templateConfig.templateId,
+            modules: templateConfig.modules,
             lastModified: Date.now()
-          }, workId, response.template_config.templateId);
+          }, workId, templateConfig.templateId);
         } else {
           
           // 数据库中没有，尝试从本地缓存加载（尝试加载最近使用的模板）
@@ -803,6 +801,104 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
     loadTemplate();
   }, [workId]);
 
+  // 从模板中提取角色信息
+  const extractCharactersFromTemplate = useCallback((template: TemplateConfig): any[] => {
+    const characters: any[] = [];
+    
+    // 查找角色模块
+    const characterModule = template.modules.find(m => m.id === 'characters');
+    if (!characterModule) return characters;
+
+    // 查找角色卡片组件
+    const findCharacterCards = (components: ComponentConfig[]): any[] => {
+      const chars: any[] = [];
+      for (const comp of components) {
+        if (comp.type === 'character-card' && comp.value && Array.isArray(comp.value)) {
+          chars.push(...comp.value);
+        } else if (comp.type === 'tabs') {
+          // tabs 组件的结构：config.tabs 包含标签页配置，每个 tab 的 components 包含实际组件
+          if (comp.config && comp.config.tabs && Array.isArray(comp.config.tabs)) {
+            for (const tab of comp.config.tabs) {
+              if (tab.components && Array.isArray(tab.components)) {
+                chars.push(...findCharacterCards(tab.components));
+              }
+            }
+          }
+          // 也检查 value 中是否有 tabs（向后兼容）
+          if (comp.value && typeof comp.value === 'object' && 'tabs' in comp.value) {
+            const tabsValue = comp.value as any;
+            if (tabsValue.tabs && Array.isArray(tabsValue.tabs)) {
+              for (const tab of tabsValue.tabs) {
+                if (tab.components && Array.isArray(tab.components)) {
+                  chars.push(...findCharacterCards(tab.components));
+                }
+              }
+            }
+          }
+        }
+      }
+      return chars;
+    };
+
+    return findCharacterCards(characterModule.components);
+  }, []);
+
+  // 保存作品信息到 metadata（包括模板配置和角色信息）
+  const saveWorkInfoToMetadata = useCallback(async (template: TemplateConfig) => {
+    if (!workId) {
+      return;
+    }
+
+    try {
+      // 提取角色信息
+      console.log('🔍 开始提取角色信息，template 结构:', {
+        id: template.id,
+        modulesCount: template.modules?.length,
+        characterModule: template.modules?.find(m => m.id === 'characters')
+      });
+      
+      const characters = extractCharactersFromTemplate(template);
+      console.log('🔍 提取到的角色信息:', characters, '数量:', characters.length);
+      
+      // 构建要更新的 metadata（只包含要更新的字段，后端会合并）
+      const metadataUpdate: any = {
+        // 保存模板配置
+        template_config: {
+          templateId: template.id,
+          modules: template.modules,
+          lastModified: Date.now()
+        }
+      };
+
+      // 只有当有角色时才更新 characters 字段
+      if (characters.length > 0) {
+        metadataUpdate.characters = characters.map((char: any) => ({
+          name: char.name || '',
+          display_name: char.display_name || char.name || '',
+          description: char.description || '',
+          gender: char.gender || '',
+          type: char.type || '',
+          personality: char.personality || {},
+          appearance: char.appearance || {},
+          background: char.background || {},
+          ...char // 包含所有其他字段
+        }));
+        console.log('✅ 准备保存角色信息:', JSON.stringify(metadataUpdate.characters, null, 2));
+      } else {
+        console.log('⚠️ 未找到角色信息，跳过更新 characters 字段');
+      }
+
+      // 直接保存到数据库（PUT 请求会返回更新后的作品信息，后端会合并 metadata）
+      await worksApi.updateWork(Number(workId), {
+        metadata: metadataUpdate
+      });
+
+      console.log('✅ 作品信息已保存到 metadata 字段');
+    } catch (error) {
+      console.error('❌ 保存作品信息到 metadata 失败:', error);
+    }
+  }, [workId, extractCharactersFromTemplate]);
+
   // 自动保存到数据库和缓存（防抖，基于 workId）
   useEffect(() => {
     // 如果模板为空或没有模块，不保存
@@ -826,14 +922,14 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
         console.error('保存到本地缓存失败:', error);
       }
 
-      // 如果有 workId，同时保存到数据库
+      // 如果有 workId，直接保存到作品的 metadata 字段
       if (workId) {
         try {
-          const response = await templatesApi.saveWorkTemplateConfig(Number(workId), templateData);
-          
-      setHasUnsavedChanges(false);
+          // 使用统一的保存函数
+          await saveWorkInfoToMetadata(template);
+          setHasUnsavedChanges(false);
         } catch (error) {
-          console.error('❌ 保存模板配置到数据库失败:', error);
+          console.error('❌ 保存作品信息到 metadata 失败:', error);
           // 保存失败时保持未保存状态
           setHasUnsavedChanges(true);
           // 显示错误提示
@@ -851,7 +947,7 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
     return () => {
       clearTimeout(timer);
     };
-  }, [template, workId]);
+  }, [template, workId, saveWorkInfoToMetadata, extractCharactersFromTemplate]);
 
 
   // 更新组件值
@@ -921,14 +1017,17 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
     if (workId && userTemplates.length > 0) {
       const reloadTemplate = async () => {
         try {
-          const response = await templatesApi.getWorkTemplateConfig(Number(workId));
-          if (response.template_config && 
-              response.template_config.templateId && 
-              response.template_config.modules &&
-              Array.isArray(response.template_config.modules)) {
+          // 从作品的 metadata 字段加载模板配置
+          const workData = await worksApi.getWork(Number(workId));
+          const templateConfig = workData.metadata?.template_config;
+          
+          if (templateConfig && 
+              templateConfig.templateId && 
+              templateConfig.modules &&
+              Array.isArray(templateConfig.modules)) {
             // 检查是否是数据库模板
-            if (response.template_config.templateId.startsWith('db-')) {
-              const dbTemplateId = parseInt(response.template_config.templateId.replace('db-', ''));
+            if (templateConfig.templateId.startsWith('db-')) {
+              const dbTemplateId = parseInt(templateConfig.templateId.replace('db-', ''));
               const dbTemplate = userTemplates.find(t => t.id === dbTemplateId);
               if (dbTemplate) {
                 
@@ -936,7 +1035,7 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
                   id: `db-${dbTemplate.id}`,
                   name: dbTemplate.name,
                   description: dbTemplate.description || '',
-                  modules: response.template_config.modules
+                  modules: templateConfig.modules
                 });
               }
             }
@@ -956,12 +1055,8 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
     // 如果有 workId，先保存当前编辑的内容
     if (workId && template && template.modules) {
       try {
-        const currentTemplateData = {
-          templateId: template.id,
-          modules: template.modules,
-          lastModified: Date.now()
-        };
-        await templatesApi.saveWorkTemplateConfig(Number(workId), currentTemplateData);
+        // 直接保存到作品的 metadata 字段
+        await saveWorkInfoToMetadata(template);
         
       } catch (error) {
         console.error('切换模板前保存失败:', error);
@@ -981,24 +1076,18 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
     // 如果有 workId，尝试加载该作品保存的模板配置
     if (workId) {
       try {
-        const response = await templatesApi.getWorkTemplateConfig(Number(workId));
+        // 从作品的 metadata 字段加载模板配置
+        const workData = await worksApi.getWork(Number(workId));
+        const templateConfig = workData.metadata?.template_config;
         
-        
-        
-        
-        if (response.template_config && 
-            response.template_config.templateId === newTemplate.id &&
-            response.template_config.modules &&
-            Array.isArray(response.template_config.modules) &&
-            response.template_config.modules.length > 0) {
-          // 如果数据库中有该模板的保存内容，使用保存的内容
+        if (templateConfig && 
+            templateConfig.templateId === newTemplate.id &&
+            templateConfig.modules &&
+            Array.isArray(templateConfig.modules) &&
+            templateConfig.modules.length > 0) {
+          // 如果作品 metadata 中有该模板的保存内容，使用保存的内容
           
-          newTemplate.modules = response.template_config.modules;
-        } else {
-          
-          if (response.template_config) {
-            
-          }
+          newTemplate.modules = templateConfig.modules;
         }
       } catch (error) {
         console.error('加载保存的模板内容失败:', error);
@@ -2399,13 +2488,8 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
               onClick={async () => {
                 try {
                   
-                  const templateData = {
-                    templateId: template.id,
-                    modules: template.modules,
-                    lastModified: Date.now()
-                  };
-                  
-                  const response = await templatesApi.saveWorkTemplateConfig(Number(workId), templateData);
+                  // 直接保存到作品的 metadata 字段
+                  await saveWorkInfoToMetadata(template);
                   
                   setHasUnsavedChanges(false);
                   alert('保存成功！');
@@ -3343,9 +3427,9 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
                       return t;
                     });
                     
-                    setTemplate(prev => ({
-                      ...prev,
-                      modules: prev.modules.map(m => {
+                    const updatedTemplate = {
+                      ...template,
+                      modules: template.modules.map(m => {
                         if (m.id !== characterModal.moduleId) return m;
                         return {
                           ...m,
@@ -3363,7 +3447,14 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
                           })
                         };
                       })
-                    }));
+                    };
+                    
+                    setTemplate(updatedTemplate);
+                    
+                    // 保存作品信息到 metadata
+                    if (workId) {
+                      saveWorkInfoToMetadata(updatedTemplate).catch(console.error);
+                    }
                   } else {
                     // 组件不在分页中，直接更新
                     const comp = module.components.find(c => c.id === characterModal.compId);
@@ -3381,7 +3472,27 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
                       newData = [...currentData, { ...characterModal.form }];
                     }
                     
+                    const updatedTemplate = {
+                      ...template,
+                      modules: template.modules.map(m => {
+                        if (m.id === characterModal.moduleId) {
+                          return {
+                            ...m,
+                            components: m.components.map(c => 
+                              c.id === characterModal.compId ? { ...c, value: newData } : c
+                            )
+                          };
+                        }
+                        return m;
+                      })
+                    };
+                    
                     updateComponentValue(characterModal.moduleId, characterModal.compId, newData);
+                    
+                    // 保存作品信息到 metadata
+                    if (workId) {
+                      saveWorkInfoToMetadata(updatedTemplate).catch(console.error);
+                    }
                   }
                   
                   setCharacterModal({ ...characterModal, isOpen: false });
