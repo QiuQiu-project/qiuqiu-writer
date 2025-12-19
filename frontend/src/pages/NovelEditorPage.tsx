@@ -526,7 +526,11 @@ export default function NovelEditorPage(){
   const [headingMenuOpen, setHeadingMenuOpen] = useState(false);
   const headingMenuRef = useRef<HTMLDivElement>(null);
 
-  // 编辑器实例
+  // 关键修复：为每个章节维护独立的编辑器实例
+  // 通过 editorKey 来强制重新创建编辑器实例
+  const [editorKey, setEditorKey] = useState(0);
+
+  // 为当前章节创建或获取编辑器实例
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -545,7 +549,7 @@ export default function NovelEditorPage(){
     },
     enableInputRules: true,
     enablePasteRules: true,
-  });
+  }, [editorKey]); // 关键修复：当 editorKey 变化时，重新创建编辑器
 
   // 存储章节数据
   const [chaptersData, setChaptersData] = useState<Record<string, ChapterFullData>>({});
@@ -1229,24 +1233,56 @@ export default function NovelEditorPage(){
     loadChapters();
   }, [workId]);
 
+  // 关键修复：章节切换时，重新创建编辑器实例，确保每个章节有独立的状态
+  useEffect(() => {
+    if (!selectedChapter) return;
+    
+    const chapterId = parseInt(selectedChapter);
+    if (isNaN(chapterId)) return;
+    
+    // 如果切换到新章节，销毁旧编辑器并创建新编辑器
+    if (currentChapterIdRef.current !== chapterId && currentChapterIdRef.current !== null) {
+      // 销毁旧编辑器
+      if (editor) {
+        editor.destroy();
+      }
+      // 通过改变 key 来强制重新创建编辑器
+      // 注意：editor 会在下一个渲染周期重新创建
+      setEditorKey(prev => prev + 1);
+      // 清除内容记录，等待新编辑器创建后再加载内容
+      lastSetContentRef.current = '';
+      // 更新当前章节ID，这样内容加载逻辑可以正确执行
+      currentChapterIdRef.current = chapterId;
+    } else if (currentChapterIdRef.current === null) {
+      // 首次选择章节时，也要更新 currentChapterIdRef
+      currentChapterIdRef.current = chapterId;
+    }
+  }, [selectedChapter, editor]);
+
   // 加载章节内容（使用本地缓存和 ShareDB）
   useEffect(() => {
     if (!selectedChapter || !editor) return;
 
     const chapterId = parseInt(selectedChapter);
-    
-    // 关键修复：切换章节时清除上次设置的内容记录，避免影响新章节
-    // 同时清除加载状态标记（如果之前有残留）
-    if (!isNaN(chapterId) && currentChapterIdRef.current !== chapterId) {
-      lastSetContentRef.current = ''; // 清除记录，允许新章节设置内容
-      isChapterLoadingRef.current = false; // 清除可能残留的加载状态
-      
-    }
     if (isNaN(chapterId)) {
       // 如果是草稿或其他非数字ID，不加载
       editor.commands.setContent('<p></p>');
       currentChapterIdRef.current = null;
       return;
+    }
+    
+    // 关键修复：确保编辑器已经创建完成（不是被销毁的状态）
+    // 当 editorKey 变化时，编辑器会重新创建，需要等待创建完成
+    if (editor.isDestroyed) {
+      // 编辑器正在被销毁或已销毁，等待重新创建
+      return;
+    }
+    
+    // 关键修复：切换章节时清除上次设置的内容记录，避免影响新章节
+    // 同时清除加载状态标记（如果之前有残留）
+    if (currentChapterIdRef.current !== chapterId) {
+      lastSetContentRef.current = ''; // 清除记录，允许新章节设置内容
+      isChapterLoadingRef.current = false; // 清除可能残留的加载状态
     }
 
     const loadChapterContent = async () => {
@@ -1907,33 +1943,26 @@ export default function NovelEditorPage(){
                                    (currentChapterIdRef.current !== chapterId);
           
           if (shouldSetContent) {
-            // 关键修复：清除撤销/重做历史，确保每个章节的撤销历史独立
-            // 这样撤销操作只会影响当前章节，不会撤回到之前章节的内容
-            // TipTap 的 History 扩展没有直接的 clearHistory 方法
-            // 我们通过先设置空内容再设置实际内容来重置历史
-            // 这样可以确保历史记录从新章节的内容开始
-            editor.commands.setContent('<p></p>', { emitUpdate: false });
-            // 使用 setTimeout 确保历史被清除后再设置实际内容
-            setTimeout(() => {
-              editor.commands.setContent(normalizedContent, { emitUpdate: false });
-              // 更新字数显示
-              const wordCount = countCharacters(normalizedContent);
-              setCurrentChapterWordCount(wordCount);
-              
-              // 关键修复：验证设置后的内容（必须在 setTimeout 内部，确保内容已设置）
-              const setContent = editor.getHTML();
-              if (setContent === normalizedContent) {
-                // 内容设置成功
-              } else {
-                console.warn('⚠️ [设置编辑器] 内容设置后不匹配，可能存在缓存问题', {
-                  expected: normalizedContent.substring(0, 50),
-                  actual: setContent.substring(0, 50)
-                });
-              }
-            }, 0);
+            // 关键修复：每个章节有独立的编辑器实例，直接设置内容即可
+            // 不需要清除历史，因为编辑器是新建的
+            editor.commands.setContent(normalizedContent, { emitUpdate: false });
+            // 更新字数显示
+            const wordCount = countCharacters(normalizedContent);
+            setCurrentChapterWordCount(wordCount);
+            
+            // 关键修复：验证设置后的内容
+            const setContent = editor.getHTML();
+            if (setContent === normalizedContent) {
+              // 内容设置成功
+            } else {
+              console.warn('⚠️ [设置编辑器] 内容设置后不匹配，可能存在缓存问题', {
+                expected: normalizedContent.substring(0, 50),
+                actual: setContent.substring(0, 50)
+              });
+            }
             lastSetContentRef.current = normalizedContent; // 记录已设置的内容
           } else {
-            
+            // 内容没有变化，不需要更新
           }
         } else {
           // 如果 content 是 null（获取失败），设置空编辑器
@@ -2050,12 +2079,8 @@ export default function NovelEditorPage(){
                   serverContentLength: htmlServerContent.length,
                   currentContentLength: currentContent.length
                 });
-                // 关键修复：从服务器拉取内容时，先清除历史再设置内容
-                // 这样可以避免撤销到旧内容
-                editor.commands.setContent('<p></p>', { emitUpdate: false });
-                setTimeout(() => {
-                  editor.commands.setContent(htmlServerContent, { emitUpdate: false });
-                }, 0);
+                // 关键修复：每个章节有独立的编辑器实例，直接设置内容即可
+                editor.commands.setContent(htmlServerContent, { emitUpdate: false });
                 lastSetContentRef.current = serverContent; // 记录已设置的内容
               } else {
                 
@@ -2096,7 +2121,7 @@ export default function NovelEditorPage(){
     };
 
     loadChapterContent();
-  }, [selectedChapter, editor]);
+  }, [selectedChapter, editor, editorKey]); // 关键修复：将 editorKey 作为依赖项，确保编辑器重新创建后内容也会重新加载
 
   // 手动保存函数（用于主动保存当前章节内容）
   const handleManualSave = async () => {
@@ -3229,7 +3254,11 @@ export default function NovelEditorPage(){
                   <div className="toolbar-group">
                     <button
                       className="toolbar-btn"
-                      onClick={() => editor?.chain().focus().undo().run()}
+                      onClick={() => {
+                        // 关键修复：每个章节有独立的编辑器实例，直接执行撤销即可
+                        if (!editor) return;
+                        editor.chain().focus().undo().run();
+                      }}
                       disabled={!editor?.can().undo()}
                       title="撤销"
                     >
@@ -3237,7 +3266,11 @@ export default function NovelEditorPage(){
                     </button>
                     <button
                       className="toolbar-btn"
-                      onClick={() => editor?.chain().focus().redo().run()}
+                      onClick={() => {
+                        // 关键修复：每个章节有独立的编辑器实例，直接执行重做即可
+                        if (!editor) return;
+                        editor.chain().focus().redo().run();
+                      }}
                       disabled={!editor?.can().redo()}
                       title="重做"
                     >
