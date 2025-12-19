@@ -55,6 +55,15 @@ export interface Work {
   created_at: string;
   updated_at: string;
   cover_image?: string;
+  metadata?: {
+    characters?: Array<{
+      name: string;
+      display_name?: string;
+      description?: string;
+      [key: string]: any;
+    }>;
+    [key: string]: any;
+  };
 }
 
 export interface WorkCreate {

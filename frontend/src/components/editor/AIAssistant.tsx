@@ -1,10 +1,10 @@
-import { MessageSquare, Sparkles, Upload, FileText, Send, ChevronUp, Copy, Check, Loader2, Trash2, BookOpen, User } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { MessageSquare, Send, ChevronUp, Copy, Check, Loader2, Trash2, BookOpen, User, FileText } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
 import { streamChatMessage } from '../../utils/chatApi';
 import type { ChatMessage } from '../../utils/chatApi';
 import { authApi } from '../../utils/authApi';
 import { chaptersApi, type Chapter } from '../../utils/chaptersApi';
-import { charactersApi, type Character } from '../../utils/charactersApi';
+import { worksApi } from '../../utils/worksApi';
 import MarkdownIt from 'markdown-it';
 import './AIAssistant.css';
 
@@ -26,19 +26,25 @@ interface MessageWithTime extends ChatMessage {
 
 interface Mention {
   type: 'chapter' | 'character';
-  id: number;
+  id: number | string; // 章节使用number，角色使用string（名称）
   name: string;
 }
 
 interface MentionOption {
   type: 'chapter' | 'character';
-  id: number;
+  id: number | string; // 角色可能使用name作为id
   name: string;
   subtitle?: string;
 }
 
+interface CharacterFromMetadata {
+  name: string;
+  display_name?: string;
+  description?: string;
+  [key: string]: any;
+}
+
 export default function AIAssistant({ workId }: AIAssistantProps) {
-  const [activeTab, setActiveTab] = useState<'inspiration' | 'chat'>('chat');
   const [message, setMessage] = useState('');
   const [charCount, setCharCount] = useState(0);
   const [messages, setMessages] = useState<MessageWithTime[]>([]);
@@ -51,12 +57,11 @@ export default function AIAssistant({ workId }: AIAssistantProps) {
   
   // @ 提及相关状态
   const [showMentionMenu, setShowMentionMenu] = useState(false);
-  const [mentionQuery, setMentionQuery] = useState('');
   const [mentionPosition, setMentionPosition] = useState({ top: 0, left: 0 });
   const [mentionOptions, setMentionOptions] = useState<MentionOption[]>([]);
   const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
   const [chapters, setChapters] = useState<Chapter[]>([]);
-  const [characters, setCharacters] = useState<Character[]>([]);
+  const [characters, setCharacters] = useState<CharacterFromMetadata[]>([]);
   const mentionMenuRef = useRef<HTMLDivElement>(null);
 
   // 检查登录状态
@@ -64,7 +69,7 @@ export default function AIAssistant({ workId }: AIAssistantProps) {
     setIsAuthenticated(authApi.isAuthenticated());
   }, []);
 
-  // 加载章节和角色列表
+  // 加载章节和作品信息（包含角色）
   useEffect(() => {
     if (!workId || !isAuthenticated) return;
 
@@ -82,11 +87,14 @@ export default function AIAssistant({ workId }: AIAssistantProps) {
         });
         setChapters(chaptersResponse.chapters);
 
-        // 加载角色列表
-        const charactersResponse = await charactersApi.listCharacters(workIdNum);
-        setCharacters(charactersResponse.characters);
+        // 加载作品详情（包含metadata中的角色信息）
+        const workData = await worksApi.getWork(workIdNum);
+        
+        // 从作品metadata中提取角色信息
+        const charactersFromMetadata = workData.metadata?.characters || [];
+        setCharacters(charactersFromMetadata);
       } catch (err) {
-        console.error('加载章节/角色列表失败:', err);
+        console.error('加载章节/作品信息失败:', err);
       }
     };
 
@@ -135,8 +143,8 @@ export default function AIAssistant({ workId }: AIAssistantProps) {
       const hasCompleteMention = /^(章节|角色):/.test(textAfterAt);
       
       // 检查 @ 后面是否有空格、换行或已完成的提及，如果有则关闭菜单
-      // 检查是否已经有完整的提及格式（@chapter:123 或 @character:456）
-      const hasCompleteMentionId = /^(chapter|character):\d+/.test(textAfterAt);
+      // 检查是否已经有完整的提及格式（@chapter:123 或 @character:角色名称）
+      const hasCompleteMentionId = /^(chapter:\d+|character:[^@\s]+)/.test(textAfterAt);
       
       if (textAfterAt.includes(' ') || 
           textAfterAt.includes('\n') ||
@@ -145,7 +153,6 @@ export default function AIAssistant({ workId }: AIAssistantProps) {
         setShowMentionMenu(false);
       } else {
         const query = textAfterAt.toLowerCase();
-        setMentionQuery(query);
         
         // 构建提及选项
         const options: MentionOption[] = [];
@@ -163,15 +170,19 @@ export default function AIAssistant({ workId }: AIAssistantProps) {
             });
           });
         
-        // 添加角色选项
+        // 添加角色选项（从作品metadata中获取）
         characters
-          .filter(char => char.name.toLowerCase().includes(query) ||
-                   char.display_name?.toLowerCase().includes(query))
-          .forEach(char => {
+          .filter(char => {
+            const name = char.name || '';
+            const displayName = char.display_name || '';
+            return name.toLowerCase().includes(query) || 
+                   displayName.toLowerCase().includes(query);
+          })
+          .forEach((char, index) => {
             options.push({
               type: 'character',
-              id: char.id,
-              name: char.display_name || char.name,
+              id: char.name || `character_${index}`, // 使用name作为唯一标识
+              name: char.display_name || char.name || '未命名角色',
               subtitle: char.description ? char.description.substring(0, 30) : undefined,
             });
           });
@@ -262,11 +273,10 @@ export default function AIAssistant({ workId }: AIAssistantProps) {
     const lastAtIndex = textBeforeCursor.lastIndexOf('@');
     
     if (lastAtIndex !== -1) {
-      const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
-      // 使用ID格式：@chapter:123 或 @character:456
+      // 使用ID格式：@chapter:123 或 @character:角色名称
       const mentionText = option.type === 'chapter' 
         ? `@chapter:${option.id}`
-        : `@character:${option.id}`;
+        : `@character:${option.name}`; // 角色使用名称作为标识
       
       const newMessage = 
         message.substring(0, lastAtIndex) + 
@@ -313,10 +323,10 @@ export default function AIAssistant({ workId }: AIAssistantProps) {
       return renderMentionsFromText(text);
     }
 
-    const parts: (string | JSX.Element)[] = [];
+    const parts: (string | React.ReactElement)[] = [];
     let lastIndex = 0;
-    // 匹配 @chapter:123 或 @character:456 格式
-    const regex = /(@chapter:\d+|@character:\d+)/g;
+    // 匹配 @chapter:123 或 @character:角色名称 格式
+    const regex = /(@chapter:\d+|@character:[^@\s]+)/g;
     let match;
 
     while ((match = regex.exec(text)) !== null) {
@@ -327,12 +337,20 @@ export default function AIAssistant({ workId }: AIAssistantProps) {
 
       // 添加提及标签
       const mentionText = match[0];
-      const idMatch = mentionText.match(/(chapter|character):(\d+)/);
+      const idMatch = mentionText.match(/(chapter|character):(.+)/);
       
       if (idMatch) {
         const type = idMatch[1] === 'chapter' ? 'chapter' : 'character';
-        const id = parseInt(idMatch[2], 10);
-        const mention = mentions.find(m => m.type === type && m.id === id);
+        const identifier = idMatch[2];
+        
+        let mention: Mention | undefined;
+        if (type === 'chapter') {
+          const id = parseInt(identifier, 10);
+          mention = mentions.find(m => m.type === type && m.id === id);
+        } else {
+          // 角色使用名称匹配
+          mention = mentions.find(m => m.type === type && (m.id === identifier || m.name === identifier));
+        }
 
         if (mention) {
           parts.push(
@@ -364,9 +382,10 @@ export default function AIAssistant({ workId }: AIAssistantProps) {
 
   // 从文本中解析并渲染提及（用于没有mentions的情况）
   const renderMentionsFromText = (text: string) => {
-    const parts: (string | JSX.Element)[] = [];
+    const parts: (string | React.ReactElement)[] = [];
     let lastIndex = 0;
-    const regex = /(@chapter:\d+|@character:\d+)/g;
+    // 匹配 @chapter:123 或 @character:角色名称
+    const regex = /(@chapter:\d+|@character:[^@\s]+)/g;
     let match;
 
     while ((match = regex.exec(text)) !== null) {
@@ -375,19 +394,23 @@ export default function AIAssistant({ workId }: AIAssistantProps) {
       }
 
       const mentionText = match[0];
-      const idMatch = mentionText.match(/(chapter|character):(\d+)/);
+      const idMatch = mentionText.match(/(chapter|character):(.+)/);
       
       if (idMatch) {
         const type = idMatch[1] === 'chapter' ? 'chapter' : 'character';
-        const id = parseInt(idMatch[2], 10);
+        const identifier = idMatch[2];
         
         let name = '';
         if (type === 'chapter') {
+          const id = parseInt(identifier, 10);
           const chapter = chapters.find(ch => ch.id === id);
           name = chapter ? chapter.title : `章节#${id}`;
         } else {
-          const character = characters.find(char => char.id === id);
-          name = character ? (character.display_name || character.name) : `角色#${id}`;
+          // 角色使用名称作为标识
+          const character = characters.find(char => 
+            char.name === identifier || char.display_name === identifier
+          );
+          name = character ? (character.display_name || character.name) : identifier;
         }
 
         parts.push(
@@ -416,9 +439,9 @@ export default function AIAssistant({ workId }: AIAssistantProps) {
   // 解析消息中的提及（使用ID格式）
   const parseMentions = (text: string): Mention[] => {
     const mentions: Mention[] = [];
-    // 匹配 @chapter:123 或 @character:456 格式
+    // 匹配 @chapter:123 或 @character:name 格式
     const chapterRegex = /@chapter:(\d+)/g;
-    const characterRegex = /@character:(\d+)/g;
+    const characterRegex = /@character:([^@\s]+)/g;
     
     let match;
     while ((match = chapterRegex.exec(text)) !== null) {
@@ -430,10 +453,16 @@ export default function AIAssistant({ workId }: AIAssistantProps) {
     }
     
     while ((match = characterRegex.exec(text)) !== null) {
-      const id = parseInt(match[1], 10);
-      const character = characters.find(char => char.id === id);
+      const characterName = match[1];
+      const character = characters.find(char => 
+        char.name === characterName || char.display_name === characterName
+      );
       if (character) {
-        mentions.push({ type: 'character', id: character.id, name: character.display_name || character.name });
+        mentions.push({ 
+          type: 'character', 
+          id: character.name || characterName, 
+          name: character.display_name || character.name || characterName 
+        });
       }
     }
     
@@ -527,25 +556,14 @@ export default function AIAssistant({ workId }: AIAssistantProps) {
 
   return (
     <aside className="ai-assistant">
-      <div className="assistant-tabs">
-        <button
-          className={`tab-button ${activeTab === 'inspiration' ? 'active' : ''}`}
-          onClick={() => setActiveTab('inspiration')}
-        >
-          <Sparkles size={16} />
-          <span>灵感卡片</span>
-        </button>
-        <button
-          className={`tab-button ${activeTab === 'chat' ? 'active' : ''}`}
-          onClick={() => setActiveTab('chat')}
-        >
-          <MessageSquare size={16} />
+      <div className="assistant-header">
+        <div className="assistant-title">
+          <MessageSquare size={20} />
           <span>AI对话</span>
-        </button>
+        </div>
       </div>
 
-      {activeTab === 'chat' && (
-        <div className="chat-content">
+      <div className="chat-content">
           <div className="chat-header">
             <div className="froggy-avatar">
               <span className="froggy-icon">🐸</span>
@@ -767,13 +785,6 @@ export default function AIAssistant({ workId }: AIAssistantProps) {
             <p>写作遇到烦恼?试试问问蛙蛙!</p>
           </div>
         </div>
-      )}
-
-      {activeTab === 'inspiration' && (
-        <div className="inspiration-content">
-          <p className="placeholder-text">灵感卡片功能开发中...</p>
-        </div>
-      )}
 
       <div className="assistant-footer">
         <div className="footer-item">

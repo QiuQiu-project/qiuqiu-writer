@@ -428,8 +428,8 @@ async def chat(chat_req: ChatRequest, db: AsyncSession = Depends(get_db_session)
 
         # 处理提及替换
         mention_service = MentionService(db)
-        processed_query = await mention_service.replace_mentions_in_text(chat_req.query)
-        processed_history = await mention_service.replace_mentions_in_history(chat_req.history or [])
+        processed_query = await mention_service.replace_mentions_in_text(chat_req.query, chat_req.user_id)
+        processed_history = await mention_service.replace_mentions_in_history(chat_req.history or [], chat_req.user_id)
 
         def generate_chat_response():
             """Generate chat response as SSE stream."""
@@ -481,8 +481,8 @@ async def chat_complete(chat_req: ChatCompleteRequest, db: AsyncSession = Depend
 
         # 处理提及替换
         mention_service = MentionService(db)
-        processed_query = await mention_service.replace_mentions_in_text(chat_req.query)
-        processed_history = await mention_service.replace_mentions_in_history(chat_req.history or [])
+        processed_query = await mention_service.replace_mentions_in_text(chat_req.query, chat_req.user_id)
+        processed_history = await mention_service.replace_mentions_in_history(chat_req.history or [], chat_req.user_id)
 
         # Collect all responses from the generator
         content, references = mos_product.chat(

@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from memos.api.services.chapter_service import ChapterService
 from memos.api.services.sharedb_service import ShareDBService
+from memos.api.services.work_service import WorkService
 from memos.log import get_logger
 
 logger = get_logger(__name__)
@@ -22,15 +23,30 @@ class MentionService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.chapter_service = ChapterService(db)
+        self.work_service = WorkService(db)
         self.sharedb_service = ShareDBService()
         self._sharedb_initialized = False
     
-    async def replace_mentions_in_text(self, text: str) -> str:
+    def _extract_work_id_from_user_id(self, user_id: str) -> Optional[int]:
+        """从 user_id 格式 user_{userId}_work_{workId} 中提取 work_id"""
+        try:
+            # 格式：user_{userId}_work_{workId}
+            if '_work_' in user_id:
+                parts = user_id.split('_work_')
+                if len(parts) == 2:
+                    work_id_str = parts[1]
+                    return int(work_id_str)
+        except (ValueError, IndexError) as e:
+            logger.warning(f"无法从 user_id {user_id} 中提取 work_id: {e}")
+        return None
+    
+    async def replace_mentions_in_text(self, text: str, user_id: Optional[str] = None) -> str:
         """
         替换文本中的提及标识为实际内容
         
         Args:
-            text: 包含提及标识的文本，格式如 @chapter:123 或 @character:456
+            text: 包含提及标识的文本，格式如 @chapter:123 或 @character:角色名称
+            user_id: 用户ID，用于提取work_id（格式：user_{userId}_work_{workId}）
         
         Returns:
             替换后的文本
@@ -41,8 +57,8 @@ class MentionService:
         # 替换章节提及 @chapter:123
         text = await self._replace_chapter_mentions(text)
         
-        # 替换角色提及 @character:456
-        text = await self._replace_character_mentions(text)
+        # 替换角色提及 @character:角色名称（从作品metadata中获取）
+        text = await self._replace_character_mentions(text, user_id)
         
         return text
     
@@ -179,50 +195,96 @@ class MentionService:
         
         return result
     
-    async def _replace_character_mentions(self, text: str) -> str:
-        """替换角色提及"""
-        pattern = r'@character:(\d+)'
+    async def _replace_character_mentions(self, text: str, user_id: Optional[str] = None) -> str:
+        """替换角色提及（从作品metadata中获取）"""
+        # 匹配 @character:角色名称 格式
+        pattern = r'@character:([^@\s]+)'
+        
+        # 获取作品ID
+        work_id = None
+        work_metadata = {}
+        if user_id:
+            work_id = self._extract_work_id_from_user_id(user_id)
+            if work_id:
+                try:
+                    work = await self.work_service.get_work_by_id(work_id)
+                    if work:
+                        work_metadata = work.work_metadata or {}
+                except Exception as e:
+                    logger.warning(f"获取作品 {work_id} 失败: {e}")
         
         async def replace_match(match):
-            character_id = int(match.group(1))
+            character_name = match.group(1).strip()
             try:
-                # 从数据库获取角色信息
-                from memos.api.models.characters import Character
-                from sqlalchemy.future import select
+                # 从作品metadata中查找角色
+                characters = work_metadata.get("characters", [])
+                character = None
                 
-                stmt = select(Character).where(Character.id == character_id)
-                result = await self.db.execute(stmt)
-                character = result.scalar_one_or_none()
+                # 尝试匹配角色名称
+                for char in characters:
+                    if not isinstance(char, dict):
+                        continue
+                    char_name = char.get("name", "")
+                    char_display_name = char.get("display_name", "")
+                    if char_name == character_name or char_display_name == character_name:
+                        character = char
+                        break
                 
                 if not character:
-                    logger.warning(f"角色 {character_id} 不存在")
-                    return f"@角色#{character_id}(不存在)"
+                    logger.warning(f"角色 '{character_name}' 在作品 {work_id} 的metadata中不存在")
+                    return f"\n\n【角色引用：{character_name}（不存在）】\n该角色在作品信息中不存在，请检查角色名称是否正确。\n"
                 
                 # 构建角色信息
-                name = character.display_name or character.name
-                description = character.description or ""
-                personality = character.personality or {}
-                appearance = character.appearance or {}
-                background = character.background or {}
+                name = character.get("display_name") or character.get("name") or character_name
+                description = character.get("description") or ""
+                personality = character.get("personality") or {}
+                appearance = character.get("appearance") or {}
+                background = character.get("background") or {}
                 
                 # 构建替换文本
                 info_parts = []
                 if description:
                     info_parts.append(f"简介：{description}")
                 if personality:
-                    info_parts.append(f"性格：{personality}")
+                    if isinstance(personality, dict):
+                        personality_str = ", ".join([f"{k}: {v}" for k, v in personality.items()])
+                        if personality_str:
+                            info_parts.append(f"性格：{personality_str}")
+                    else:
+                        info_parts.append(f"性格：{personality}")
                 if appearance:
-                    info_parts.append(f"外貌：{appearance}")
+                    if isinstance(appearance, dict):
+                        appearance_str = ", ".join([f"{k}: {v}" for k, v in appearance.items()])
+                        if appearance_str:
+                            info_parts.append(f"外貌：{appearance_str}")
+                    else:
+                        info_parts.append(f"外貌：{appearance}")
                 if background:
-                    info_parts.append(f"背景：{background}")
+                    if isinstance(background, dict):
+                        background_str = ", ".join([f"{k}: {v}" for k, v in background.items()])
+                        if background_str:
+                            info_parts.append(f"背景：{background_str}")
+                    else:
+                        info_parts.append(f"背景：{background}")
+                
+                # 如果角色信息中有其他字段，也一并显示
+                for key, value in character.items():
+                    if key not in ["name", "display_name", "description", "personality", "appearance", "background"]:
+                        if value:
+                            if isinstance(value, dict):
+                                value_str = json.dumps(value, ensure_ascii=False)
+                            else:
+                                value_str = str(value)
+                            if value_str and value_str.strip():
+                                info_parts.append(f"{key}：{value_str[:100]}")
                 
                 info_text = "\n".join(info_parts) if info_parts else "（暂无详细信息）"
                 replacement = f"\n\n【角色引用：{name}】\n{info_text}\n"
                 return replacement
                 
             except Exception as e:
-                logger.error(f"替换角色提及失败 {character_id}: {e}", exc_info=True)
-                return f"\n\n【角色引用：角色#{character_id}（获取失败）】\n错误信息：{str(e)[:200]}\n"
+                logger.error(f"替换角色提及失败 '{character_name}': {e}", exc_info=True)
+                return f"\n\n【角色引用：{character_name}（获取失败）】\n错误信息：{str(e)[:200]}\n"
         
         # 使用异步替换
         matches = list(re.finditer(pattern, text))
@@ -239,12 +301,13 @@ class MentionService:
         
         return result
     
-    async def replace_mentions_in_history(self, history: list) -> list:
+    async def replace_mentions_in_history(self, history: list, user_id: Optional[str] = None) -> list:
         """
         替换对话历史中的提及
         
         Args:
             history: 对话历史列表，每个元素包含 role 和 content
+            user_id: 用户ID，用于提取work_id
         
         Returns:
             替换后的对话历史
@@ -256,7 +319,7 @@ class MentionService:
         for msg in history:
             if isinstance(msg, dict) and 'content' in msg:
                 new_msg = msg.copy()
-                new_msg['content'] = await self.replace_mentions_in_text(msg['content'])
+                new_msg['content'] = await self.replace_mentions_in_text(msg['content'], user_id)
                 replaced_history.append(new_msg)
             else:
                 replaced_history.append(msg)
