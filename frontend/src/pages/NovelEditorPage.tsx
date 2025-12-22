@@ -257,6 +257,12 @@ const documentCache = {
       const token = localStorage.getItem('access_token');
       
       try {
+        // 关键修复：验证内容不为空（空字符串也是有效内容，但需要确保不是 undefined 或 null）
+        if (contentToSave === null || contentToSave === undefined) {
+          console.error('❌ [DocumentCache] 内容为 null 或 undefined，无法保存');
+          throw new Error('内容不能为 null 或 undefined');
+        }
+        
         // 关键修复：同时提供 HTML 和 JSON 格式，后端可以使用 JSON 格式进行更精确的段落级合并
         const requestBody: any = {
           doc_id: documentId,
@@ -271,6 +277,16 @@ const documentCache = {
           base_content_json: undefined, // 如果 base_content 是 JSON 格式，这里可以传入
           create_version: false,
         };
+        
+        // 关键修复：记录发送的内容信息，用于调试
+        console.log('📤 [DocumentCache] 发送同步请求:', {
+          documentId,
+          version: localVersion,
+          contentLength: contentToSave.length,
+          contentType: typeof contentToSave,
+          contentPreview: contentToSave.substring(0, 200),
+          hasContentJson: !!contentJson,
+        });
         
         const syncResponse = await fetch(`${API_BASE_URL}/v1/sharedb/documents/sync`, {
           method: 'POST',

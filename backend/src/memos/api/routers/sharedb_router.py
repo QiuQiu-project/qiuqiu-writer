@@ -107,6 +107,15 @@ async def sync_document(
     借鉴 nexcode_server 的实现
     """
     try:
+        # 关键修复：记录接收到的内容信息，用于调试
+        content_length = len(request.content) if request.content else 0
+        logger.info(f"📥 [ShareDB Sync] 接收同步请求: doc_id={request.doc_id}, version={request.version}, content_length={content_length}, user_id={current_user_id}")
+        
+        # 验证内容不为 None
+        if request.content is None:
+            logger.error(f"❌ [ShareDB Sync] 接收到的内容为 None: doc_id={request.doc_id}")
+            raise ValueError("内容不能为 None")
+        
         # 调用 ShareDB 服务同步
         result = await sharedb_service.sync_document(
             document_id=request.doc_id,
@@ -120,6 +129,10 @@ async def sync_document(
             create_version=request.create_version,
             db_session=db
         )
+        
+        # 记录同步结果
+        result_content_length = len(result.get('content', '')) if result.get('content') else 0
+        logger.info(f"✅ [ShareDB Sync] 同步完成: doc_id={request.doc_id}, 新版本={result.get('version')}, 内容长度={result_content_length}")
         
         # 返回 SyncResponse 对象
         return SyncResponse(**result)

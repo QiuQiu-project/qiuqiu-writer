@@ -355,7 +355,7 @@ class BookAnalysisService:
     
     async def get_work_characters_and_locations(self, work_id: int) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         """
-        从work的metadata中获取characters和locations
+        从work的metadata.component_data中获取characters和locations
         
         Args:
             work_id: 作品ID

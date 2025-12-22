@@ -1594,12 +1594,32 @@ class ShareDBService:
                 if self.use_mongodb and self.mongodb_db is not None:
                     # 保存到MongoDB
                     collection = self.mongodb_db.documents
+                    content_value = document.get('content', '')
+                    content_length = len(content_value) if isinstance(content_value, str) else 0
+                    
+                    # 关键修复：确保 content 字段存在且不为 None
+                    if 'content' not in document or document['content'] is None:
+                        logger.warning(f"⚠️ [ShareDB] 文档 {document_id} 的 content 字段缺失或为 None，设置为空字符串")
+                        document['content'] = ''
+                    
                     await collection.replace_one(
                         {"id": document_id},
                         document,
                         upsert=True
                     )
-                    logger.info(f"✅ [ShareDB] 已保存到MongoDB: {document_id}, 版本 {document.get('version')}, 内容长度 {len(document.get('content', ''))}")
+                    logger.info(f"✅ [ShareDB] 已保存到MongoDB: {document_id}, 版本 {document.get('version')}, 内容长度 {content_length}, content类型: {type(content_value).__name__}")
+                    
+                    # 验证保存：立即读取验证
+                    verify_doc = await collection.find_one({"id": document_id})
+                    if verify_doc:
+                        verify_content = verify_doc.get('content', '')
+                        verify_length = len(verify_content) if isinstance(verify_content, str) else 0
+                        if verify_length != content_length:
+                            logger.error(f"❌ [ShareDB] 保存验证失败: 期望长度 {content_length}, 实际长度 {verify_length}")
+                        else:
+                            logger.debug(f"✅ [ShareDB] 保存验证成功: 内容长度 {verify_length}")
+                    else:
+                        logger.error(f"❌ [ShareDB] 保存验证失败: 文档不存在")
                 else:
                     # 保存到Redis
                     if not self.redis_client:

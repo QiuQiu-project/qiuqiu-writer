@@ -829,18 +829,15 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
         const workData = await worksApi.getWork(Number(workId));
         const templateConfig = workData.metadata?.template_config;
         const componentData = workData.metadata?.component_data || {};
-        const charactersFromMetadata = workData.metadata?.characters || []; // 向后兼容
         
         // 初始化原始作品数据快照（用于比较是否有修改）
         // 注意：这里保存的是从数据库加载的原始数据，用于后续比较
         const initialDataStr = JSON.stringify({
-          component_data: componentData,
-          characters: charactersFromMetadata
+          component_data: componentData
         });
         setOriginalWorkDataSnapshot(initialDataStr);
         console.log('📸 初始化原始数据快照:', {
           componentDataKeys: Object.keys(componentData),
-          charactersCount: charactersFromMetadata.length,
           snapshotLength: initialDataStr.length
         });
         
@@ -954,16 +951,13 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
             }
           }
           
-          // 合并组件数据：优先使用 component_data，如果没有则使用 characters（向后兼容）
+          // 使用 component_data 中的组件数据
           const dataToWrite = { ...componentData };
-          if (charactersFromMetadata.length > 0 && !dataToWrite['characters']) {
-            dataToWrite['characters'] = charactersFromMetadata;
-          }
           
           console.log('📥 准备写入的组件数据:', {
             componentDataKeys: Object.keys(componentData),
             dataToWriteKeys: Object.keys(dataToWrite),
-            charactersCount: charactersFromMetadata.length,
+            charactersCount: (dataToWrite['characters'] || []).length,
             componentDataSample: Object.keys(componentData).slice(0, 3).reduce((acc, key) => {
               acc[key] = Array.isArray(componentData[key]) 
                 ? `数组(${componentData[key].length}项)` 
@@ -1551,9 +1545,6 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
         validateComponentConfig(module.components);
       }
       
-      // 从合并后的数据中提取角色数据（用于向后兼容 characters 字段）
-      const characters = mergedComponentData['characters'] || [];
-      
       // 清理模板结构（移除 value 字段，只保留配置信息，包括 dataKey 和 dataDependencies）
       const cleanedModules = cleanTemplateStructure(template.modules);
       
@@ -1569,26 +1560,13 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
           lastModified: Date.now()
         },
         // 保存简化格式的组件数据（使用 dataKey 作为键）
-        component_data: mergedComponentData,
-        // 向后兼容：同时保存角色数据到 characters 字段
-        characters: characters.map((char: any) => ({
-          name: char.name || '',
-          display_name: char.display_name || char.name || '',
-          description: char.description || '',
-          gender: char.gender || '',
-          type: char.type || '',
-          personality: char.personality || {},
-          appearance: char.appearance || {},
-          background: char.background || {},
-          ...char
-        }))
+        component_data: mergedComponentData
       };
 
       // 如果有原始快照，比较是否有修改（只比较 component_data，因为 template_config 由 saveTemplateStructure 处理）
       if (originalSnapshot) {
         const currentDataStr = JSON.stringify({
-          component_data: mergedComponentData,
-          characters: characters
+          component_data: mergedComponentData
         });
         
         console.log('🔍 比较数据变化:');
@@ -1734,10 +1712,8 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
           if (workSaved) {
             // 更新快照
             const componentDataFromTemplate = extractComponentDataFromTemplate(template.modules);
-            const characters = componentDataFromTemplate['characters'] || [];
             const currentDataStr = JSON.stringify({
-              component_data: componentDataFromTemplate,
-              characters: characters
+              component_data: componentDataFromTemplate
             });
             setOriginalWorkDataSnapshot(currentDataStr);
           }
@@ -1912,26 +1888,22 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
         const workData = await worksApi.getWork(Number(workId));
         const templateConfig = workData.metadata?.template_config;
         
-        // 只有当模板ID匹配时，才加载保存的内容
-        if (templateConfig && templateConfig.templateId === newTemplate.id) {
-          const componentData = workData.metadata?.component_data || {};
-          const charactersFromMetadata = workData.metadata?.characters || []; // 向后兼容
-          
-          // 从 work_template 获取结构（modules 应该只包含结构，不包含数据）
-          // 如果 newTemplate.id 是 db-1 格式，从 work_template 表获取
-          let modules = newTemplate.modules; // 从 work_template 获取结构
-          
-          // 向后兼容：如果 template_config 中有 modules，使用它（但应该从 work_template 获取）
-          if (templateConfig.modules && Array.isArray(templateConfig.modules) && templateConfig.modules.length > 0) {
-            // 向后兼容：使用保存的 modules（但未来应该从 work_template 获取）
-            modules = templateConfig.modules;
-          }
-          
-          // 合并组件数据：优先使用 component_data，如果没有则使用 characters（向后兼容）
-          const dataToWrite = { ...componentData };
-          if (charactersFromMetadata.length > 0 && !dataToWrite['characters']) {
-            dataToWrite['characters'] = charactersFromMetadata;
-          }
+          // 只有当模板ID匹配时，才加载保存的内容
+          if (templateConfig && templateConfig.templateId === newTemplate.id) {
+            const componentData = workData.metadata?.component_data || {};
+            
+            // 从 work_template 获取结构（modules 应该只包含结构，不包含数据）
+            // 如果 newTemplate.id 是 db-1 格式，从 work_template 表获取
+            let modules = newTemplate.modules; // 从 work_template 获取结构
+            
+            // 向后兼容：如果 template_config 中有 modules，使用它（但应该从 work_template 获取）
+            if (templateConfig.modules && Array.isArray(templateConfig.modules) && templateConfig.modules.length > 0) {
+              // 向后兼容：使用保存的 modules（但未来应该从 work_template 获取）
+              modules = templateConfig.modules;
+            }
+            
+            // 使用 component_data 中的组件数据
+            const dataToWrite = { ...componentData };
           
           // 从 work_template 获取结构（modules 应该只包含结构，不包含数据）
           // 从 work 的 component_data 获取数据，然后合并到结构中
@@ -2017,13 +1989,9 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
             } else {
               // 如果本地缓存没有，从 work 的 metadata 加载数据
               const componentData = workData.metadata?.component_data || {};
-              const charactersFromMetadata = workData.metadata?.characters || [];
               
-              // 合并组件数据：优先使用 component_data，如果没有则使用 characters（向后兼容）
+              // 使用 component_data 中的组件数据
               const dataToWrite = { ...componentData };
-              if (charactersFromMetadata.length > 0 && !dataToWrite['characters']) {
-                dataToWrite['characters'] = charactersFromMetadata;
-              }
               
               // 从 work_template 获取结构（modules 应该只包含结构，不包含数据）
               let modules = newTemplate.modules; // 从模板获取结构
@@ -3851,10 +3819,8 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
                   if (workSaved) {
                     // 更新快照为当前数据
                     const componentDataFromTemplate = extractComponentDataFromTemplate(template.modules);
-                    const characters = componentDataFromTemplate['characters'] || [];
                     const currentDataStr = JSON.stringify({
-                      component_data: componentDataFromTemplate,
-                      characters: characters
+                      component_data: componentDataFromTemplate
                     });
                     setOriginalWorkDataSnapshot(currentDataStr);
                     setHasUnsavedChanges(false);

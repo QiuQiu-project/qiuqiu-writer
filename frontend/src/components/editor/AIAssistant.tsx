@@ -91,9 +91,10 @@ export default function AIAssistant({ workId }: AIAssistantProps) {
         // 加载作品详情（包含metadata中的角色信息）
         const workData = await worksApi.getWork(workIdNum);
         
-        // 从作品metadata中提取角色信息
-        const charactersFromMetadata = workData.metadata?.characters || [];
-        setCharacters(charactersFromMetadata);
+        // 从作品metadata的component_data中提取角色信息
+        const componentData = workData.metadata?.component_data || {};
+        const charactersFromComponentData = componentData.characters || [];
+        setCharacters(charactersFromComponentData);
       } catch (err) {
         console.error('加载章节/作品信息失败:', err);
       }

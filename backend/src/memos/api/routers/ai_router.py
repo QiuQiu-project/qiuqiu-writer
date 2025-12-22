@@ -1196,7 +1196,7 @@ async def analyze_chapter_by_file(
 @router.post(
     "/generate-chapter-outlines",
     summary="逐章生成大纲和细纲接口",
-    description="为作品的所有章节（或指定章节）逐章生成大纲和细纲，从work的metadata中获取characters和locations信息",
+    description="为作品的所有章节（或指定章节）逐章生成大纲和细纲，从work的metadata.component_data中获取characters和locations信息",
     responses={
         200: {"description": "生成成功，返回JSON格式结果"},
         400: {"model": ErrorResponse, "description": "请求参数错误"},
