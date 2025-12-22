@@ -717,6 +717,20 @@ class PromptContextService:
         if additional_vars:
             vars_dict.update(additional_vars)
         
+        # 添加 chapter 和 work 对象，用于 @chapter.xxx 和 @work.xxx 格式
+        if context.current_chapter:
+            vars_dict['chapter'] = context.current_chapter
+            vars_dict['章节'] = context.current_chapter
+        if context.work:
+            vars_dict['work'] = context.work
+            vars_dict['作品'] = context.work
+        
+        # 添加 sharedb_service，用于获取章节内容
+        vars_dict['sharedb_service'] = self.sharedb_service
+        
+        # 添加 context 对象，用于访问完整上下文
+        vars_dict['context'] = context
+        
         # 使用模板的format_prompt方法
         return template.format_prompt(**vars_dict)
     
