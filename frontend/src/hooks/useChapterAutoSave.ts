@@ -1,4 +1,5 @@
-import { useEffect, useRef, RefObject } from 'react';
+import { useEffect } from 'react';
+import type { RefObject } from 'react';
 import { Editor } from '@tiptap/react';
 import { documentCache } from '../utils/documentCache';
 // 关键修复：移除直接使用 localCacheManager，只在 sync/document 请求中进行缓存操作
@@ -14,7 +15,7 @@ export interface UseChapterAutoSaveOptions {
   chaptersData: Record<string, ChapterFullData>;
   allChapters: Chapter[];
   work: Work | null;
-  setWork: (work: Work | null) => void;
+  setWork: React.Dispatch<React.SetStateAction<Work | null>>;
   setAllChapters: React.Dispatch<React.SetStateAction<Chapter[]>>;
   setCurrentChapterWordCount: (count: number) => void;
   stopSync: () => void;
@@ -208,38 +209,52 @@ export function useChapterAutoSave({
                 return false;
               }
             );
-            console.log('✅ [自动保存] 已同步到服务器:', {
-              documentId,
-              contentLength: editorContent.length,
-            });
             
-            // 如果 sync 接口返回了更新后的作品和章节信息，更新本地状态
-            if (syncResult.work || syncResult.chapter) {
-              // 如果返回了更新后的作品信息，更新本地状态
-              if (syncResult.work) {
-                setWork(prevWork => 
-                  prevWork ? { ...prevWork, word_count: syncResult.work!.word_count } : null
-                );
-                
-                console.log('✅ [字数统计] 作品总字数已更新（从 sync 接口返回）:', {
-                  workId,
-                  totalWordCount: syncResult.work.word_count,
-                });
-              }
+            // 关键修复：只有在同步成功时才更新状态
+            if (syncResult.success) {
+              console.log('✅ [自动保存] 已同步到服务器:', {
+                documentId,
+                contentLength: editorContent.length,
+              });
               
-              // 如果返回了更新后的章节信息，更新本地章节数据
-              if (syncResult.chapter) {
-                setAllChapters(prevChapters => 
-                  prevChapters.map(ch => 
-                    ch.id === chapterId ? { ...ch, word_count: syncResult.chapter!.word_count } : ch
-                  )
-                );
+              // 如果 sync 接口返回了更新后的作品和章节信息，更新本地状态
+              if (syncResult.work || syncResult.chapter) {
+                // 如果返回了更新后的作品信息，更新本地状态
+                if (syncResult.work) {
+                  // 关键修复：只有在 prevWork 存在时才更新，避免将 work 设置为 null
+                  setWork(prevWork => {
+                    if (prevWork) {
+                      return { ...prevWork, word_count: syncResult.work!.word_count };
+                    }
+                    // 如果 prevWork 为 null，不更新（因为需要完整的 work 对象）
+                    return prevWork;
+                  });
+                  
+                  console.log('✅ [字数统计] 作品总字数已更新（从 sync 接口返回）:', {
+                    workId,
+                    totalWordCount: syncResult.work.word_count,
+                  });
+                }
                 
-                console.log('✅ [字数统计] 章节字数已更新（从 sync 接口返回）:', {
-                  chapterId,
-                  wordCount: syncResult.chapter.word_count,
-                });
+                // 如果返回了更新后的章节信息，更新本地章节数据
+                if (syncResult.chapter) {
+                  setAllChapters(prevChapters => 
+                    prevChapters.map(ch => 
+                      ch.id === chapterId ? { ...ch, word_count: syncResult.chapter!.word_count } : ch
+                    )
+                  );
+                  
+                  console.log('✅ [字数统计] 章节字数已更新（从 sync 接口返回）:', {
+                    chapterId,
+                    wordCount: syncResult.chapter.word_count,
+                  });
+                }
               }
+            } else {
+              console.warn('⚠️ [自动保存] 同步未成功，跳过状态更新:', {
+                documentId,
+                error: syncResult.error,
+              });
             }
           } catch (syncErr) {
             console.warn('⚠️ [自动保存] 同步到服务器失败，但已保存到本地缓存:', syncErr);

@@ -439,29 +439,27 @@ export function useIntelligentSync(
     };
   }, [enablePolling, pollInterval, documentId]); // 移除 pollForUpdates 依赖，使用 ref
 
-  // 启动同步检查
-  useEffect(() => {
-    startSyncCheck();
+  // 关键修复：禁用自动同步检查，避免与 useChapterAutoSave 重复同步
+  // useChapterAutoSave 已经负责了自动保存，useIntelligentSync 只负责轮询更新
+  // useEffect(() => {
+  //   startSyncCheck();
+  //   return () => {
+  //     if (syncCheckTimer.current) {
+  //       clearTimeout(syncCheckTimer.current);
+  //     }
+  //   };
+  // }, [startSyncCheck]);
 
-    return () => {
-      if (syncCheckTimer.current) {
-        clearTimeout(syncCheckTimer.current);
-      }
-    };
-  }, [startSyncCheck]);
-
-  // 初始同步
-  useEffect(() => {
-    const initTimer = setTimeout(() => {
-      const initialContent = getCurrentContent();
-      if (initialContent && initialContent !== lastSyncedContent.current) {
-        
-        performSync();
-      }
-    }, 1000);
-
-    return () => clearTimeout(initTimer);
-  }, [getCurrentContent, performSync]);
+  // 关键修复：禁用初始同步，避免与 useChapterAutoSave 重复同步
+  // useEffect(() => {
+  //   const initTimer = setTimeout(() => {
+  //     const initialContent = getCurrentContent();
+  //     if (initialContent && initialContent !== lastSyncedContent.current) {
+  //       performSync();
+  //     }
+  //   }, 1000);
+  //   return () => clearTimeout(initTimer);
+  // }, [getCurrentContent, performSync]);
 
   // 监听用户输入事件
   useEffect(() => {
