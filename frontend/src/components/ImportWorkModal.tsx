@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { X, Upload, FileText, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { createWorkFromFile } from '../utils/bookAnalysisApi';
+import { convertTextToHtml } from '../utils/editorHelpers';
 import './ImportWorkModal.css';
 
 interface ImportWorkModalProps {
@@ -311,10 +312,12 @@ export default function ImportWorkModal({ isOpen, onClose, onSuccess }: ImportWo
       setStatus('creating');
 
       // 准备章节数据
+      // 关键修复：将txt文本转换为HTML格式，统一前后端格式
       const chaptersData = chapters.map(ch => ({
         chapter_number: ch.number, // 使用修正后的递增章节号
         title: ch.title,
-        content: ch.content,
+        // 将纯文本转换为HTML格式（换行符转换为段落）
+        content: convertTextToHtml(ch.content),
         volume_number: ch.volumeNumber || 1 // 使用解析出的卷号
       }));
       

@@ -53,9 +53,7 @@ export default function NovelEditorPage(){
   const [titleValue, setTitleValue] = useState('');
   const titleInputRef = useRef<HTMLInputElement>(null);
   // 章节名编辑状态
-  const [isEditingChapterName, setIsEditingChapterName] = useState(false);
-  const [chapterNameValue, setChapterNameValue] = useState('');
-  const chapterNameInputRef = useRef<HTMLInputElement>(null);
+  const chapterNameInputRef = useRef<HTMLDivElement>(null);
   // 分析本书状态
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   
@@ -210,6 +208,19 @@ export default function NovelEditorPage(){
     }
   }, [isEditingTitle]);
 
+  // 同步章节名内容（当章节切换或章节名更新时）
+  useEffect(() => {
+    if (selectedChapter && chaptersData[selectedChapter] && chapterNameInputRef.current) {
+      // 只有当元素不在焦点时（不在编辑状态）才更新内容
+      if (document.activeElement !== chapterNameInputRef.current) {
+        const currentTitle = chaptersData[selectedChapter].title || '未命名章节';
+        if (chapterNameInputRef.current.textContent !== currentTitle) {
+          chapterNameInputRef.current.textContent = currentTitle;
+        }
+      }
+    }
+  }, [selectedChapter, chaptersData]);
+
 
   // 保存标题
   const handleSaveTitle = async () => {
@@ -256,40 +267,26 @@ export default function NovelEditorPage(){
     }
   };
 
-  // 开始编辑章节名
-  const handleStartEditChapterName = () => {
-    if (!selectedChapter || !chaptersData[selectedChapter]) return;
-    const currentTitle = chaptersData[selectedChapter].title || '';
-    setChapterNameValue(currentTitle);
-    setIsEditingChapterName(true);
-    // 使用 setTimeout 确保 DOM 更新后再聚焦
-    setTimeout(() => {
-      chapterNameInputRef.current?.focus();
-      chapterNameInputRef.current?.select();
-    }, 0);
-  };
 
   // 保存章节名
-  const handleSaveChapterName = async () => {
+  const handleSaveChapterName = async (e: React.FocusEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>) => {
     if (!selectedChapter || !chaptersData[selectedChapter]) {
-      setIsEditingChapterName(false);
       return;
     }
 
     const chapterId = parseInt(selectedChapter);
     const currentTitle = chaptersData[selectedChapter].title || '';
-    const newTitle = chapterNameValue.trim();
+    // 从contentEditable元素获取文本内容
+    const newTitle = (e.currentTarget.textContent || '').trim();
 
-    // 如果没有变化，直接退出编辑模式
+    // 如果没有变化，直接返回
     if (newTitle === currentTitle) {
-      setIsEditingChapterName(false);
       return;
     }
 
     // 如果新标题为空，恢复原值
     if (!newTitle) {
-      setChapterNameValue(currentTitle);
-      setIsEditingChapterName(false);
+      e.currentTarget.textContent = currentTitle;
       return;
     }
 
@@ -318,32 +315,30 @@ export default function NovelEditorPage(){
         ),
       })));
 
-      setIsEditingChapterName(false);
       console.log('✅ 章节名已更新:', newTitle);
     } catch (err) {
       console.error('更新章节名失败:', err);
       alert(err instanceof Error ? err.message : '更新章节名失败');
-      setChapterNameValue(currentTitle);
-      setIsEditingChapterName(false);
+      // 恢复原值
+      e.currentTarget.textContent = currentTitle;
     }
   };
 
   // 取消编辑章节名
-  const handleCancelEditChapterName = () => {
-    if (!selectedChapter || !chaptersData[selectedChapter]) return;
-    const currentTitle = chaptersData[selectedChapter].title || '';
-    setChapterNameValue(currentTitle);
-    setIsEditingChapterName(false);
-  };
 
   // 处理章节名输入框的键盘事件
-  const handleChapterNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleChapterNameKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      handleSaveChapterName();
+      e.currentTarget.blur(); // 触发onBlur，从而保存
     } else if (e.key === 'Escape') {
       e.preventDefault();
-      handleCancelEditChapterName();
+      // 恢复原值
+      if (selectedChapter && chaptersData[selectedChapter]) {
+        const currentTitle = chaptersData[selectedChapter].title || '未命名章节';
+        e.currentTarget.textContent = currentTitle;
+        e.currentTarget.blur();
+      }
     }
   };
 
@@ -1661,48 +1656,42 @@ export default function NovelEditorPage(){
             <div className="chapter-editor-container">
               {/* 文本编辑区域 */}
               <div className="novel-editor-wrapper">
-                <div style={{ width: '100%', maxWidth: '800px', margin: '0 auto' }}>
-                  {/* 章节头部信息 */}
-                  {selectedChapter && chaptersData[selectedChapter] && (
-                    <div className="chapter-header-info">
-                      <div className="chapter-number">
-                        {chaptersData[selectedChapter].chapter_number !== undefined 
-                          ? `第${chaptersData[selectedChapter].chapter_number}章`
-                          : chaptersData[selectedChapter].volumeTitle || ''}
-                      </div>
-                      <div className="chapter-name">
-                        {isEditingChapterName ? (
-                          <input
+                <div className="chapter-content-wrapper" style={{ width: '100%', maxWidth: '800px', margin: '0 auto' }}>
+                  {/* 编辑器内容 - 包含章节头部 */}
+                  <div className="editor-with-header">
+                    {/* 章节头部信息 - 作为编辑器的一部分 */}
+                    {selectedChapter && chaptersData[selectedChapter] && (
+                      <div className="chapter-header-info">
+                        <div className="chapter-number">
+                          {chaptersData[selectedChapter].chapter_number !== undefined 
+                            ? `第${chaptersData[selectedChapter].chapter_number}章`
+                            : chaptersData[selectedChapter].volumeTitle || ''}
+                        </div>
+                        <div className="chapter-name">
+                          <div
                             ref={chapterNameInputRef}
-                            type="text"
-                            className="chapter-name-input"
-                            value={chapterNameValue}
-                            onChange={(e) => setChapterNameValue(e.target.value)}
+                            className="chapter-name-editable"
+                            contentEditable
+                            suppressContentEditableWarning
                             onBlur={handleSaveChapterName}
                             onKeyDown={handleChapterNameKeyDown}
                             onClick={(e) => e.stopPropagation()}
-                            autoFocus
-                          />
-                        ) : (
-                          <span
-                            className="chapter-name-editable"
-                            onClick={handleStartEditChapterName}
                             title="点击编辑章节名"
                           >
                             {chaptersData[selectedChapter].title || '未命名章节'}
-                          </span>
-                        )}
+                          </div>
+                        </div>
+                        <div className="chapter-stats">
+                          <span>{currentChapterWordCount.toLocaleString()} 字</span>
+                          <span>•</span>
+                          <span>预计阅读 {Math.ceil(currentChapterWordCount / 500)} 分钟</span>
+                        </div>
                       </div>
-                      <div className="chapter-stats">
-                        <span>{currentChapterWordCount.toLocaleString()} 字</span>
-                        <span>•</span>
-                        <span>预计阅读 {Math.ceil(currentChapterWordCount / 500)} 分钟</span>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* 编辑器内容 */}
-                  <EditorContent editor={editor} />
+                    )}
+                    
+                    {/* 编辑器内容 */}
+                    <EditorContent editor={editor} />
+                  </div>
                 </div>
                 {/* 章节加载弹窗 */}
                 {chapterLoading && (

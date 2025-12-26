@@ -37,6 +37,50 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/ai", tags=["AI Analysis"])
 
 
+def convert_text_to_html(text: str) -> str:
+    """
+    将纯文本转换为HTML格式（与前端逻辑保持一致）
+    换行符转换为段落，多个连续换行符转换为段落分隔
+    
+    Args:
+        text: 纯文本内容
+        
+    Returns:
+        HTML格式的字符串
+    """
+    import re
+    
+    if not text or not text.strip():
+        return '<p></p>'
+    
+    # 检测是否已经是HTML格式（包含HTML标签）
+    html_tag_pattern = re.compile(r'</?[a-z][\s\S]*>', re.IGNORECASE)
+    has_html_tags = html_tag_pattern.search(text)
+    
+    if has_html_tags:
+        trimmed = text.strip()
+        # 如果已经是完整的HTML格式，直接返回
+        if trimmed.startswith('<') and trimmed.endswith('>'):
+            return text
+        # 如果包含HTML标签但格式不完整，直接返回（前端会处理）
+        if '<p>' in trimmed or '<br>' in trimmed or '<div>' in trimmed:
+            return text
+    
+    # 将纯文本转换为HTML：换行符转换为段落
+    # 多个连续换行符转换为段落分隔
+    paragraphs = re.split(r'\n\s*\n', text)
+    html_parts = []
+    
+    for para in paragraphs:
+        para = para.strip()
+        if para:
+            # 段落内的单换行符转换为 <br>
+            para_html = para.replace('\n', '<br>')
+            html_parts.append(f'<p>{para_html}</p>')
+    
+    return ''.join(html_parts) if html_parts else '<p></p>'
+
+
 # 辅助函数：确保返回的是 AsyncSession 对象，而不是生成器
 async def get_db_session(db: AsyncSession = Depends(get_async_db)) -> AsyncSession:
     """
@@ -1430,6 +1474,7 @@ async def create_work_from_file(
                     continue
                 
                 # 计算章节字数（去除HTML标签，统计纯文本字符数）
+                # 注意：这里使用原始内容计算字数，因为转换后的HTML会增加标签
                 chapter_word_count = 0
                 if chapter_data.content:
                     # 如果内容是HTML，需要提取纯文本
@@ -1450,12 +1495,15 @@ async def create_work_from_file(
                 )
                 
                 # 4. 将章节内容保存到 ShareDB
+                # 关键修复：确保内容是HTML格式（如果前端已经转换，这里作为双重保障）
+                content_html = convert_text_to_html(chapter_data.content)
+                
                 document_id = f"work_{work.id}_chapter_{chapter.id}"
                 await sharedb_service.create_document(
                     document_id=document_id,
                     initial_content={
                         "id": document_id,
-                        "content": chapter_data.content,
+                        "content": content_html,  # 使用转换后的HTML格式
                         "title": chapter_data.title,
                         "metadata": {
                             "work_id": work.id,

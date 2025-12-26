@@ -739,12 +739,13 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  overflow: hidden;
-  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
   position: relative;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* 第二行工具栏中的编辑器工具栏样式 */
@@ -933,18 +934,16 @@
 .novel-editor-wrapper {
   position: relative;
   flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: visible;
   padding: 40px 24px;
   display: flex;
   justify-content: center;
-  min-height: 0;
+  min-height: min-content;
   background: var(--bg-secondary, #f8fafc);
   box-sizing: border-box;
-  -webkit-overflow-scrolling: touch;
 }
 
-.chapter-editor-container .novel-editor-wrapper > div {
+.chapter-content-wrapper {
   width: 100%;
   max-width: 800px;
   display: flex;
@@ -953,14 +952,30 @@
   box-sizing: border-box;
   overflow: visible;
   margin: 0 auto;
+  /* 让内容自然增长，不限制高度 */
 }
 
-/* 章节头部信息 */
-.chapter-header-info {
+.editor-with-header {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  overflow: visible;
+  /* 确保内容可以超出容器高度 */
+  min-height: min-content;
+}
+
+/* 章节头部信息 - 作为编辑器的一部分 */
+.editor-with-header .chapter-header-info {
   text-align: center;
-  margin-bottom: 8px;
-  padding-bottom: 8px;
+  padding: 24px 80px 16px 80px;
   border-bottom: 1px solid var(--border-light, #e2e8f0);
+  max-height: 100px;
+  overflow: hidden;
+  background: var(--bg-primary);
+  border-radius: 12px 12px 0 0;
 }
 
 .chapter-number {
@@ -969,21 +984,27 @@
   margin-bottom: 4px;
   font-weight: 500;
   letter-spacing: 0.5px;
+  line-height: 1.4;
 }
 
 .chapter-name {
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 600;
   color: var(--text-primary, #0f172a);
-  margin-bottom: 6px;
+  margin-bottom: 4px;
+  line-height: 1.4;
 }
 
 .chapter-name-editable {
-  cursor: pointer;
+  cursor: text;
   padding: 4px 8px;
   border-radius: 4px;
   transition: all 0.2s ease;
   display: inline-block;
+  outline: none;
+  min-width: 100px;
+  /* 确保空内容时也有高度 */
+  min-height: 1.4em;
 }
 
 .chapter-name-editable:hover {
@@ -991,34 +1012,30 @@
   color: var(--primary-color, #2563eb);
 }
 
-.chapter-name-input {
-  font-size: 24px;
-  font-weight: 600;
-  color: var(--text-primary, #0f172a);
-  border: 2px solid var(--primary-color, #2563eb);
-  border-radius: 6px;
-  padding: 4px 12px;
+.chapter-name-editable:focus {
   background: var(--bg-primary);
-  width: 100%;
-  max-width: 600px;
-  outline: none;
-  font-family: inherit;
+  border: 2px solid var(--primary-color, #2563eb);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  padding: 2px 10px;
 }
 
-.chapter-name-input:focus {
-  border-color: var(--primary-color, #2563eb);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+.chapter-name-editable:empty::before {
+  content: '未命名章节';
+  color: var(--text-tertiary, #94a3b8);
+  font-style: italic;
 }
 
 .chapter-stats {
   display: flex;
   justify-content: center;
-  gap: 24px;
-  font-size: 13px;
+  gap: 16px;
+  font-size: 12px;
   color: var(--text-secondary, #64748b);
+  margin-top: 4px;
+  line-height: 1.4;
 }
 
-.chapter-editor-container .novel-editor-wrapper > div > div {
+.editor-with-header > div {
   width: 100%;
   max-width: 100%;
   display: flex;
@@ -1026,33 +1043,37 @@
   background: transparent;
   box-sizing: border-box;
   overflow: visible;
+  /* 移除 flex: 1，让内容自然增长 */
+  min-height: min-content;
 }
 
-.chapter-editor-container .novel-editor-wrapper .ProseMirror {
+.editor-with-header .ProseMirror {
   width: 100%;
   max-width: 100%;
   outline: none;
   background: var(--bg-primary);
-  border-radius: 12px;
+  border-radius: 0 0 12px 12px;
   padding: 12px 80px 60px 80px;
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  box-shadow: none;
   color: var(--text-primary);
   word-wrap: break-word;
   word-break: break-word;
   overflow-wrap: break-word;
-  min-height: auto;
+  /* 编辑器不产生滚动，滚动在 novel-editor-wrapper 中 */
   box-sizing: border-box;
-  overflow-x: hidden;
+  overflow: visible;
+  /* 确保编辑器内容区域可以自然增长 */
+  min-height: 400px;
 }
 
 /* 确保章节编辑器内所有文本元素颜色一致 */
-.chapter-editor-container .novel-editor-wrapper .ProseMirror * {
+.editor-with-header .ProseMirror * {
   color: inherit;
 }
 
-.chapter-editor-container .novel-editor-wrapper .ProseMirror p,
-.chapter-editor-container .novel-editor-wrapper .ProseMirror span,
-.chapter-editor-container .novel-editor-wrapper .ProseMirror div {
+.editor-with-header .ProseMirror p,
+.editor-with-header .ProseMirror span,
+.editor-with-header .ProseMirror div {
   color: var(--text-primary);
   word-wrap: break-word;
   word-break: break-word;
@@ -1062,7 +1083,7 @@
 }
 
 /* 优化段落样式 - 阅读模式 */
-.chapter-editor-container .novel-editor-wrapper .ProseMirror p {
+.editor-with-header .ProseMirror p {
   margin-bottom: 1.5em;
   text-indent: 2em;
   font-size: 16px;
@@ -1160,32 +1181,32 @@
 }
 
 /* 美化滚动条 */
-.novel-editor-wrapper::-webkit-scrollbar,
-.chapter-editor-container .novel-editor-wrapper .ProseMirror::-webkit-scrollbar {
+.chapter-editor-container::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
-.novel-editor-wrapper::-webkit-scrollbar-track,
-.chapter-editor-container .novel-editor-wrapper .ProseMirror::-webkit-scrollbar-track {
+.chapter-editor-container::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.novel-editor-wrapper::-webkit-scrollbar-thumb,
-.chapter-editor-container .novel-editor-wrapper .ProseMirror::-webkit-scrollbar-thumb {
+.chapter-editor-container::-webkit-scrollbar-thumb {
   background: var(--border-light, #e2e8f0);
   border-radius: 4px;
 }
 
-.novel-editor-wrapper::-webkit-scrollbar-thumb:hover,
-.chapter-editor-container .novel-editor-wrapper .ProseMirror::-webkit-scrollbar-thumb:hover {
+.chapter-editor-container::-webkit-scrollbar-thumb:hover {
   background: var(--text-tertiary, #94a3b8);
 }
 
 /* 响应式设计 */
 @media (max-width: 1200px) {
-  .chapter-editor-container .novel-editor-wrapper .ProseMirror {
-    padding: 48px 60px;
+  .editor-with-header .chapter-header-info {
+    padding: 24px 60px 16px 60px;
+  }
+  
+  .editor-with-header .ProseMirror {
+    padding: 12px 60px 60px 60px;
   }
 }
 
@@ -1205,8 +1226,12 @@
     margin-bottom: 8px;
   }
 
-  .chapter-editor-container .novel-editor-wrapper .ProseMirror {
-    padding: 32px 24px;
+  .editor-with-header .chapter-header-info {
+    padding: 16px 24px 12px 24px;
+  }
+  
+  .editor-with-header .ProseMirror {
+    padding: 12px 24px 60px 24px;
   }
 }
 
