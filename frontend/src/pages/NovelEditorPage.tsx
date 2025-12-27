@@ -71,6 +71,15 @@ export default function NovelEditorPage(){
   // 标题下拉菜单状态
   const [headingMenuOpen, setHeadingMenuOpen] = useState(false);
   
+  // 替换功能状态（VSCode风格）
+  const [isReplacePanelOpen, setIsReplacePanelOpen] = useState(false);
+  const [findText, setFindText] = useState('');
+  const [replaceText, setReplaceText] = useState('');
+  const [matchCase, setMatchCase] = useState(false);
+  const [wholeWord, setWholeWord] = useState(false);
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
+  const [matches, setMatches] = useState<Array<{ start: number; end: number }>>([]);
+  
   // 侧边栏折叠状态
   const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
   const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false);
@@ -359,6 +368,222 @@ export default function NovelEditorPage(){
       alert(err instanceof Error ? err.message : '删除作品失败');
     }
   };
+
+  // 处理替换功能（打开/关闭面板）
+  const handleReplace = () => {
+    setIsReplacePanelOpen(!isReplacePanelOpen);
+    if (!isReplacePanelOpen && editor) {
+      // 打开时聚焦到查找输入框
+      setTimeout(() => {
+        const findInput = document.querySelector('.find-replace-panel .find-input') as HTMLInputElement;
+        findInput?.focus();
+      }, 0);
+    }
+  };
+
+  // 查找匹配项
+  const findMatches = () => {
+    if (!editor || !findText.trim()) {
+      setMatches([]);
+      setCurrentMatchIndex(-1);
+      return;
+    }
+
+    try {
+      const content = editor.getText();
+      let regex: RegExp;
+      
+      if (wholeWord) {
+        // 全字匹配
+        const escaped = findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        regex = matchCase 
+          ? new RegExp(`\\b${escaped}\\b`, 'g')
+          : new RegExp(`\\b${escaped}\\b`, 'gi');
+      } else {
+        // 普通匹配
+        const escaped = findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        regex = matchCase 
+          ? new RegExp(escaped, 'g')
+          : new RegExp(escaped, 'gi');
+      }
+
+      const foundMatches: Array<{ start: number; end: number }> = [];
+      let match;
+      const textContent = content;
+      
+      while ((match = regex.exec(textContent)) !== null) {
+        foundMatches.push({
+          start: match.index,
+          end: match.index + match[0].length,
+        });
+      }
+
+      setMatches(foundMatches);
+      if (foundMatches.length > 0) {
+        setCurrentMatchIndex(0);
+        scrollToMatch(foundMatches[0]);
+      } else {
+        setCurrentMatchIndex(-1);
+      }
+    } catch (err) {
+      console.error('查找失败:', err);
+      setMatches([]);
+      setCurrentMatchIndex(-1);
+    }
+  };
+
+  // 滚动到匹配项
+  const scrollToMatch = (match: { start: number; end: number }) => {
+    if (!editor) return;
+    
+    // 使用 Tiptap 的 setTextSelection 来定位
+    editor.commands.setTextSelection({ from: match.start, to: match.end });
+    editor.commands.focus();
+    
+    // 滚动到视图
+    try {
+      const editorElement = editor.view.dom;
+      const selection = window.getSelection();
+      if (selection && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        const editorRect = editorElement.getBoundingClientRect();
+        
+        // 如果匹配项不在视图中，滚动到它
+        if (rect.top < editorRect.top || rect.bottom > editorRect.bottom) {
+          range.startContainer.parentElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+    } catch (err) {
+      // 忽略滚动错误
+      console.warn('滚动到匹配项失败:', err);
+    }
+  };
+
+  // 查找下一个
+  const findNext = () => {
+    if (matches.length === 0) {
+      findMatches();
+      return;
+    }
+    
+    const nextIndex = (currentMatchIndex + 1) % matches.length;
+    setCurrentMatchIndex(nextIndex);
+    scrollToMatch(matches[nextIndex]);
+  };
+
+  // 查找上一个
+  const findPrevious = () => {
+    if (matches.length === 0) {
+      findMatches();
+      return;
+    }
+    
+    const prevIndex = currentMatchIndex <= 0 ? matches.length - 1 : currentMatchIndex - 1;
+    setCurrentMatchIndex(prevIndex);
+    scrollToMatch(matches[prevIndex]);
+  };
+
+  // 替换当前匹配项
+  const replaceCurrent = () => {
+    if (!editor || matches.length === 0 || currentMatchIndex < 0) return;
+
+    try {
+      const match = matches[currentMatchIndex];
+      const htmlContent = editor.getHTML();
+      
+      // 在 HTML 中找到对应的位置并替换（简化处理）
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = htmlContent;
+      const textNodes: Array<{ node: Node; start: number; end: number }> = [];
+      
+      const walker = document.createTreeWalker(
+        tempDiv,
+        NodeFilter.SHOW_TEXT,
+        null
+      );
+      
+      let currentTextPos = 0;
+      let node;
+      while ((node = walker.nextNode())) {
+        const nodeText = node.textContent || '';
+        const nodeStart = currentTextPos;
+        const nodeEnd = currentTextPos + nodeText.length;
+        textNodes.push({ node, start: nodeStart, end: nodeEnd });
+        currentTextPos = nodeEnd;
+      }
+      
+      // 找到包含匹配项的文本节点并替换
+      for (const textNode of textNodes) {
+        if (match.start >= textNode.start && match.start < textNode.end) {
+          const offset = match.start - textNode.start;
+          const nodeText = textNode.node.textContent || '';
+          const beforeMatch = nodeText.substring(0, offset);
+          const afterMatch = nodeText.substring(offset + (match.end - match.start));
+          
+          textNode.node.textContent = beforeMatch + replaceText + afterMatch;
+          break;
+        }
+      }
+      
+      editor.commands.setContent(tempDiv.innerHTML);
+      
+      // 重新查找匹配项
+      setTimeout(() => {
+        findMatches();
+      }, 100);
+    } catch (err) {
+      console.error('替换失败:', err);
+    }
+  };
+
+  // 替换全部
+  const replaceAllMatches = () => {
+    if (!editor || !findText.trim() || matches.length === 0) return;
+
+    try {
+      const htmlContent = editor.getHTML();
+      let regex: RegExp;
+      
+      if (wholeWord) {
+        const escaped = findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        regex = matchCase 
+          ? new RegExp(`\\b${escaped}\\b`, 'g')
+          : new RegExp(`\\b${escaped}\\b`, 'gi');
+      } else {
+        const escaped = findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        regex = matchCase 
+          ? new RegExp(escaped, 'g')
+          : new RegExp(escaped, 'gi');
+      }
+
+      // 简单处理：直接替换 HTML 中的文本（保持格式）
+      const newHtmlContent = htmlContent.replace(regex, replaceText);
+      editor.commands.setContent(newHtmlContent);
+      
+      alert(`已替换 ${matches.length} 处"${findText}"为"${replaceText}"`);
+      setMatches([]);
+      setCurrentMatchIndex(-1);
+      setFindText('');
+    } catch (err) {
+      console.error('替换失败:', err);
+      alert('替换失败，请重试');
+    }
+  };
+
+  // 监听查找文本变化
+  useEffect(() => {
+    if (isReplacePanelOpen && findText && editor) {
+      const timeoutId = setTimeout(() => {
+        findMatches();
+      }, 300); // 防抖
+      return () => clearTimeout(timeoutId);
+    } else {
+      setMatches([]);
+      setCurrentMatchIndex(-1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [findText, matchCase, wholeWord, isReplacePanelOpen, editor]);
 
   // 分析本书（后台运行，不显示弹窗）
   const handleAnalyzeWork = async () => {
@@ -1585,9 +1810,13 @@ export default function NovelEditorPage(){
               <Trash2 size={16} />
               <span>删除</span>
             </button>
-            <button className="action-btn">替换</button>
-            <button className="action-btn">回收站</button>
-            <button className="action-btn">分享</button>
+            <button 
+              className="action-btn" 
+              onClick={handleReplace}
+              title="查找和替换文字"
+            >
+              <span>替换</span>
+            </button>
           </div>
           {/* 侧边栏折叠按钮组 */}
           <div className="sidebar-toggle-buttons">
@@ -1726,6 +1955,119 @@ export default function NovelEditorPage(){
           <AIAssistant workId={workId} />
         </div>
       </div>
+
+      {/* VSCode风格的查找替换面板 */}
+      {isReplacePanelOpen && (
+        <div className="find-replace-panel">
+          <div className="find-replace-content">
+            <div className="find-replace-row">
+              <div className="find-input-wrapper">
+                <input
+                  type="text"
+                  className="find-input"
+                  value={findText}
+                  onChange={(e) => setFindText(e.target.value)}
+                  placeholder="查找"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && e.shiftKey) {
+                      e.preventDefault();
+                      findPrevious();
+                    } else if (e.key === 'Enter') {
+                      e.preventDefault();
+                      findNext();
+                    } else if (e.key === 'Escape') {
+                      setIsReplacePanelOpen(false);
+                    }
+                  }}
+                />
+                <div className="find-actions">
+                  <button
+                    className="find-action-btn"
+                    onClick={findPrevious}
+                    title="上一个 (Shift+Enter)"
+                    disabled={matches.length === 0}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    className="find-action-btn"
+                    onClick={findNext}
+                    title="下一个 (Enter)"
+                    disabled={matches.length === 0}
+                  >
+                    ↓
+                  </button>
+                </div>
+                {matches.length > 0 && (
+                  <span className="match-count">
+                    {currentMatchIndex + 1} / {matches.length}
+                  </span>
+                )}
+              </div>
+              <div className="replace-input-wrapper">
+                <input
+                  type="text"
+                  className="replace-input"
+                  value={replaceText}
+                  onChange={(e) => setReplaceText(e.target.value)}
+                  placeholder="替换"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      replaceCurrent();
+                    } else if (e.key === 'Escape') {
+                      setIsReplacePanelOpen(false);
+                    }
+                  }}
+                />
+                <div className="replace-actions">
+                  <button
+                    className="replace-action-btn"
+                    onClick={replaceCurrent}
+                    title="替换"
+                    disabled={matches.length === 0 || currentMatchIndex < 0}
+                  >
+                    替换
+                  </button>
+                  <button
+                    className="replace-action-btn replace-all-btn"
+                    onClick={replaceAllMatches}
+                    title="全部替换"
+                    disabled={matches.length === 0}
+                  >
+                    全部替换
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="find-replace-options">
+              <label className="option-checkbox">
+                <input
+                  type="checkbox"
+                  checked={matchCase}
+                  onChange={(e) => setMatchCase(e.target.checked)}
+                />
+                <span>区分大小写</span>
+              </label>
+              <label className="option-checkbox">
+                <input
+                  type="checkbox"
+                  checked={wholeWord}
+                  onChange={(e) => setWholeWord(e.target.checked)}
+                />
+                <span>全字匹配</span>
+              </label>
+              <button
+                className="close-panel-btn"
+                onClick={() => setIsReplacePanelOpen(false)}
+                title="关闭 (Esc)"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 章节设置弹框 */}
       <ChapterSettingsModal

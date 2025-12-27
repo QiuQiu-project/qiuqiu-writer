@@ -1245,6 +1245,181 @@
   }
 }
 
+/* VSCode风格的查找替换面板 */
+.find-replace-panel {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--bg-primary, #ffffff);
+  border-top: 1px solid var(--border-light, #e2e8f0);
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  padding: 8px 16px;
+}
+
+.find-replace-content {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.find-replace-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.find-input-wrapper,
+.replace-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.find-input,
+.replace-input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--border-light, #e2e8f0);
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--text-primary, #0f172a);
+  background: var(--bg-primary, #ffffff);
+  outline: none;
+  transition: all 0.2s ease;
+  min-width: 200px;
+}
+
+.find-input:focus,
+.replace-input:focus {
+  border-color: var(--primary-color, #2563eb);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.find-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.find-action-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-light, #e2e8f0);
+  background: var(--bg-secondary, #f8fafc);
+  color: var(--text-secondary, #64748b);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.find-action-btn:hover:not(:disabled) {
+  background: var(--bg-primary, #ffffff);
+  border-color: var(--primary-color, #2563eb);
+  color: var(--primary-color, #2563eb);
+}
+
+.find-action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.match-count {
+  font-size: 12px;
+  color: var(--text-secondary, #64748b);
+  white-space: nowrap;
+  margin-left: 4px;
+}
+
+.replace-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.replace-action-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--border-light, #e2e8f0);
+  background: var(--bg-secondary, #f8fafc);
+  color: var(--text-primary, #0f172a);
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.replace-action-btn:hover:not(:disabled) {
+  background: var(--bg-primary, #ffffff);
+  border-color: var(--primary-color, #2563eb);
+  color: var(--primary-color, #2563eb);
+}
+
+.replace-action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.replace-all-btn {
+  background: var(--primary-color, #2563eb);
+  color: white;
+  border-color: var(--primary-color, #2563eb);
+}
+
+.replace-all-btn:hover:not(:disabled) {
+  background: var(--primary-hover, #1d4ed8);
+  border-color: var(--primary-hover, #1d4ed8);
+}
+
+.find-replace-options {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-light, #e2e8f0);
+}
+
+.option-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary, #64748b);
+  cursor: pointer;
+  user-select: none;
+}
+
+.option-checkbox input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+.close-panel-btn {
+  margin-left: auto;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary, #64748b);
+  font-size: 20px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.close-panel-btn:hover {
+  background: var(--bg-secondary, #f8fafc);
+  color: var(--text-primary, #0f172a);
+}
+
 @media (max-width: 768px) {
   .novel-editor-header {
     flex-wrap: wrap;
