@@ -1638,8 +1638,12 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
       } else {
         console.warn('⚠️ 未找到任何 dataKey，请检查组件配置');
       }
+      
+      // 返回 true 表示保存成功
+      return true;
     } catch (error) {
       console.error('❌ 保存作品信息到 metadata 失败:', error);
+      throw error; // 重新抛出错误，让调用者处理
     }
   }, [workId, extractComponentDataFromTemplate, writeComponentDataToTemplate, cleanTemplateStructure]);
 
@@ -1683,63 +1687,17 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
     }
   }, [template, cleanTemplateStructure]);
 
-  // 自动保存到数据库和缓存（防抖，基于 workId）
+  // 不再自动保存，改为手动保存
+  // 当模板变化时，只标记为未保存状态
   useEffect(() => {
-    // 如果模板为空或没有模块，不保存
+    // 如果模板为空或没有模块，不标记
     if (!template || !template.modules || template.modules.length === 0) {
       return;
     }
 
-    const timer = setTimeout(async () => {
-      const templateData = {
-        templateId: template.id,
-        modules: template.modules,
-        lastModified: Date.now()
-      };
-
-      
-      // 保存到本地缓存（使用模板ID作为key的一部分）
-      try {
-        saveToCache(templateData, workId || null, template.id);
-        
-      } catch (error) {
-        console.error('保存到本地缓存失败:', error);
-      }
-
-      // 如果有 workId，直接保存到作品的 metadata 字段
-      if (workId) {
-        try {
-          // 使用统一的保存函数（自动保存时不比较，总是保存）
-          const workSaved = await saveWorkInfoToMetadata(template, null);
-          if (workSaved) {
-            // 更新快照
-            const componentDataFromTemplate = extractComponentDataFromTemplate(template.modules);
-            const currentDataStr = JSON.stringify({
-              component_data: componentDataFromTemplate
-            });
-            setOriginalWorkDataSnapshot(currentDataStr);
-          }
-          setHasUnsavedChanges(false);
-        } catch (error) {
-          console.error('❌ 保存作品信息到 metadata 失败:', error);
-          // 保存失败时保持未保存状态
-          setHasUnsavedChanges(true);
-          // 显示错误提示
-          if (error instanceof Error) {
-            console.error('错误详情:', error.message);
-          }
-        }
-      } else {
-        // 没有 workId 时，只保存到缓存
-        setHasUnsavedChanges(false);
-      }
-    }, 2000); // 2秒后自动保存（防抖）
-
+    // 标记为未保存状态，但不自动保存
     setHasUnsavedChanges(true);
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [template, workId, saveWorkInfoToMetadata, extractCharactersFromTemplate]);
+  }, [template]);
 
 
   // 更新组件值
@@ -1760,15 +1718,8 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
         console.log(`✅ updateComponentValue: 更新关系图谱组件 ${componentId}，${value.relations.length} 个关系`, value);
       }
       
-      // 立即保存到数据库（如果有 workId）
-      if (workId) {
-        // 使用 setTimeout 确保状态更新后再保存（自动保存时不比较，总是保存）
-        setTimeout(() => {
-          saveWorkInfoToMetadata(updated, null).catch(error => {
-            console.error('❌ 保存组件数据失败:', error);
-          });
-        }, 0);
-      }
+      // 不再自动保存，只标记为未保存状态
+      // 用户需要手动点击保存按钮来保存
       
       return updated;
     });
@@ -3819,7 +3770,19 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
               className="save-btn" 
               onClick={async () => {
                 try {
-                  // 保存作品信息（如果有修改）
+                  // 先保存到本地缓存
+                  const templateData = {
+                    templateId: template.id,
+                    modules: template.modules,
+                    lastModified: Date.now()
+                  };
+                  try {
+                    saveToCache(templateData, workId || null, template.id);
+                  } catch (error) {
+                    console.error('保存到本地缓存失败:', error);
+                  }
+
+                  // 保存作品信息到数据库（如果有修改）
                   const workSaved = await saveWorkInfoToMetadata(template, originalWorkDataSnapshot);
                   if (workSaved) {
                     // 更新快照为当前数据
@@ -3831,6 +3794,8 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
                     setHasUnsavedChanges(false);
                     alert('保存成功！');
                   } else {
+                    // 即使没有修改，也更新缓存
+                    setHasUnsavedChanges(false);
                     alert('数据未修改，无需保存');
                   }
                 } catch (error) {
