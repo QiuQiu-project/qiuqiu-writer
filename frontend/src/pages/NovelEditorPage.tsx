@@ -901,10 +901,14 @@ export default function NovelEditorPage(){
     const editorContent = editor.getHTML();
     const documentId = `work_${workId}_chapter_${chapterId}`;
 
+    // 检查是否离线
+    const isOffline = !navigator.onLine || !syncStatus.isOnline;
+
     console.log('💾 [手动保存] 开始保存:', {
       chapterId,
       documentId,
       contentLength: editorContent.length,
+      isOffline,
     });
 
     try {
@@ -913,7 +917,7 @@ export default function NovelEditorPage(){
       if (saveButton) {
         saveButton.disabled = true;
         if (saveButton.querySelector('span')) {
-          saveButton.querySelector('span')!.textContent = '保存中...';
+          saveButton.querySelector('span')!.textContent = isOffline ? '保存到缓存中...' : '保存中...';
         }
       }
 
@@ -938,8 +942,8 @@ export default function NovelEditorPage(){
         updated_at: new Date().toISOString(),
       };
       
-      // 关键修复：只在 sync 请求中进行缓存操作
-      // syncDocumentState 内部会调用 updateDocument 进行缓存更新
+      // 关键修复：无论在线还是离线，都先保存到本地缓存
+      // syncDocumentState 内部会先调用 updateDocument 进行缓存更新
       // 关键修复：添加验证函数，确保只有当前章节才会同步
       const result = await documentCache.syncDocumentState(
         documentId, 
@@ -966,11 +970,16 @@ export default function NovelEditorPage(){
         console.log('✅ [手动保存] 保存成功:', {
           version: result.version,
           contentLength: result.content.length,
+          isOffline,
         });
         
-        // 显示成功提示（可选）
+        // 显示成功提示（根据在线/离线状态显示不同提示）
         if (saveButton && saveButton.querySelector('span')) {
-          saveButton.querySelector('span')!.textContent = '已保存';
+          if (isOffline) {
+            saveButton.querySelector('span')!.textContent = '已保存到缓存';
+          } else {
+            saveButton.querySelector('span')!.textContent = '已保存';
+          }
           setTimeout(() => {
             if (saveButton && saveButton.querySelector('span')) {
               saveButton.querySelector('span')!.textContent = '保存';
@@ -978,14 +987,33 @@ export default function NovelEditorPage(){
             if (saveButton) {
               saveButton.disabled = false;
             }
-          }, 1000);
+          }, 1500);
         }
       } else {
         throw new Error(result.error || '保存失败');
       }
     } catch (err) {
       console.error('❌ [手动保存] 保存失败:', err);
-      alert('保存失败: ' + (err instanceof Error ? err.message : String(err)));
+      
+      // 关键修复：即使保存失败，也尝试保存到本地缓存（作为最后的备份）
+      try {
+        await documentCache.updateDocument(documentId, editorContent, {
+          work_id: Number(workId),
+          chapter_id: chapterId,
+          updated_at: new Date().toISOString(),
+        });
+        console.log('✅ [手动保存] 已保存到本地缓存（作为备份）');
+        
+        // 显示提示：已保存到缓存，但服务器同步失败
+        if (isOffline) {
+          alert('已保存到本地缓存（离线模式）');
+        } else {
+          alert('已保存到本地缓存，但服务器同步失败。网络恢复后将自动同步。');
+        }
+      } catch (cacheErr) {
+        console.error('❌ [手动保存] 保存到缓存也失败:', cacheErr);
+        alert('保存失败: ' + (err instanceof Error ? err.message : String(err)));
+      }
       
       // 恢复按钮状态
       const saveButton = document.querySelector('.manual-save-btn') as HTMLButtonElement;
