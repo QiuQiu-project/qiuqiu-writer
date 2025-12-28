@@ -31,7 +31,9 @@
   gap: 16px;
   flex: 1;
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
+  position: relative;
+  z-index: 1;
 }
 
 .exit-btn {
@@ -65,7 +67,8 @@
   gap: 8px;
   min-width: 0;
   flex: 1;
-  overflow: hidden;
+  overflow: visible;
+  position: relative;
 }
 
 .work-info-row {
@@ -74,7 +77,8 @@
   gap: 12px;
   flex-wrap: nowrap;
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
+  position: relative;
 }
 
 .work-title {
@@ -196,8 +200,8 @@
   white-space: nowrap;
 }
 
-/* 总字数 tooltip */
-.word-count-tooltip-wrapper {
+/* 统一的 tooltip 样式 */
+.tooltip-wrapper {
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -205,31 +209,86 @@
   flex-shrink: 0;
 }
 
-.word-count-tooltip {
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  margin-top: 8px;
+.tooltip {
+  position: fixed;
   padding: 6px 12px;
-  background: var(--bg-secondary, #1f2937);
-  color: var(--text-primary, #ffffff);
+  background: rgba(31, 41, 55, 0.95);
+  backdrop-filter: blur(8px);
+  color: #ffffff;
   font-size: 12px;
   white-space: nowrap;
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  z-index: 1000;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  z-index: 99999;
   pointer-events: none;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
-.word-count-tooltip::before {
+.tooltip-wrapper:hover .tooltip,
+.tooltip-wrapper[data-tooltip-visible="true"] .tooltip {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.tooltip::before {
   content: '';
   position: absolute;
   bottom: 100%;
   left: 50%;
   transform: translateX(-50%);
-  border: 4px solid transparent;
-  border-bottom-color: var(--bg-secondary, #1f2937);
+  border: 5px solid transparent;
+  border-bottom-color: rgba(31, 41, 55, 0.95);
+}
+
+/* 总字数 tooltip - 使用统一样式 */
+.word-count-tooltip-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  z-index: 100000;
+}
+
+.word-count-tooltip {
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 6px 12px;
+  background: rgba(31, 41, 55, 0.95);
+  backdrop-filter: blur(8px);
+  color: #ffffff;
+  font-size: 12px;
+  white-space: nowrap;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  z-index: 99999;
+  pointer-events: auto;
+  animation: tooltipFadeInRight 0.2s ease-out;
+}
+
+@keyframes tooltipFadeInRight {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+}
+
+.word-count-tooltip::before {
+  content: '';
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 5px solid transparent;
+  border-right-color: rgba(31, 41, 55, 0.95);
 }
 
 .header-right {
@@ -578,7 +637,9 @@
 }
 
 .toolbar-dropdown-menu {
-  position: fixed;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
   min-width: 160px;
   background: white;
   border: 1px solid #e5e7eb;
@@ -1478,6 +1539,7 @@
   .header-left {
     flex: 1;
     min-width: 0;
+    overflow: visible;
   }
 
   .header-right {
@@ -1764,18 +1826,25 @@
   }
 
   /* 移动端下拉菜单样式 */
+  .editor-toolbar-row .novel-editor-toolbar {
+    overflow: visible;
+    position: relative;
+  }
+
   .editor-toolbar-row .toolbar-dropdown {
     z-index: 10000;
+    position: relative;
   }
 
   .editor-toolbar-row .toolbar-dropdown-menu {
-    z-index: 10001;
-    min-width: 140px;
+    z-index: 100000;
+    min-width: 160px;
     max-width: 200px;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    margin-top: 4px;
+    position: fixed;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
   }
 
   /* 动画 */

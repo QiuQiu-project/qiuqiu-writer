@@ -18,22 +18,29 @@ export default function ChapterEditorToolbar({
   setHeadingMenuOpen,
 }: ChapterEditorToolbarProps) {
   const headingMenuRef = useRef<HTMLDivElement>(null);
+  const headingButtonRef = useRef<HTMLButtonElement>(null);
+  const dropdownMenuRef = useRef<HTMLDivElement>(null);
   const [currentHeading, setCurrentHeading] = useState<string>('P');
 
   // 点击外部关闭标题下拉菜单
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       if (headingMenuRef.current && !headingMenuRef.current.contains(event.target as Node)) {
         setHeadingMenuOpen(false);
       }
     };
 
     if (headingMenuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+      // 使用 setTimeout 确保事件监听器在点击事件之后添加
+      setTimeout(() => {
+        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('touchstart', handleClickOutside);
+      }, 0);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
     };
   }, [headingMenuOpen, setHeadingMenuOpen]);
 
@@ -117,8 +124,35 @@ export default function ChapterEditorToolbar({
         {/* 标题下拉菜单 */}
         <div className="toolbar-dropdown" ref={headingMenuRef}>
           <button
+            ref={headingButtonRef}
             className="toolbar-btn"
-            onClick={() => setHeadingMenuOpen(!headingMenuOpen)}
+            onClick={(e) => {
+              e.stopPropagation();
+              const newState = !headingMenuOpen;
+              setHeadingMenuOpen(newState);
+              // 动态计算下拉菜单位置（移动端和桌面端都需要）
+              if (newState && headingButtonRef.current) {
+                setTimeout(() => {
+                  if (headingButtonRef.current && dropdownMenuRef.current) {
+                    const rect = headingButtonRef.current.getBoundingClientRect();
+                    const isMobile = window.innerWidth <= 768;
+                    if (isMobile) {
+                      // 移动端使用 fixed 定位
+                      dropdownMenuRef.current.style.position = 'fixed';
+                      dropdownMenuRef.current.style.left = `${rect.left}px`;
+                      dropdownMenuRef.current.style.top = `${rect.bottom + 4}px`;
+                      dropdownMenuRef.current.style.transform = 'none';
+                    } else {
+                      // 桌面端使用 absolute 定位（相对于按钮）
+                      dropdownMenuRef.current.style.position = 'absolute';
+                      dropdownMenuRef.current.style.left = '0';
+                      dropdownMenuRef.current.style.top = '100%';
+                      dropdownMenuRef.current.style.transform = 'none';
+                    }
+                  }
+                }, 0);
+              }
+            }}
             title="标题样式"
           >
             <Heading size={16} />
@@ -126,7 +160,11 @@ export default function ChapterEditorToolbar({
             <ChevronDown size={14} className="dropdown-arrow" />
           </button>
           {headingMenuOpen && (
-            <div className="toolbar-dropdown-menu">
+            <div 
+              ref={dropdownMenuRef}
+              className="toolbar-dropdown-menu"
+              onClick={(e) => e.stopPropagation()}
+            >
               <button
                 className={`toolbar-dropdown-item ${editor?.isActive('heading', { level: 1 }) ? 'active' : ''}`}
                 onClick={() => {

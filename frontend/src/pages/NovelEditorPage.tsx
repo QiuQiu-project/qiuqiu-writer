@@ -220,6 +220,38 @@ export default function NovelEditorPage(){
     }
   }, [work]);
 
+  // 移动端：点击外部关闭 tooltip
+  useEffect(() => {
+    if (!isMobile || !showWordCountTooltip) return;
+
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node;
+      const wrapper = document.querySelector('.word-count-tooltip-wrapper');
+      const tooltip = document.querySelector('.word-count-tooltip');
+      
+      if (
+        wrapper &&
+        !wrapper.contains(target) &&
+        tooltip &&
+        !tooltip.contains(target)
+      ) {
+        setShowWordCountTooltip(false);
+      }
+    };
+
+    // 延迟添加事件监听，避免立即触发
+    const timer = setTimeout(() => {
+      document.addEventListener('click', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
+    }, 100);
+
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('click', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [isMobile, showWordCountTooltip]);
+
   // 当进入编辑模式时，聚焦输入框
   useEffect(() => {
     if (isEditingTitle && titleInputRef.current) {
@@ -1792,12 +1824,26 @@ export default function NovelEditorPage(){
               )}
               <span 
                 className="word-count-tooltip-wrapper"
-                onMouseEnter={() => setShowWordCountTooltip(true)}
-                onMouseLeave={() => setShowWordCountTooltip(false)}
+                data-tooltip-visible={showWordCountTooltip}
+                onMouseEnter={() => {
+                  if (!isMobile) {
+                    setShowWordCountTooltip(true);
+                  }
+                }}
+                onMouseLeave={() => !isMobile && setShowWordCountTooltip(false)}
+                onClick={(e) => {
+                  if (isMobile) {
+                    e.stopPropagation();
+                    setShowWordCountTooltip(!showWordCountTooltip);
+                  }
+                }}
               >
                 <Info size={14} />
                 {showWordCountTooltip && (
-                  <div className="word-count-tooltip">
+                  <div 
+                    className="word-count-tooltip"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     总字数: {work?.word_count || 0}
                   </div>
                 )}

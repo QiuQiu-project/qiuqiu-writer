@@ -29,8 +29,9 @@
   gap: 12px;
   flex-shrink: 0;
   flex-wrap: nowrap;
-  overflow: hidden;
+  overflow: visible;
   min-width: 0;
+  position: relative;
 }
 
 .toolbar-group {
