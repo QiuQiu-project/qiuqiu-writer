@@ -39,8 +39,10 @@ class PromptTemplate(Base):
     # 组件相关字段（用于组件级别的prompt）
     component_id = Column(String(100), nullable=True, index=True)  # 组件ID（如：char-cards, cp-relations等）
     component_type = Column(String(50), nullable=True, index=True)  # 组件类型（如：character-card, relation-graph等）
-    prompt_category = Column(String(20), nullable=True, index=True)  # prompt类别：generate（生成）或validate（验证）
-    work_id = Column(Integer, ForeignKey("works.id", ondelete="CASCADE"), nullable=True, index=True)  # 关联的作品ID（如果prompt是作品级别的）
+    prompt_category = Column(String(20), nullable=True, index=True)  # prompt类别：generate（生成）或validate（验证）或analysis（分析）
+    data_key = Column(String(100), nullable=True, index=True)  # 数据存储键（用于在 component_data 中存储数据）
+    work_id = Column(Integer, ForeignKey("works.id", ondelete="CASCADE"), nullable=True, index=True)  # 关联的作品ID（如果prompt是作品级别的，向后兼容）
+    work_template_id = Column(Integer, ForeignKey("work_templates.id", ondelete="CASCADE"), nullable=True, index=True)  # 关联的模板ID（如果prompt是模板级别的）
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -70,7 +72,9 @@ class PromptTemplate(Base):
             "component_id": self.component_id,
             "component_type": self.component_type,
             "prompt_category": self.prompt_category,
+            "data_key": self.data_key,
             "work_id": self.work_id,
+            "work_template_id": self.work_template_id,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
@@ -109,6 +113,8 @@ class PromptTemplate(Base):
                 if chapter_data:
                     if len(parts) == 1:
                         # @chapter 本身，返回整个对象（JSON格式）
+                        if isinstance(chapter_data, dict):
+                            return json.dumps(chapter_data, ensure_ascii=False, indent=2)
                         return json.dumps(chapter_data.to_dict() if hasattr(chapter_data, 'to_dict') else chapter_data, ensure_ascii=False, indent=2)
                     elif len(parts) == 2:
                         # @chapter.content 或 @chapter.title
@@ -121,20 +127,34 @@ class PromptTemplate(Base):
                                 return str(kwargs['content']) if kwargs['content'] else ''
                             if '章节内容' in kwargs:
                                 return str(kwargs['章节内容']) if kwargs['章节内容'] else ''
-                            # 如果都没有，尝试从 chapter_data 获取
+                            if 'chapter_content' in kwargs:
+                                return str(kwargs['chapter_content']) if kwargs['chapter_content'] else ''
+                            # 如果都没有，尝试从 chapter_data 获取（支持字典和对象）
+                            if isinstance(chapter_data, dict):
+                                return str(chapter_data.get('content', '')) or ''
                             return getattr(chapter_data, 'content', '') or ''
                         elif key == 'title':
+                            if isinstance(chapter_data, dict):
+                                return str(chapter_data.get('title', '')) or ''
                             return getattr(chapter_data, 'title', '') or ''
                         elif key == 'meta':
                             # @chapter.meta 返回整个元信息对象
-                            metadata = getattr(chapter_data, 'chapter_metadata', None) or {}
+                            if isinstance(chapter_data, dict):
+                                metadata = chapter_data.get('chapter_metadata') or chapter_data.get('meta') or {}
+                            else:
+                                metadata = getattr(chapter_data, 'chapter_metadata', None) or {}
                             return json.dumps(metadata, ensure_ascii=False, indent=2)
                         else:
                             # 其他属性
-                            return str(getattr(chapter_data, key, ''))
+                            if isinstance(chapter_data, dict):
+                                return str(chapter_data.get(key, '')) or ''
+                            return str(getattr(chapter_data, key, '')) or ''
                     elif len(parts) >= 3 and parts[1] == 'meta':
                         # @chapter.meta.outline 格式
-                        metadata = getattr(chapter_data, 'chapter_metadata', None) or {}
+                        if isinstance(chapter_data, dict):
+                            metadata = chapter_data.get('chapter_metadata') or chapter_data.get('meta') or {}
+                        else:
+                            metadata = getattr(chapter_data, 'chapter_metadata', None) or {}
                         # 从 metadata 中获取嵌套的键
                         current_value = metadata
                         for key in parts[2:]:
@@ -247,4 +267,6 @@ Index("idx_prompt_templates_default", PromptTemplate.is_default)
 Index("idx_prompt_templates_active", PromptTemplate.is_active)
 Index("idx_prompt_templates_component", PromptTemplate.component_id, PromptTemplate.component_type)
 Index("idx_prompt_templates_work_component", PromptTemplate.work_id, PromptTemplate.component_id, PromptTemplate.prompt_category)
+Index("idx_prompt_templates_template_component", PromptTemplate.work_template_id, PromptTemplate.component_id, PromptTemplate.prompt_category)
+Index("idx_prompt_templates_data_key", PromptTemplate.data_key)
 

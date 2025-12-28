@@ -3,13 +3,15 @@ AI接口路由
 提供章节分析、健康检查和默认提示词接口
 """
 
+import json
 import traceback
 from datetime import datetime, timezone
 from typing import Optional
-
+from memos.api.models.template import WorkTemplate
 from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 
 from memos.api.ai_models import (
     AnalyzeChapterRequest,
@@ -911,9 +913,9 @@ async def generate_chapter_outlines(
         success_count = 0
         error_count = 0
         
-        # 收集所有章节的角色信息
-        all_characters = []
-        characters_extraction_errors = []
+        # 收集所有章节的组件数据 {dataKey: [data_list]}
+        all_component_data = {}
+        component_extraction_errors = []
         
         try:
             # 逐章生成大纲和细纲
@@ -939,148 +941,282 @@ async def generate_chapter_outlines(
                     chapter_id = result.get("chapter_id")
                     chapter_number = result.get("chapter_number")
                     
-                    # 提取该章节的角色信息
-                    chapter_characters = []
+                    # 提取该章节的所有组件数据
+                    chapter_component_data = {}  # {dataKey: [data_list]}
                     try:
                         # 获取章节内容
                         chapter_content = await book_analysis_service.get_chapter_content(chapter_id)
                         
                         if chapter_content:
-                            logger.info(f"开始为章节 {chapter_id} 提取角色信息...")
+                            logger.info(f"开始为章节 {chapter_id} 提取组件数据...")
                             
                             # 获取现有的 work 数据，特别是 component_data 结构
                             work_metadata = work.work_metadata or {}
                             component_data = work_metadata.get("component_data", {})
-                            existing_characters = component_data.get("characters", [])
                             
-                            # 构建现有数据的描述，用于指导模型生成合适的数据结构
-                            existing_data_context = ""
-                            if existing_characters:
-                                import json
-                                # 只展示前3个角色作为示例，避免 prompt 过长
-                                example_characters = existing_characters[:3]
-                                existing_data_context = f"""
+
+                            template_config = None
+                            template_id = None
+                            
+                            # 从 work_metadata.template_config.templateId 中获取 template_id
+                            template_config_in_metadata = work_metadata.get("template_config")
+                            if template_config_in_metadata and isinstance(template_config_in_metadata, dict):
+                                template_id_str = template_config_in_metadata.get("templateId")
+                                if template_id_str:
+                                    # templateId 可能是 "db-1" 格式，需要提取数字
+                                    if isinstance(template_id_str, str) and template_id_str.startswith("db-"):
+                                        try:
+                                            template_id = int(template_id_str.replace("db-", ""))
+                                            logger.info(f"✅ 从 work_metadata.template_config.templateId 中获取到 template_id: {template_id_str} -> {template_id}")
+                                        except ValueError:
+                                            logger.warning(f"无法解析 templateId: {template_id_str}")
+                                    elif isinstance(template_id_str, (int, str)):
+                                        try:
+                                            template_id = int(template_id_str)
+                                            logger.info(f"✅ 从 work_metadata.template_config.templateId 中获取到 template_id: {template_id}")
+                                        except (ValueError, TypeError):
+                                            logger.warning(f"无法解析 templateId: {template_id_str}")
+                                else:
+                                    logger.debug(f"work_metadata.template_config 中没有 templateId 字段")
+                                    
+                                # 如果 template_config 中直接包含 modules，也可以直接使用（作为备用方案）
+                                if not template_id and "modules" in template_config_in_metadata:
+                                    template_config = template_config_in_metadata
+                                    logger.info(f"从 work_metadata.template_config 中直接获取到模板配置（modules），但没有 templateId，无法从 work_template 表获取最新配置")
+                            else:
+                                logger.warning(f"作品 {work_id} 的 work_metadata 中没有 template_config 或格式不正确")
+                            
+                            # 如果有 template_id，从 work_template 表查询
+                            if template_id:
+                                template_stmt = select(WorkTemplate).where(WorkTemplate.id == template_id)
+                                template_result = await db.execute(template_stmt)
+                                work_template = template_result.scalar_one_or_none()
+                                
+                                if not work_template:
+                                    logger.warning(f"作品 {work_id} 的模板不存在（template_id: {template_id}），跳过组件数据提取")
+                                elif not work_template.template_config:
+                                    logger.warning(f"作品 {work_id} 的模板配置为空，跳过组件数据提取")
+                                else:
+                                    template_config = work_template.template_config
+                                    logger.info(f"✅ 成功从 work_template 表获取模板配置（template_id: {template_id}）")
+                            
+                            # 如果仍然没有 template_config，记录警告
+                            if not template_config:
+                                logger.warning(f"作品 {work_id} 没有关联的模板配置，跳过组件数据提取。可能的原因：1) work_metadata.template_config 中没有 templateId；2) work_metadata.template_config 中没有 modules；3) templateId 对应的模板不存在或配置为空")
+                            
+                            # 如果找到了 template_id，直接从 prompt_template 表查询 analysis 类型的 prompt
+                            if template_id:
+                                try:
+                                    from memos.api.models.prompt_template import PromptTemplate
+                                    from sqlalchemy import and_
+                                    
+                                    # 查询所有 work_template_id 匹配且 prompt_category 为 analysis 的 prompt
+                                    prompt_stmt = select(PromptTemplate).where(
+                                        and_(
+                                            PromptTemplate.work_template_id == template_id,
+                                            PromptTemplate.prompt_category == "analysis",
+                                            PromptTemplate.is_active == True
+                                        )
+                                    )
+                                    prompt_result = await db.execute(prompt_stmt)
+                                    prompt_templates = prompt_result.scalars().all()
+                                    
+                                    if not prompt_templates:
+                                        logger.warning(f"作品 {work_id} 的模板（template_id: {template_id}）中未找到 prompt_category 为 analysis 的 prompt，跳过数据提取")
+                                    else:
+                                        logger.info(f"找到 {len(prompt_templates)} 个需要分析的 prompt（template_id: {template_id}）")
+                                        
+                                        # 对每个 prompt_template 调用 AI 生成数据
+                                        for prompt_template in prompt_templates:
+                                            data_key = prompt_template.data_key
+                                            component_id = prompt_template.component_id
+                                            analysis_prompt = prompt_template.prompt_content
+                                            print(f"data_key: {data_key}, component_id: {component_id}, analysis_prompt: {analysis_prompt}")
+                                            if not data_key:
+                                                logger.warning(f"⚠️ prompt_template (id: {prompt_template.id}, component_id: {component_id}) 没有定义 data_key，跳过")
+                                                continue
+                                            
+                                            if not analysis_prompt:
+                                                logger.warning(f"⚠️ prompt_template (id: {prompt_template.id}, component_id: {component_id}, data_key: {data_key}) 的 prompt_content 为空，跳过")
+                                                continue
+                                            
+                                            comp_path = f"{component_id or 'unknown'} > {data_key}"
+                                            
+                                            try:
+                                                logger.info(f"✅ 开始处理组件: {comp_path}, dataKey: {data_key}, analysisPrompt长度: {len(analysis_prompt)}")
+                                                logger.debug(f"analysisPrompt内容（前200字符）: {analysis_prompt[:200]}")
+                                                
+                                                # 获取该 dataKey 的现有数据，用于构建上下文
+                                                existing_data = component_data.get(data_key, [])
+                                            
+                                                # 构建现有数据的描述，用于指导模型生成合适的数据结构
+                                                existing_data_context = ""
+                                                if existing_data and isinstance(existing_data, list) and len(existing_data) > 0:
+                                                    import json
+                                                    # 只展示前3个数据作为示例，避免 prompt 过长
+                                                    example_data = existing_data[:3]
+                                                    existing_data_context = f"""
 # 现有作品数据结构参考
-以下是该作品已有的角色数据结构示例（请参考此结构生成新角色数据）：
+以下是该作品已有的 {data_key} 数据结构示例（请参考此结构生成新数据）：
 
 ```json
-{json.dumps(example_characters, ensure_ascii=False, indent=2)}
+{json.dumps(example_data, ensure_ascii=False, indent=2)}
 ```
-
 **重要提示：**
-1. 新提取的角色数据应该与上述数据结构保持一致
-2. 如果提取到已存在的角色（通过 name 字段匹配），请保持该角色的现有字段结构，只更新或补充新信息
-3. 新角色的数据结构应该包含以下字段：name, display_name, type, gender, appearance, background, description, personality, display_name
-4. 如果章节中出现了新角色，请按照上述数据结构格式生成完整的角色信息
+1. 新提取的数据应该与上述数据结构保持一致
+2. 如果提取到已存在的数据（通过唯一标识字段匹配，如 name、id、title 等），请保持该数据的现有字段结构，只更新或补充新信息
+3. 如果章节中出现了新数据，请按照上述数据结构格式生成完整的信息
 """
-                            
-                            # 获取角色状态提取的提示词模板
-                            character_status_template = await book_analysis_service.get_default_prompt_template("character_status_extraction")
-                            
-                            if character_status_template:
-                                # 从模板的 metadata 中提取 system_prompt 和 user_prompt
-                                template_metadata = character_status_template.template_metadata or {}
-                                character_system_prompt = template_metadata.get("system_prompt")
-                                character_user_prompt = template_metadata.get("user_prompt")
-                                
-                                # 如果 metadata 中没有，则使用 prompt_content 作为 user_prompt
-                                if not character_user_prompt:
-                                    character_user_prompt = character_status_template.format_prompt(content=chapter_content)
-                                else:
-                                    # 如果 user_prompt 中有 {content} 变量，需要替换
-                                    character_user_prompt = character_user_prompt.replace("{content}", chapter_content)
-                                
-                                # 在 user_prompt 中添加现有数据结构上下文
-                                if existing_data_context:
-                                    character_user_prompt = existing_data_context + "\n\n" + character_user_prompt
+                                                
+                                                # 使用 format_prompt 方法处理变量替换（支持 @chapter.content 格式）
+                                                from memos.api.models.prompt_template import PromptTemplate
+                                                temp_template = PromptTemplate()
+                                                temp_template.prompt_content = analysis_prompt
+                                                logger.debug(f"使用组件的 analysisPrompt 进行变量替换，原始prompt长度: {len(analysis_prompt)}")
+                                                # 传递章节内容和章节数据，确保 @chapter.content 等变量能正确替换
+                                                user_prompt = temp_template.format_prompt(
+                                                    chapter={"content": chapter_content} if chapter_content else {},
+                                                    content=chapter_content if chapter_content else "",  # 直接传递 content，format_prompt 会优先使用这个
+                                                    chapter_content=chapter_content if chapter_content else ""  # 备用键名
+                                                )
+                                                logger.debug(f"变量替换后的 user_prompt 长度: {len(user_prompt)}")
+                                                logger.debug(f"变量替换后的 user_prompt 前500字符: {user_prompt[:500] if user_prompt else '空'}")
+                                                
+                                                # 设置默认的 system_prompt
+                                                system_prompt = f"""你是一位专业的小说分析专家，擅长从章节内容中提取和分析信息。请根据提示词要求，从章节内容中提取 {data_key} 相关的数据。"""
+                                                
+                                                # 在 user_prompt 中添加现有数据结构上下文
+                                                if existing_data_context:
+                                                    user_prompt = existing_data_context + "\n\n" + user_prompt
+                                                    logger.debug(f"添加现有数据上下文后，user_prompt 长度: {len(user_prompt)}")
+                                                
+                                                # 调用AI服务提取数据
+                                                logger.info(f"🚀 调用AI服务分析章节 {chapter_id} 的 {data_key} 数据，使用组件的 analysisPrompt")
+                                                ai_response = await ai_service.analyze_chapter_stream(
+                                                    content=chapter_content,
+                                                    prompt=user_prompt,
+                                                    system_prompt=system_prompt,
+                                                    model=analysis_settings.get("model"),
+                                                    temperature=analysis_settings.get("temperature", 0.7),
+                                                    max_tokens=analysis_settings.get("max_tokens", 4000),
+                                                )
+                                                logger.info(f"✅ AI服务返回响应，长度: {len(ai_response)}")
+                                                
+                                                # 解析AI响应
+                                                logger.debug(f"开始解析章节 {chapter_id} 的 {data_key} 数据，AI响应长度: {len(ai_response)}")
+                                                parsed_data = book_analysis_service.parse_single_chapter_response(ai_response)
+                                                
+                                                if parsed_data:
+                                                    logger.debug(f"解析成功，数据键: {list(parsed_data.keys())}")
+                                                    # 查找与 dataKey 匹配的数据
+                                                    if data_key in parsed_data:
+                                                        data_list = parsed_data[data_key]
+                                                        if isinstance(data_list, list):
+                                                            if data_key not in chapter_component_data:
+                                                                chapter_component_data[data_key] = []
+                                                            chapter_component_data[data_key].extend(data_list)
+                                                            logger.info(f"✅ 成功为章节 {chapter_id} 提取 {len(data_list)} 个 {data_key} 数据")
+                                                            
+                                                            # 立即将 AI 生成的该 data_key 数据保存到 work 的 component_data 中
+                                                            try:
+                                                                logger.info(f"开始将章节 {chapter_id} 的 {data_key} 数据（由 AI 生成）保存到作品 {work_id} 的 component_data 中...")
+                                                                save_result = await book_analysis_service.incremental_insert_to_work(
+                                                                    work_id=work_id,
+                                                                    analysis_data={data_key: data_list},  # 只保存当前 AI 生成的该 data_key 数据
+                                                                    user_id=current_user_id,
+                                                                    chapter_index=chapter_number
+                                                                )
+                                                                
+                                                                # 记录保存结果
+                                                                processed = save_result.get(f"{data_key}_processed", 0)
+                                                                updated = save_result.get(f"{data_key}_updated", 0)
+                                                                total = save_result.get(f"{data_key}_total", 0)
+                                                                logger.info(f"✅ 成功将章节 {chapter_id} 的 {data_key} 数据保存到作品 {work_id}，新增 {processed}，更新 {updated}，总计 {total}")
+                                                            except Exception as e:
+                                                                logger.error(f"保存章节 {chapter_id} 的 {data_key} 数据到作品 {work_id} 失败: {traceback.format_exc()}")
+                                                                # 单个 data_key 保存失败不影响其他 data_key，继续处理
+                                                        else:
+                                                            logger.warning(f"⚠️ 章节 {chapter_id} 的 {data_key} 数据不是列表格式")
+                                                    else:
+                                                        logger.warning(f"⚠️ 章节 {chapter_id} 解析成功但未找到 {data_key} 字段，数据键: {list(parsed_data.keys())}")
+                                                else:
+                                                    logger.warning(f"⚠️ 章节 {chapter_id} 未提取到 {data_key} 数据，解析返回 None")
+                                                    logger.debug(f"AI响应内容（前500字符）: {ai_response[:500]}")
+                                            except Exception as e:
+                                                logger.error(f"提取章节 {chapter_id} 的 {data_key} 数据失败: {traceback.format_exc()}")
+                                                # 单个组件失败不影响其他组件，继续处理
+                                except Exception as e:
+                                    logger.error(f"从 prompt_template 表查询 analysis prompt 失败: {e}")
+                                    logger.error(f"详细错误: {traceback.format_exc()}")
                             else:
-                                # 使用默认的角色状态提取提示词
-                                character_system_prompt = """# 角色
-                                    你是一位专业的小说分析专家，擅长从章节内容中提取角色信息和他们的当前状态。
-
-                                    # 任务
-                                    请仔细分析以下章节内容，提取出所有出现的角色信息，包括：
-                                    1. 角色的姓名、特征、性格
-                                    2. 角色在本章中的状态（情绪、身体状况、心理状态等）
-                                    3. 角色之间的关系和互动
-                                    4. 角色的行为、动作、对话等
-
-                                    # 输出格式要求
-                                    **必须严格按照以下JSON格式输出，不要添加任何其他文字：**
-
-                                    ```json
-                                    {
-                                    "characters": [
-                                        {
-                                        "name": "角色名称",
-                                        "display_name": "显示名称",
-                                        "type": "主要角色",
-                                        "gender": "男/女",
-                                        "description": "角色描述",
-                                        "appearance": {},
-                                        "background": {},
-                                        "personality": {}
-                                        }
-                                    ]
-                                    }
-                                    ```
-
-                                    # 重要提示
-                                    1. **必须输出有效的JSON格式**，不要添加任何Markdown代码块标记外的文字
-                                    2. 只提取本章中实际出现的角色
-                                    3. 如果提供了现有角色数据结构参考，请按照该结构生成数据
-                                    4. 新角色的数据结构应该包含：name, display_name, type, gender, appearance, background, description, personality
-                                    5. 如果某个角色在本章中没有出现，不要包含在结果中
-
-                                    # 章节内容
-                                    {content}
-                                    # 开始分析
-                                    请严格按照上述JSON格式输出角色信息和状态："""
-                                character_user_prompt = character_system_prompt.replace("{content}", chapter_content)
-                                
-                                # 在 user_prompt 中添加现有数据结构上下文
-                                if existing_data_context:
-                                    character_user_prompt = existing_data_context + "\n\n" + character_user_prompt
-                            
-                            # 调用AI服务提取角色信息
-                            character_status_response = await ai_service.analyze_chapter_stream(
-                                content=chapter_content,
-                                prompt=character_user_prompt,
-                                system_prompt=character_system_prompt,
-                                model=analysis_settings.get("model"),
-                                temperature=analysis_settings.get("temperature", 0.7),
-                                max_tokens=analysis_settings.get("max_tokens", 4000),
-                            )
-                            
-                            # 解析角色状态信息
-                            logger.debug(f"开始解析章节 {chapter_id} 的角色信息，AI响应长度: {len(character_status_response)}")
-                            character_status_data = book_analysis_service.parse_single_chapter_response(character_status_response)
-                            
-                            if character_status_data:
-                                logger.debug(f"解析成功，数据键: {list(character_status_data.keys())}")
-                                if character_status_data.get("characters"):
-                                    chapter_characters = character_status_data.get("characters", [])
-                                    logger.info(f"✅ 成功为章节 {chapter_id} 提取 {len(chapter_characters)} 个角色的状态信息")
-                                    # 记录每个角色的名称
-                                    for char in chapter_characters:
-                                        char_name = char.get("name", "未知") if isinstance(char, dict) else "无效数据"
-                                        logger.debug(f"  - 角色: {char_name}")
-                                    all_characters.extend(chapter_characters)
-                                else:
-                                    logger.warning(f"⚠️ 章节 {chapter_id} 解析成功但未找到 characters 字段，数据键: {list(character_status_data.keys())}")
-                            else:
-                                logger.warning(f"⚠️ 章节 {chapter_id} 未提取到角色信息，解析返回 None")
-                                logger.debug(f"AI响应内容（前500字符）: {character_status_response[:500]}")
+                                logger.warning(f"作品 {work_id} 没有关联的 template_id，跳过组件数据提取")
                         else:
-                            logger.warning(f"⚠️ 章节 {chapter_id} 内容为空，跳过角色提取")
+                            logger.warning(f"⚠️ 章节 {chapter_id} 内容为空，跳过组件数据提取")
                     except Exception as e:
-                        logger.error(f"提取章节 {chapter_id} 的角色信息失败: {traceback.format_exc()}")
-                        characters_extraction_errors.append({
-                            "chapter_id": chapter_id,
-                            "chapter_number": chapter_number,
-                            "error": str(e)
-                        })
-                        # 角色提取失败不影响主流程，继续执行
+                        logger.error(f"提取章节 {chapter_id} 的组件数据失败: {traceback.format_exc()}")
+                        # 组件数据提取失败不影响主流程，继续执行
+                    
+                    # 收集该章节的所有组件数据到全局集合中
+                    for data_key, data_list in chapter_component_data.items():
+                        if data_key not in all_component_data:
+                            all_component_data[data_key] = []
+                        all_component_data[data_key].extend(data_list)
+                    
+                    # 保存该章节的组件数据到章节的 metadata.component_data 中，并立即整合保存到 work 的 component_data 中
+                    if chapter_component_data:
+                        try:
+                            from memos.api.models.chapter import Chapter
+                            from sqlalchemy.orm.attributes import flag_modified
+                            # select 已经在文件顶部导入，不需要重复导入
+                            
+                            # 获取章节对象
+                            chapter_stmt = select(Chapter).where(Chapter.id == chapter_id)
+                            chapter_result = await db.execute(chapter_stmt)
+                            chapter = chapter_result.scalar_one_or_none()
+                            
+                            if chapter:
+                                # 获取或初始化章节的 metadata
+                                chapter_metadata = chapter.chapter_metadata or {}
+                                if "component_data" not in chapter_metadata:
+                                    chapter_metadata["component_data"] = {}
+                                
+                                # 将组件数据保存到章节的 component_data 中
+                                for data_key, data_list in chapter_component_data.items():
+                                    if data_key not in chapter_metadata["component_data"]:
+                                        chapter_metadata["component_data"][data_key] = []
+                                    
+                                    # 合并数据（去重）
+                                    existing_data = chapter_metadata["component_data"][data_key]
+                                    if not isinstance(existing_data, list):
+                                        existing_data = []
+                                    
+                                    # 使用集合去重（基于JSON字符串）
+                                    existing_set = {json.dumps(item, sort_keys=True, ensure_ascii=False) for item in existing_data if isinstance(item, dict)}
+                                    for item in data_list:
+                                        if isinstance(item, dict):
+                                            item_str = json.dumps(item, sort_keys=True, ensure_ascii=False)
+                                            if item_str not in existing_set:
+                                                existing_set.add(item_str)
+                                                existing_data.append(item)
+                                    
+                                    chapter_metadata["component_data"][data_key] = existing_data
+                                
+                                # 更新章节的 metadata
+                                chapter.chapter_metadata = chapter_metadata
+                                flag_modified(chapter, "chapter_metadata")
+                                await db.commit()
+                                logger.info(f"✅ 成功保存章节 {chapter_id} 的组件数据到 chapter_metadata.component_data")
+                            else:
+                                logger.warning(f"⚠️ 无法找到章节 {chapter_id}，跳过保存到章节 metadata")
+                            
+                            # 注意：组件数据已经在 AI 生成时立即保存到 work 的 component_data 中了
+                            # 这里不再需要统一保存，因为每个 data_key 的数据在 AI 生成后就已经保存了
+                        except Exception as e:
+                            logger.error(f"保存章节 {chapter_id} 的组件数据到 metadata 失败: {traceback.format_exc()}")
+                            # 不影响主流程，继续执行
+                    
+                    # 统计该章节提取的数据
+                    chapter_data_stats = {key: len(data_list) for key, data_list in chapter_component_data.items()}
                     
                     results.append({
                         "chapter_id": chapter_id,
@@ -1090,125 +1226,188 @@ async def generate_chapter_outlines(
                         "total": result.get("total"),
                         "outline": result.get("outline", {}),
                         "detailed_outline": result.get("detailed_outline", {}),
-                        "characters_count": len(chapter_characters),
+                        "component_data_stats": chapter_data_stats,
                         "success": True
                     })
                     total_chapters = result.get("total", 0)
             
-            # 合并并保存角色信息到作品
-            characters_saved = False
-            characters_count = 0
-            save_error = None
+            # 注意：组件数据已经在每个章节处理完后立即保存到 work 的 component_data 中了
+            # 这里保留统一保存逻辑主要用于：
+            # 1. 最终统计和汇总所有章节的保存结果
+            # 2. 作为备用方案，确保所有数据都已保存
+            # 3. incremental_insert_to_work 方法会进行去重，所以重复保存不会有数据重复问题
+            all_save_results = {}  # {dataKey: {saved: bool, count: int, error: str}}
             
-            if all_characters:
+            # 初始化 all_component_data（如果还没有初始化）
+            if 'all_component_data' not in locals():
+                all_component_data = {}
+            
+            # 记录 all_component_data 的状态，帮助调试
+            logger.info(f"准备最终统计组件数据保存结果（已逐章保存），all_component_data 包含 {len(all_component_data)} 个 data_key: {list(all_component_data.keys())}")
+            for data_key, data_list in all_component_data.items():
+                print(f"检查 data_key: {data_key}，数据数量: {len(data_list) if data_list else 0}")
+                if not data_list:
+                    logger.warning(f"⚠️ data_key {data_key} 的数据列表为空，跳过保存")
+                    continue
+                
                 try:
-                    logger.info(f"开始保存 {len(all_characters)} 个角色信息到作品 {work_id}...")
-                    logger.debug(f"所有提取的角色列表: {[char.get('name', '未知') if isinstance(char, dict) else '无效' for char in all_characters]}")
+                    logger.info(f"开始保存 {len(data_list)} 个 {data_key} 数据到作品 {work_id}...")
                     
-                    # 合并角色信息（去重）
-                    character_map = {}
+                    # 对数据进行去重和合并
+                    data_map = {}
                     skipped_count = 0
-                    for char_data in all_characters:
-                        if not isinstance(char_data, dict):
-                            logger.warning(f"跳过无效的角色数据（不是字典）: {type(char_data)}")
+                    
+                    # 尝试找到唯一标识字段（name, id, title 等）
+                    identifier_key = None
+                    if data_list and isinstance(data_list[0], dict):
+                        for key in ["name", "id", "title", "identifier", "key"]:
+                            if key in data_list[0]:
+                                identifier_key = key
+                                break
+                    
+                    for item_data in data_list:
+                        if not isinstance(item_data, dict):
+                            logger.warning(f"跳过无效的 {data_key} 数据（不是字典）: {type(item_data)}")
                             skipped_count += 1
                             continue
-                        char_name = char_data.get("name", "")
-                        if char_name:
-                            if char_name in character_map:
-                                logger.debug(f"合并已存在的角色: {char_name}")
-                                # 合并现有角色
-                                existing_char = character_map[char_name]
+                        
+                        if identifier_key and identifier_key in item_data:
+                            item_id = item_data[identifier_key]
+                            if item_id in data_map:
+                                logger.debug(f"合并已存在的 {data_key} 数据: {item_id}")
+                                # 合并现有数据
+                                existing_item = data_map[item_id]
                                 # 深度合并
-                                for key, value in char_data.items():
-                                    if key in existing_char and isinstance(existing_char[key], dict) and isinstance(value, dict):
-                                        existing_char[key].update(value)
+                                for key, value in item_data.items():
+                                    if key in existing_item and isinstance(existing_item[key], dict) and isinstance(value, dict):
+                                        existing_item[key].update(value)
                                     else:
-                                        existing_char[key] = value
+                                        existing_item[key] = value
                             else:
-                                logger.debug(f"添加新角色: {char_name}")
-                                # 添加新角色
-                                character_map[char_name] = char_data
+                                logger.debug(f"添加新的 {data_key} 数据: {item_id}")
+                                # 添加新数据
+                                data_map[item_id] = item_data
                         else:
-                            logger.warning(f"跳过没有 name 字段的角色数据: {char_data}")
-                            skipped_count += 1
+                            # 没有唯一标识，使用整个数据的字符串表示作为键
+                            item_str = json.dumps(item_data, sort_keys=True, ensure_ascii=False)
+                            if item_str not in data_map:
+                                data_map[item_str] = item_data
+                            else:
+                                # 如果已存在，进行合并
+                                existing_item = data_map[item_str]
+                                for key, value in item_data.items():
+                                    if key in existing_item and isinstance(existing_item[key], dict) and isinstance(value, dict):
+                                        existing_item[key].update(value)
+                                    else:
+                                        existing_item[key] = value
                     
                     if skipped_count > 0:
-                        logger.warning(f"跳过了 {skipped_count} 个无效的角色数据")
+                        logger.warning(f"跳过了 {skipped_count} 个无效的 {data_key} 数据")
                     
-                    characters_count = len(character_map)
-                    logger.info(f"合并后共有 {characters_count} 个唯一角色（跳过 {skipped_count} 个无效数据）")
+                    data_count = len(data_map)
+                    logger.info(f"合并后共有 {data_count} 个唯一的 {data_key} 数据（跳过 {skipped_count} 个无效数据）")
                     
-                    if characters_count > 0:
-                        # 保存角色信息到作品的 metainfo 中
-                        logger.info(f"准备保存 {characters_count} 个角色到作品 {work_id} 的 metainfo 中")
+                    if data_count > 0:
+                        # 保存数据到作品的 component_data 中
+                        logger.info(f"准备保存 {data_count} 个 {data_key} 数据到作品 {work_id} 的 component_data 中")
                         save_result = await book_analysis_service.incremental_insert_to_work(
                             work_id=work_id,
-                            analysis_data={"characters": list(character_map.values())},
+                            analysis_data={data_key: list(data_map.values())},
                             user_id=current_user_id,
                         )
-                        # characters_processed 现在包含新增和更新的角色总数
-                        processed_count = save_result.get("characters_processed", 0)
-                        # 如果 processed_count 为 0，但 character_map 不为空，说明所有角色都已存在且没有更新
-                        # 这种情况下，我们仍然认为保存成功（因为角色数据已经在数据库中）
-                        if processed_count > 0:
-                            characters_count = processed_count
-                            characters_saved = True
-                        elif len(character_map) > 0:
-                            # 所有角色都已存在，虽然没有新处理，但数据已保存
-                            characters_count = len(character_map)
-                            characters_saved = True
-                            logger.info(f"所有 {characters_count} 个角色都已存在于数据库中，无需新增或更新")
-                        else:
-                            characters_count = 0
-                            characters_saved = False
                         
-                        # 验证角色信息是否已保存到 work.work_metadata.component_data 中
-                        if characters_saved:
-                            # 重新查询 work 对象以获取最新数据（因为 incremental_insert_to_work 已经提交并刷新了）
-                            from memos.api.services.work_service import WorkService
-                            work_service = WorkService(db)
-                            updated_work = await work_service.get_work_by_id(work_id)
-                            if updated_work:
-                                work_metadata = updated_work.work_metadata or {}
-                                component_data = work_metadata.get("component_data", {})
-                                saved_characters = component_data.get("characters", [])
-                                logger.info(
-                                    f"✅ 成功保存 {characters_count} 个角色信息到作品 {work_id} 的 component_data 中，"
-                                    f"当前 component_data 中共有 {len(saved_characters)} 个角色"
-                                )
-                                # 更新 work 对象引用
-                                work = updated_work
-                            else:
-                                logger.error(f"❌ 无法重新查询作品 {work_id}，无法验证保存结果")
+                        # 获取处理结果
+                        processed_count = save_result.get(f"{data_key}_processed", 0)
+                        updated_count = save_result.get(f"{data_key}_updated", 0)
+                        total_count = save_result.get(f"{data_key}_total", 0)
+                        
+                        if processed_count > 0 or updated_count > 0:
+                            all_save_results[data_key] = {
+                                "saved": True,
+                                "processed": processed_count,
+                                "updated": updated_count,
+                                "total": total_count or data_count
+                            }
+                            logger.info(f"✅ 成功保存 {data_key} 数据: 新增 {processed_count}，更新 {updated_count}，总计 {total_count or data_count}")
+                        elif data_count > 0:
+                            # 所有数据都已存在，虽然没有新处理，但数据已保存
+                            all_save_results[data_key] = {
+                                "saved": True,
+                                "processed": 0,
+                                "updated": 0,
+                                "total": data_count
+                            }
+                            logger.info(f"所有 {data_count} 个 {data_key} 数据都已存在于数据库中，无需新增或更新")
                         else:
-                            logger.warning(f"⚠️ 保存角色信息到作品 {work_id} 失败，可能没有新角色（characters_processed=0）")
+                            all_save_results[data_key] = {
+                                "saved": False,
+                                "processed": 0,
+                                "updated": 0,
+                                "total": 0,
+                                "error": "没有有效数据"
+                            }
+                    else:
+                        all_save_results[data_key] = {
+                            "saved": False,
+                            "processed": 0,
+                            "updated": 0,
+                            "total": 0,
+                            "error": "没有有效数据"
+                        }
                 except Exception as e:
-                    logger.error(f"保存角色信息到作品 metainfo 失败: {traceback.format_exc()}")
-                    save_error = str(e)
+                    logger.error(f"❌ 保存 {data_key} 数据到作品 {work_id} 失败: {str(e)}")
+                    logger.error(f"详细错误信息: {traceback.format_exc()}")
+                    all_save_results[data_key] = {
+                        "saved": False,
+                        "processed": 0,
+                        "updated": 0,
+                        "total": 0,
+                        "error": str(e)
+                    }
             
             # 提交所有更改
             await db.commit()
             
+            # 构建消息
             message_parts = [f"所有章节的大纲和细纲生成完成，成功: {success_count}，失败: {error_count}"]
-            if characters_saved:
-                message_parts.append(f"已保存 {characters_count} 个角色信息到作品")
-            elif all_characters:
-                message_parts.append(f"提取了 {len(all_characters)} 个角色信息，但保存失败")
+            
+            # 添加每个组件数据的保存结果
+            for data_key, result_info in all_save_results.items():
+                if result_info["saved"]:
+                    if result_info["processed"] > 0 or result_info["updated"] > 0:
+                        message_parts.append(f"已保存 {data_key}: 新增 {result_info['processed']}，更新 {result_info['updated']}，总计 {result_info['total']}")
+                    else:
+                        message_parts.append(f"{data_key} 数据已存在（{result_info['total']} 条）")
+                else:
+                    error_msg = result_info.get("error", "未知错误")
+                    message_parts.append(f"{data_key} 保存失败: {error_msg}")
+            
+            # 计算总提取的数据量
+            total_extracted = sum(len(data_list) for data_list in all_component_data.values())
+            
+            # 重新获取 work 对象以确保数据是最新的（避免访问过期对象）
+            try:
+                from memos.api.services.work_service import WorkService
+                work_service = WorkService(db)
+                final_work = await work_service.get_work_by_id(work_id)
+                work_title = final_work.title if final_work else work.title if hasattr(work, 'title') else "未知"
+            except Exception as e:
+                logger.warning(f"无法重新获取作品信息: {e}，使用缓存的标题")
+                work_title = getattr(work, 'title', '未知') if hasattr(work, 'title') else '未知'
             
             return JSONResponse({
                 "success": True,
                 "message": "；".join(message_parts),
                 "work_id": work_id,
-                "work_title": work.title,
+                "work_title": work_title,
                 "total_chapters": total_chapters,
                 "success_count": success_count,
                 "error_count": error_count,
-                "characters_extracted": len(all_characters),
-                "characters_saved": characters_saved,
-                "characters_count": characters_count,
-                "characters_extraction_errors": characters_extraction_errors,
-                "save_error": save_error,
+                "component_data_extracted": all_component_data,  # 返回具体数据，而不是长度
+                "component_data_extracted_count": {key: len(data_list) for key, data_list in all_component_data.items()},  # 同时返回数量统计
+                "component_data_saved": all_save_results,
+                "total_extracted": total_extracted,
+                "component_extraction_errors": component_extraction_errors,
                 "results": results
             })
             
@@ -1450,8 +1649,8 @@ async def create_work_from_file(
             try:
                 # 检查章节是否已存在（根据章节号和卷号）
                 from sqlalchemy import and_
-                from sqlalchemy.future import select
                 from memos.api.models.chapter import Chapter
+                # select 已经在文件顶部导入，不需要重复导入
                 
                 existing_chapter_stmt = select(Chapter).where(
                     and_(

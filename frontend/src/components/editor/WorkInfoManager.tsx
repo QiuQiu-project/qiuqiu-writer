@@ -12,7 +12,92 @@ import CustomSelect from '../CustomSelect';
 import type { SelectOption } from '../CustomSelect';
 import { templatesApi } from '../../utils/templatesApi';
 import { worksApi } from '../../utils/worksApi';
+import { promptTemplateApi } from '../../utils/promptTemplateApi';
 import './WorkInfoManager.css';
+
+// 递归收集所有组件的 promptId
+const collectPromptIds = (components: ComponentConfig[]): number[] => {
+  const promptIds: number[] = [];
+  
+  for (const comp of components) {
+    if (comp.generatePromptId) promptIds.push(comp.generatePromptId);
+    if (comp.validatePromptId) promptIds.push(comp.validatePromptId);
+    if (comp.analysisPromptId) promptIds.push(comp.analysisPromptId);
+    
+    // 递归处理 tabs 中的组件
+    if (comp.type === 'tabs' && comp.config?.tabs) {
+      for (const tab of comp.config.tabs) {
+        if (tab.components) {
+          promptIds.push(...collectPromptIds(tab.components));
+        }
+      }
+    }
+  }
+  
+  return promptIds;
+};
+
+// 递归填充组件的 prompt 内容
+const fillPromptsForComponents = (components: ComponentConfig[], promptMap: Map<number, any>): ComponentConfig[] => {
+  return components.map(comp => {
+    const updatedComp: ComponentConfig = { ...comp };
+    
+    // 填充 prompt 内容
+    if (comp.generatePromptId) {
+      const prompt = promptMap.get(comp.generatePromptId);
+      if (prompt) {
+        updatedComp.generatePrompt = prompt.prompt_content;
+      }
+    }
+    if (comp.validatePromptId) {
+      const prompt = promptMap.get(comp.validatePromptId);
+      if (prompt) {
+        updatedComp.validatePrompt = prompt.prompt_content;
+      }
+    }
+    if (comp.analysisPromptId) {
+      const prompt = promptMap.get(comp.analysisPromptId);
+      if (prompt) {
+        updatedComp.analysisPrompt = prompt.prompt_content;
+      }
+    }
+    
+    // 递归处理 tabs 中的组件
+    if (comp.type === 'tabs' && comp.config?.tabs) {
+      updatedComp.config = {
+        ...comp.config,
+        tabs: comp.config.tabs.map(tab => ({
+          ...tab,
+          components: tab.components ? fillPromptsForComponents(tab.components, promptMap) : []
+        }))
+      };
+    }
+    
+    return updatedComp;
+  });
+};
+
+// 为模板的所有组件加载 prompt 内容
+const loadPromptsForComponents = async (modules: ModuleConfig[]): Promise<ModuleConfig[]> => {
+  // 收集所有 promptId
+  const promptIds: number[] = [];
+  for (const module of modules) {
+    promptIds.push(...collectPromptIds(module.components));
+  }
+  
+  if (promptIds.length === 0) {
+    return modules; // 没有 promptId，直接返回
+  }
+  
+  // 批量获取 prompt 内容
+  const promptMap = await promptTemplateApi.getPromptTemplatesByIds(promptIds);
+  
+  // 填充 prompt 内容到组件
+  return modules.map(module => ({
+    ...module,
+    components: fillPromptsForComponents(module.components, promptMap)
+  }));
+};
 
 // 势力数据类型
 interface FactionData {
@@ -65,10 +150,13 @@ interface ComponentConfig {
     nodeTypes?: { type: string; label: string; color: string }[];  // relation-graph 节点类型
     relationTypes?: { type: string; label: string; color: string }[]; // relation-graph 关系类型
   };
-  // AI Prompt 配置
-  generatePrompt?: string;   // 用于生成内容的提示词
-  validatePrompt?: string;   // 用于检验内容的提示词
-  analysisPrompt?: string;   // 用于分析内容的提示词
+  // AI Prompt 配置（支持两种方式：直接存储内容或存储 prompt_templates 表的 id）
+  generatePrompt?: string;   // 用于生成内容的提示词（向后兼容：直接存储内容）
+  generatePromptId?: number; // prompt_templates 表的 id（新方式）
+  validatePrompt?: string;   // 用于检验内容的提示词（向后兼容：直接存储内容）
+  validatePromptId?: number; // prompt_templates 表的 id（新方式）
+  analysisPrompt?: string;   // 用于分析内容的提示词（向后兼容：直接存储内容）
+  analysisPromptId?: number; // prompt_templates 表的 id（新方式）
   // 组件数据
   value: any;
 }
@@ -1062,16 +1150,18 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
                 }
                 
                 if (dbModules.length > 0) {
+                  // 加载 prompt 内容
+                  const modulesWithPrompts = await loadPromptsForComponents(dbModules);
                   // 从 work_template 表加载模板结构（包含 dataKey）
                   baseTemplate = {
                     id: `db-${dbTemplate.id}`,
                     name: dbTemplate.name,
                     description: dbTemplate.description || '',
-                    modules: dbModules
+                    modules: modulesWithPrompts
                   };
                   console.log(`✅ 从 work_template 表加载模板结构: ${dbTemplate.name}，包含 ${dbModules.length} 个模块`);
                   // 使用 work_template 表中的模板结构，而不是 metadata 中的
-                  templateConfig.modules = dbModules;
+                  templateConfig.modules = modulesWithPrompts;
                 } else {
                   console.warn('⚠️ work_template 表中没有找到 modules，template_config:', dbTemplate.template_config);
                 }
@@ -1086,11 +1176,13 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
           // 如果 templateId 不是 db-* 格式，但 templateConfig.modules 存在，使用它
           if (!baseTemplate && templateConfig.modules && Array.isArray(templateConfig.modules) && templateConfig.modules.length > 0) {
             console.log(`📥 使用 templateConfig.modules（templateId: ${templateConfig.templateId}），共 ${templateConfig.modules.length} 个模块`);
+            // 加载 prompt 内容
+            const modulesWithPrompts = await loadPromptsForComponents(templateConfig.modules);
             baseTemplate = {
               id: templateConfig.templateId,
               name: '作品模板',
               description: '',
-              modules: templateConfig.modules
+              modules: modulesWithPrompts
             };
           }
           
@@ -1098,7 +1190,12 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
           if (!baseTemplate) {
             const defaultTemplate = await loadDefaultTemplate();
             if (defaultTemplate) {
-              baseTemplate = defaultTemplate;
+              // 加载 prompt 内容
+              const modulesWithPrompts = await loadPromptsForComponents(defaultTemplate.modules);
+              baseTemplate = {
+                ...defaultTemplate,
+                modules: modulesWithPrompts
+              };
             } else {
               // 最后的回退：使用空模板（应该不会发生，因为数据库应该有默认模板）
               console.warn('⚠️ 无法从数据库加载默认模板，使用空模板');
@@ -1135,12 +1232,16 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
             modules = baseTemplate.modules;
             console.log(`📥 使用 baseTemplate 的模块结构，共 ${modules.length} 个模块`);
           } else if (templateConfig.modules && Array.isArray(templateConfig.modules)) {
-            modules = templateConfig.modules;
+            // 加载 prompt 内容
+            modules = await loadPromptsForComponents(templateConfig.modules);
             console.log(`📥 使用 templateConfig.modules，共 ${modules.length} 个模块`);
           } else {
             console.warn('⚠️ 没有找到模块结构，baseTemplate:', baseTemplate, 'templateConfig.modules:', templateConfig.modules);
             modules = [];
           }
+          
+          // 确保 modules 中的 prompt 内容已加载（如果 baseTemplate 已经加载过，这里不会重复加载）
+          const modulesWithPrompts = await loadPromptsForComponents(modules);
           
           // 不再使用预设模板补充，所有配置都应该在数据库中
           // 如果数据库模板缺少配置，需要重新运行初始化脚本或更新数据库
@@ -1257,12 +1358,14 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
                   }
                   
                   if (dbModules.length > 0) {
+                    // 加载 prompt 内容
+                    const modulesWithPrompts = await loadPromptsForComponents(dbModules);
                     setTemplate({
                       id: `db-${dbTemplate.id}`,
                       name: dbTemplate.name,
                       description: dbTemplate.description || '',
                       modules: writeComponentDataToTemplate(
-                        dbModules,
+                        modulesWithPrompts,
                         cached.modules ? extractComponentDataFromTemplate(cached.modules) : {}
                       )
                     });
@@ -1458,13 +1561,21 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
                 components: tab.components ? cleanComponents(tab.components) : []
               }))
             },
-            value: undefined // 清理 value
+            value: undefined, // 清理 value
+            // 清理 prompt 内容，只保留 id（数据库中只存储 id）
+            generatePrompt: undefined,
+            validatePrompt: undefined,
+            analysisPrompt: undefined,
           };
         } else {
-          // 保留所有结构信息（id, type, label, config, dataKey, dataDependencies 等），但清理 value
+          // 保留所有结构信息（id, type, label, config, dataKey, dataDependencies 等），但清理 value 和 prompt 内容
           return {
             ...comp,
-            value: undefined // 清理 value，只保留结构
+            value: undefined, // 清理 value，只保留结构
+            // 清理 prompt 内容，只保留 id（数据库中只存储 id）
+            generatePrompt: undefined,
+            validatePrompt: undefined,
+            analysisPrompt: undefined,
           };
         }
       });
@@ -1805,6 +1916,104 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
     }
   }, [workId, extractComponentDataFromTemplate, writeComponentDataToTemplate, cleanTemplateStructure]);
 
+  // 递归保存组件 prompt 到 prompt_templates 表，并返回更新后的组件配置（只包含 prompt id）
+  const saveComponentPrompts = useCallback(async (
+    components: ComponentConfig[],
+    templateId?: number
+  ): Promise<ComponentConfig[]> => {
+    const updatedComponents: ComponentConfig[] = [];
+    
+    for (const comp of components) {
+      // 处理 tabs 组件的子组件
+      if (comp.type === 'tabs' && comp.config?.tabs) {
+        const updatedTabs = await Promise.all(
+          comp.config.tabs.map(async (tab) => ({
+            ...tab,
+            components: await saveComponentPrompts(tab.components || [], templateId)
+          }))
+        );
+        updatedComponents.push({
+          ...comp,
+          config: {
+            ...comp.config,
+            tabs: updatedTabs
+          }
+        });
+        continue;
+      }
+      
+      // 处理普通组件的 prompt
+      const updatedComp: ComponentConfig = { ...comp };
+      
+      // 保存 generatePrompt
+      if (comp.generatePrompt && comp.generatePrompt.trim()) {
+        try {
+          const promptTemplate = await promptTemplateApi.upsertComponentPrompt(
+            comp.id,
+            comp.type,
+            'generate',
+            comp.generatePrompt.trim(),
+            templateId,
+            comp.dataKey
+          );
+          updatedComp.generatePromptId = promptTemplate.id;
+          // 保留 prompt 内容用于显示，但数据库中只存储 id
+          // updatedComp.generatePrompt = undefined; // 不移除内容，保留用于显示
+          console.log(`✅ 保存组件 ${comp.id} 的 generatePrompt 到 prompt_templates (id: ${promptTemplate.id})`);
+        } catch (error) {
+          console.error(`❌ 保存组件 ${comp.id} 的 generatePrompt 失败:`, error);
+          // 如果保存失败，保留原始内容（向后兼容）
+        }
+      }
+      
+      // 保存 validatePrompt
+      if (comp.validatePrompt && comp.validatePrompt.trim()) {
+        try {
+          const promptTemplate = await promptTemplateApi.upsertComponentPrompt(
+            comp.id,
+            comp.type,
+            'validate',
+            comp.validatePrompt.trim(),
+            templateId,
+            comp.dataKey
+          );
+          updatedComp.validatePromptId = promptTemplate.id;
+          // 保留 prompt 内容用于显示，但数据库中只存储 id
+          // updatedComp.validatePrompt = undefined; // 不移除内容，保留用于显示
+          console.log(`✅ 保存组件 ${comp.id} 的 validatePrompt 到 prompt_templates (id: ${promptTemplate.id})`);
+        } catch (error) {
+          console.error(`❌ 保存组件 ${comp.id} 的 validatePrompt 失败:`, error);
+          // 如果保存失败，保留原始内容（向后兼容）
+        }
+      }
+      
+      // 保存 analysisPrompt
+      if (comp.analysisPrompt && comp.analysisPrompt.trim()) {
+        try {
+          const promptTemplate = await promptTemplateApi.upsertComponentPrompt(
+            comp.id,
+            comp.type,
+            'analysis',
+            comp.analysisPrompt.trim(),
+            templateId,
+            comp.dataKey
+          );
+          updatedComp.analysisPromptId = promptTemplate.id;
+          // 保留 prompt 内容用于显示，但数据库中只存储 id
+          // updatedComp.analysisPrompt = undefined; // 不移除内容，保留用于显示
+          console.log(`✅ 保存组件 ${comp.id} 的 analysisPrompt 到 prompt_templates (id: ${promptTemplate.id})`);
+        } catch (error) {
+          console.error(`❌ 保存组件 ${comp.id} 的 analysisPrompt 失败:`, error);
+          // 如果保存失败，保留原始内容（向后兼容）
+        }
+      }
+      
+      updatedComponents.push(updatedComp);
+    }
+    
+    return updatedComponents;
+  }, []);
+
   // 保存模板结构到数据库（所有数据库模板都可以保存）
   const saveTemplateStructure = useCallback(async (originalSnapshot: string | null) => {
     if (!template || !template.id || !template.id.startsWith('db-')) {
@@ -1819,8 +2028,23 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
         return false;
       }
 
+      // 先保存所有组件的 prompt 到 prompt_templates 表，并获取更新后的组件配置（只包含 prompt id）
+      console.log('📤 保存组件 prompt 到 prompt_templates 表...');
+      const modulesWithPromptIds = await Promise.all(
+        template.modules.map(async (module) => ({
+          ...module,
+          components: await saveComponentPrompts(module.components, dbTemplateId)
+        }))
+      );
+      
+      // 更新 template state，保留 prompt 内容用于显示（但数据库中只存储 id）
+      setTemplate(prev => ({
+        ...prev,
+        modules: modulesWithPromptIds
+      }));
+      
       // 清理模板结构（移除 value 字段，只保留配置信息，包括 dataKey 和 dataDependencies）
-      const cleanedModules = cleanTemplateStructure(template.modules);
+      const cleanedModules = cleanTemplateStructure(modulesWithPromptIds);
       const currentModulesStr = JSON.stringify(cleanedModules);
       
       // 如果有原始快照，比较是否有修改
@@ -1843,7 +2067,7 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
       console.error('❌ 保存模板结构失败:', error);
       throw error;
     }
-  }, [template, cleanTemplateStructure]);
+  }, [template, cleanTemplateStructure, saveComponentPrompts, workId]);
 
   // 不再自动保存，改为手动保存
   // 当模板变化时，只标记为未保存状态
@@ -2434,7 +2658,7 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
   };
 
   // 保存编辑的组件
-  const saveEditedComponent = () => {
+  const saveEditedComponent = async () => {
     if (!editingComponentId || !newComponentForm.label.trim() || !activeModule) return;
     
     // 如果是 tabs 类型，必须至少有一个分页
@@ -2446,6 +2670,18 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
     if (newComponentForm.type === 'card-list' && newComponentForm.cardFields.length === 0) {
       return;
     }
+    
+    // 获取 templateId（如果是数据库模板）
+    let dbTemplateId: number | undefined;
+    if (template?.id && template.id.startsWith('db-')) {
+      const parsedId = parseInt(template.id.replace('db-', ''));
+      if (!isNaN(parsedId)) {
+        dbTemplateId = parsedId;
+      }
+    }
+    
+    // 获取组件的 dataKey
+    const componentDataKey = newComponentForm.type === 'tabs' ? undefined : (newComponentForm.dataKey.trim() || undefined);
     
     // 如果是在 tabs 中的组件
     if (editingComponentContext?.tabsComponentId && editingComponentContext?.tabId) {
@@ -2471,8 +2707,9 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
                                 config: { ...newComponentForm.config },
                                 generatePrompt: newComponentForm.generatePrompt.trim() || undefined,
                                 validatePrompt: newComponentForm.validatePrompt.trim() || undefined,
+                                analysisPrompt: newComponentForm.analysisPrompt.trim() || undefined,
                                 // tabs 组件不需要 dataKey 和 dataDependencies
-                                dataKey: newComponentForm.type === 'tabs' ? undefined : (newComponentForm.dataKey.trim() || undefined),
+                                dataKey: componentDataKey,
                                 dataDependencies: newComponentForm.type === 'tabs' ? undefined : (newComponentForm.dataDependencies.length > 0 ? newComponentForm.dataDependencies : undefined),
                               };
                             }
@@ -2496,6 +2733,44 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
             : m
         )
       }));
+      
+      // 保存 prompt 到数据库
+      if (dbTemplateId && componentDataKey) {
+        try {
+          if (newComponentForm.generatePrompt.trim()) {
+            await promptTemplateApi.upsertComponentPrompt(
+              editingComponentId,
+              newComponentForm.type,
+              'generate',
+              newComponentForm.generatePrompt.trim(),
+              dbTemplateId,
+              componentDataKey
+            );
+          }
+          if (newComponentForm.validatePrompt.trim()) {
+            await promptTemplateApi.upsertComponentPrompt(
+              editingComponentId,
+              newComponentForm.type,
+              'validate',
+              newComponentForm.validatePrompt.trim(),
+              dbTemplateId,
+              componentDataKey
+            );
+          }
+          if (newComponentForm.analysisPrompt.trim()) {
+            await promptTemplateApi.upsertComponentPrompt(
+              editingComponentId,
+              newComponentForm.type,
+              'analysis',
+              newComponentForm.analysisPrompt.trim(),
+              dbTemplateId,
+              componentDataKey
+            );
+          }
+        } catch (error) {
+          console.error('保存组件 prompt 失败:', error);
+        }
+      }
     } else {
       // 普通组件
       setTemplate(prev => ({
@@ -2537,7 +2812,8 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
                     config: newConfig,
                     generatePrompt: newComponentForm.generatePrompt.trim() || undefined,
                     validatePrompt: newComponentForm.validatePrompt.trim() || undefined,
-                    dataKey: newComponentForm.dataKey.trim() || undefined,
+                    analysisPrompt: newComponentForm.analysisPrompt.trim() || undefined,
+                    dataKey: componentDataKey,
                     dataDependencies: newComponentForm.dataDependencies.length > 0 ? newComponentForm.dataDependencies : undefined,
                   };
                 })
@@ -2545,6 +2821,44 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
             : m
         )
       }));
+      
+      // 保存 prompt 到数据库
+      if (dbTemplateId && componentDataKey) {
+        try {
+          if (newComponentForm.generatePrompt.trim()) {
+            await promptTemplateApi.upsertComponentPrompt(
+              editingComponentId,
+              newComponentForm.type,
+              'generate',
+              newComponentForm.generatePrompt.trim(),
+              dbTemplateId,
+              componentDataKey
+            );
+          }
+          if (newComponentForm.validatePrompt.trim()) {
+            await promptTemplateApi.upsertComponentPrompt(
+              editingComponentId,
+              newComponentForm.type,
+              'validate',
+              newComponentForm.validatePrompt.trim(),
+              dbTemplateId,
+              componentDataKey
+            );
+          }
+          if (newComponentForm.analysisPrompt.trim()) {
+            await promptTemplateApi.upsertComponentPrompt(
+              editingComponentId,
+              newComponentForm.type,
+              'analysis',
+              newComponentForm.analysisPrompt.trim(),
+              dbTemplateId,
+              componentDataKey
+            );
+          }
+        } catch (error) {
+          console.error('保存组件 prompt 失败:', error);
+        }
+      }
     }
     closeAddComponentModal();
   };

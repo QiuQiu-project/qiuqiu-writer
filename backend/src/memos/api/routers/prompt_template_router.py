@@ -3,7 +3,7 @@ Prompt模板管理API路由
 """
 
 from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Body, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import and_
@@ -16,6 +16,23 @@ from memos.api.services.book_analysis_service import BookAnalysisService
 from memos.log import get_logger
 
 logger = get_logger(__name__)
+
+# 辅助函数：确保返回的是 AsyncSession 对象，而不是生成器
+async def get_db_session(db: AsyncSession = Depends(get_async_db)) -> AsyncSession:
+    """
+    确保返回的是 AsyncSession 对象，而不是生成器
+    FastAPI 的 Depends 应该已经处理了生成器，但为了安全起见，我们再次检查
+    """
+    # FastAPI 的 Depends 应该已经处理了生成器，直接返回
+    # 但如果仍然是生成器，尝试获取会话对象
+    if hasattr(db, '__aiter__') and not hasattr(db, 'execute'):
+        # 如果是生成器，尝试获取会话对象
+        try:
+            db = await db.__anext__()
+        except StopAsyncIteration:
+            raise ValueError("无法从生成器获取数据库会话")
+    
+    return db
 
 router = APIRouter(prefix="/api/v1/prompt-templates", tags=["Prompt模板管理"])
 
@@ -33,8 +50,10 @@ class PromptTemplateCreate(BaseModel):
     # 组件相关字段
     component_id: Optional[str] = None  # 组件ID
     component_type: Optional[str] = None  # 组件类型
-    prompt_category: Optional[str] = None  # generate或validate
-    work_id: Optional[int] = None  # 关联的作品ID
+    prompt_category: Optional[str] = None  # generate或validate或analysis
+    data_key: Optional[str] = None  # 数据存储键
+    work_id: Optional[int] = None  # 关联的作品ID（向后兼容）
+    work_template_id: Optional[int] = None  # 关联的模板ID
 
 
 class PromptTemplateUpdate(BaseModel):
@@ -48,6 +67,7 @@ class PromptTemplateUpdate(BaseModel):
     variables: Optional[dict] = None
     metadata: Optional[dict] = None
     # 组件相关字段
+    data_key: Optional[str] = None  # 数据存储键
     component_id: Optional[str] = None
     component_type: Optional[str] = None
     prompt_category: Optional[str] = None
@@ -82,7 +102,7 @@ class PromptTemplateResponse(BaseModel):
 @router.post("/", response_model=PromptTemplateResponse)
 async def create_prompt_template(
     template_data: PromptTemplateCreate,
-    db: AsyncSession = Depends(get_async_db),
+    db: AsyncSession = Depends(get_db_session),
     current_user_id: int = Depends(get_current_user_id),
 ):
     """创建Prompt模板"""
@@ -111,7 +131,9 @@ async def create_prompt_template(
             component_id=template_data.component_id,
             component_type=template_data.component_type,
             prompt_category=template_data.prompt_category,
+            data_key=template_data.data_key,
             work_id=template_data.work_id,
+            work_template_id=template_data.work_template_id,
             creator_id=current_user_id,
         )
         
@@ -133,7 +155,11 @@ async def create_prompt_template(
 async def list_prompt_templates(
     template_type: Optional[str] = Query(None, description="模板类型过滤"),
     is_active: Optional[bool] = Query(None, description="是否只获取活跃的模板"),
-    db: AsyncSession = Depends(get_async_db),
+    component_id: Optional[str] = Query(None, description="组件ID过滤"),
+    prompt_category: Optional[str] = Query(None, description="Prompt类别过滤（generate/validate/analysis）"),
+    work_id: Optional[int] = Query(None, description="作品ID过滤（向后兼容）"),
+    work_template_id: Optional[int] = Query(None, description="模板ID过滤"),
+    db: AsyncSession = Depends(get_db_session),
 ):
     """获取Prompt模板列表"""
     try:
@@ -144,6 +170,14 @@ async def list_prompt_templates(
             conditions.append(PromptTemplate.template_type == template_type)
         if is_active is not None:
             conditions.append(PromptTemplate.is_active == is_active)
+        if component_id:
+            conditions.append(PromptTemplate.component_id == component_id)
+        if prompt_category:
+            conditions.append(PromptTemplate.prompt_category == prompt_category)
+        if work_id is not None:
+            conditions.append(PromptTemplate.work_id == work_id)
+        if work_template_id is not None:
+            conditions.append(PromptTemplate.work_template_id == work_template_id)
         
         if conditions:
             stmt = stmt.where(and_(*conditions))
@@ -163,7 +197,7 @@ async def list_prompt_templates(
 @router.get("/{template_id}", response_model=PromptTemplateResponse)
 async def get_prompt_template(
     template_id: int,
-    db: AsyncSession = Depends(get_async_db),
+    db: AsyncSession = Depends(get_db_session),
 ):
     """获取Prompt模板详情"""
     try:
@@ -187,7 +221,7 @@ async def get_prompt_template(
 async def update_prompt_template(
     template_id: int,
     template_update: PromptTemplateUpdate,
-    db: AsyncSession = Depends(get_async_db),
+    db: AsyncSession = Depends(get_db_session),
     current_user_id: int = Depends(get_current_user_id),
 ):
     """更新Prompt模板"""
@@ -243,7 +277,7 @@ async def update_prompt_template(
 @router.delete("/{template_id}")
 async def delete_prompt_template(
     template_id: int,
-    db: AsyncSession = Depends(get_async_db),
+    db: AsyncSession = Depends(get_db_session),
     current_user_id: int = Depends(get_current_user_id),
 ):
     """删除Prompt模板"""
@@ -277,7 +311,7 @@ async def delete_prompt_template(
 @router.get("/type/{template_type}/default", response_model=PromptTemplateResponse)
 async def get_default_prompt_template(
     template_type: str,
-    db: AsyncSession = Depends(get_async_db),
+    db: AsyncSession = Depends(get_db_session),
 ):
     """获取指定类型的默认Prompt模板"""
     try:
@@ -302,7 +336,7 @@ async def get_default_prompt_template(
 async def get_component_prompts(
     component_id: str,
     work_id: Optional[int] = Query(None, description="作品ID（可选，用于获取作品级别的组件prompt）"),
-    db: AsyncSession = Depends(get_async_db),
+    db: AsyncSession = Depends(get_db_session),
 ):
     """获取组件的生成和验证prompt"""
     try:
@@ -355,7 +389,7 @@ class ComponentPromptCreate(BaseModel):
 async def create_component_prompts(
     component_id: str,
     prompt_data: ComponentPromptCreate,
-    db: AsyncSession = Depends(get_async_db),
+    db: AsyncSession = Depends(get_db_session),
     current_user_id: int = Depends(get_current_user_id),
 ):
     """创建或更新组件的生成和验证prompt"""
@@ -449,7 +483,7 @@ async def create_component_prompts(
 @router.get("/work/{work_id}/components", response_model=Dict[str, Any])
 async def get_work_component_prompts(
     work_id: int,
-    db: AsyncSession = Depends(get_async_db),
+    db: AsyncSession = Depends(get_db_session),
 ):
     """获取作品所有组件的prompt"""
     try:
@@ -488,4 +522,25 @@ async def get_work_component_prompts(
     except Exception as e:
         logger.error(f"获取作品组件prompt失败: {e}")
         raise HTTPException(status_code=500, detail=f"获取作品组件prompt失败: {str(e)}")
+
+
+@router.post("/batch", response_model=List[PromptTemplateResponse])
+async def get_prompt_templates_by_ids(
+    prompt_ids: List[int] = Body(..., description="Prompt模板ID列表"),
+    db: AsyncSession = Depends(get_db_session),
+):
+    """根据ID列表批量获取Prompt模板"""
+    try:
+        if not prompt_ids:
+            return []
+        
+        stmt = select(PromptTemplate).where(PromptTemplate.id.in_(prompt_ids))
+        result = await db.execute(stmt)
+        templates = result.scalars().all()
+        
+        return [PromptTemplateResponse(**t.to_dict()) for t in templates]
+        
+    except Exception as e:
+        logger.error(f"批量获取Prompt模板失败: {e}")
+        raise HTTPException(status_code=500, detail=f"批量获取模板失败: {str(e)}")
 
