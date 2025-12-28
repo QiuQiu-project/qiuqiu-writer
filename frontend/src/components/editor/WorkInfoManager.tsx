@@ -68,6 +68,7 @@ interface ComponentConfig {
   // AI Prompt 配置
   generatePrompt?: string;   // 用于生成内容的提示词
   validatePrompt?: string;   // 用于检验内容的提示词
+  analysisPrompt?: string;   // 用于分析内容的提示词
   // 组件数据
   value: any;
 }
@@ -849,11 +850,12 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
     config: any;
     generatePrompt: string;
     validatePrompt: string;
+    analysisPrompt: string;
     tabsConfig: { id: string; label: string }[];
     cardFields: { key: string; label: string; type: 'text' | 'textarea' | 'image' }[];
     dataKey: string;
     dataDependencies: string[];
-  }>({ type: 'text', label: '', config: {}, generatePrompt: '', validatePrompt: '', tabsConfig: [], cardFields: [], dataKey: '', dataDependencies: [] });
+  }>({ type: 'text', label: '', config: {}, generatePrompt: '', validatePrompt: '', analysisPrompt: '', tabsConfig: [], cardFields: [], dataKey: '', dataDependencies: [] });
   const [addComponentStep, setAddComponentStep] = useState<'type' | 'config'>('type');
   const [editingComponentId, setEditingComponentId] = useState<string | null>(null);
   const [editingComponentContext, setEditingComponentContext] = useState<{
@@ -2318,6 +2320,7 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
       config: finalConfig,
       generatePrompt: newComponentForm.generatePrompt.trim() || undefined,
       validatePrompt: newComponentForm.validatePrompt.trim() || undefined,
+      analysisPrompt: newComponentForm.analysisPrompt.trim() || undefined,
       // tabs 组件不需要 dataKey 和 dataDependencies
       dataKey: newComponentForm.type === 'tabs' ? undefined : (newComponentForm.dataKey.trim() || undefined),
       dataDependencies: newComponentForm.type === 'tabs' ? undefined : (newComponentForm.dataDependencies.length > 0 ? newComponentForm.dataDependencies : undefined),
@@ -2376,7 +2379,7 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
     setEditingComponentId(null);
     setEditingComponentContext(null);
     setAddingToTab(null);
-    setNewComponentForm({ type: 'text', label: '', config: {}, generatePrompt: '', validatePrompt: '', tabsConfig: [], cardFields: [], dataKey: '', dataDependencies: [] });
+    setNewComponentForm({ type: 'text', label: '', config: {}, generatePrompt: '', validatePrompt: '', analysisPrompt: '', tabsConfig: [], cardFields: [], dataKey: '', dataDependencies: [] });
     setNewTabName('');
     setNewCardFieldForm({ label: '', type: 'text' });
     setNewTagOption({ label: '', color: '#64748b' });
@@ -2420,6 +2423,7 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
       config: { ...comp.config },
       generatePrompt: comp.generatePrompt || '',
       validatePrompt: comp.validatePrompt || '',
+      analysisPrompt: comp.analysisPrompt || '',
       tabsConfig,
       cardFields,
       dataKey: comp.dataKey || '',
@@ -2647,7 +2651,7 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
         const selectOptions: SelectOption[] = comp.config.options?.map(opt => ({
           value: opt.value,
           label: opt.label,
-          disabled: opt.disabled,
+          // removed `disabled` as it's not part of SelectOption type
         })) || [];
         return (
           <CustomSelect
@@ -4737,6 +4741,19 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
                         value={newComponentForm.validatePrompt}
                         onChange={(e) => setNewComponentForm({ ...newComponentForm, validatePrompt: e.target.value })}
                         placeholder="例如：请检查这段简介是否：1. 吸引读者兴趣 2. 包含核心冲突 3. 不剧透关键情节..."
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label>
+                        分析 Prompt
+                        <span className="label-hint">AI 根据此提示词分析内容</span>
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={newComponentForm.analysisPrompt}
+                        onChange={(e) => setNewComponentForm({ ...newComponentForm, analysisPrompt: e.target.value })}
+                        placeholder="例如：请分析这段内容的特点、风格、主题等..."
                       />
                     </div>
                   </div>
