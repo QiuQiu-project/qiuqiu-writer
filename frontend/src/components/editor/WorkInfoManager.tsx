@@ -1477,16 +1477,13 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
           if (comp.type === 'character-card' && Array.isArray(comp.value)) {
             componentData[storageKey] = comp.value;
           } else if (comp.type === 'relation-graph' && typeof comp.value === 'object') {
-            // 关系图组件：只保存关系，角色来自角色列表（不保存）
+            // 关系图组件：直接保存 relations 数组，不保存为对象格式
             const relationValue = comp.value as { characters?: any[]; relations?: any[] } || {};
             
-            // 确保保存的数据格式正确：只保存 relations，characters 始终为空
-            componentData[storageKey] = {
-              characters: [], // 角色来自依赖的角色列表，不保存
-              relations: Array.isArray(relationValue.relations) ? relationValue.relations : []  // 只保存关系
-            };
+            // 直接保存 relations 数组到 character_relations
+            componentData[storageKey] = Array.isArray(relationValue.relations) ? relationValue.relations : [];
             
-            console.log(`💾 提取关系图谱数据 "${storageKey}": 0 个角色（来自角色列表）, ${componentData[storageKey].relations.length} 个关系`);
+            console.log(`💾 提取关系图谱数据 "${storageKey}": ${componentData[storageKey].length} 个关系（直接存储为数组）`);
           } else if (comp.type === 'timeline') {
             // 时间线组件：如果是新格式（包含 events），只提取 events；否则提取整个 value
             if (comp.value && typeof comp.value === 'object' && 'events' in comp.value) {
@@ -1649,24 +1646,31 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
               const existing = comp.value && typeof comp.value === 'object' ? comp.value : { characters: [], relations: [] };
               const newData = componentData[storageKey];
               
-              // 确保 newData 是对象格式，并且包含 characters 和 relations 两个字段
-              if (newData && typeof newData === 'object') {
-                // 优先使用 newData 中的数据（即使为空数组也要使用，因为可能是用户清空了数据）
-                const restoredValue = {
-                  characters: Array.isArray(newData.characters) ? newData.characters : (Array.isArray(existing.characters) ? existing.characters : []),
-                  relations: Array.isArray(newData.relations) ? newData.relations : (Array.isArray(existing.relations) ? existing.relations : [])
-                };
-                
-                console.log(`📥 恢复关系图谱数据 "${storageKey}": ${restoredValue.characters.length} 个角色, ${restoredValue.relations.length} 个关系`);
-                value = restoredValue;
-              } else {
-                // 如果 newData 格式不正确，使用现有数据
-                console.log(`⚠️ 关系图谱数据格式不正确 "${storageKey}", 使用现有数据`);
-                value = {
-                  characters: Array.isArray(existing.characters) ? existing.characters : [],
-                  relations: Array.isArray(existing.relations) ? existing.relations : []
-                };
+              // 新格式：直接存储为 relations 数组
+              // 兼容旧格式：如果是对象格式，提取 relations 字段
+              let relationsArray: any[] = [];
+              
+              if (Array.isArray(newData)) {
+                // 新格式：直接是数组
+                relationsArray = newData;
+              } else if (newData && typeof newData === 'object' && Array.isArray(newData.relations)) {
+                // 旧格式：对象中包含 relations 字段
+                relationsArray = newData.relations;
+              } else if (Array.isArray(existing)) {
+                // 如果 existing 是数组（新格式），使用它
+                relationsArray = existing;
+              } else if (existing && typeof existing === 'object' && Array.isArray(existing.relations)) {
+                // 如果 existing 是对象（旧格式），提取 relations
+                relationsArray = existing.relations;
               }
+              
+              // 转换为组件需要的格式：包含 characters 和 relations
+              value = {
+                characters: [], // 角色来自依赖的角色列表，不保存
+                relations: relationsArray
+              };
+              
+              console.log(`📥 恢复关系图谱数据 "${storageKey}": 0 个角色（来自角色列表）, ${relationsArray.length} 个关系`);
             } else {
               // 其他类型：直接使用新数据
               value = componentData[storageKey];
@@ -1690,15 +1694,20 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
                 _dependencies: dependencies // 将依赖数据作为元数据注入
               };
             } else if (comp.type === 'relation-graph' && typeof value === 'object') {
-              // 关系图组件：只保存关系，角色来自角色列表（不保存）
+              // 关系图组件：提取 relations 数组，直接存储到 character_relations
               const currentValue = value && typeof value === 'object' ? value : { characters: [], relations: [] };
+              const relationsArray = Array.isArray(currentValue.relations) ? currentValue.relations : [];
               
+              // 直接存储 relations 数组，不存储为对象格式
+              componentData[storageKey] = relationsArray;
+              
+              // value 保持对象格式供组件使用
               value = {
                 characters: [], // 角色来自依赖的角色列表，不保存
-                relations: Array.isArray(currentValue.relations) ? currentValue.relations : []  // 只保存关系
+                relations: relationsArray
               };
               
-              console.log(`💾 写入关系图谱数据到模板 "${storageKey}": 0 个角色（来自角色列表）, ${value.relations.length} 个关系`);
+              console.log(`💾 写入关系图谱数据到模板 "${storageKey}": ${relationsArray.length} 个关系（直接存储为数组）`);
             }
           }
           
@@ -3209,16 +3218,21 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
 
       case 'relation-graph':
         // 转换数据格式
-        // 确保 comp.value 是对象格式，包含 characters 和 relations 两个字段
-        let relationData: { characters?: any[]; relations?: any[] } = {};
-        if (comp.value && typeof comp.value === 'object') {
+        // 兼容新格式（直接是数组）和旧格式（对象包含 relations）
+        let relationData: { characters?: any[]; relations?: any[] } = { characters: [], relations: [] };
+        
+        if (Array.isArray(comp.value)) {
+          // 新格式：直接是 relations 数组
+          relationData = {
+            characters: [],
+            relations: comp.value
+          };
+        } else if (comp.value && typeof comp.value === 'object') {
+          // 旧格式：对象包含 characters 和 relations
           relationData = {
             characters: Array.isArray(comp.value.characters) ? comp.value.characters : [],
             relations: Array.isArray(comp.value.relations) ? comp.value.relations : []
           };
-        } else {
-          // 如果 comp.value 不存在或格式不正确，初始化为空对象
-          relationData = { characters: [], relations: [] };
         }
         
         // 如果组件有依赖，尝试从依赖中获取角色数据
