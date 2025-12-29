@@ -146,8 +146,13 @@ class PromptTemplateApiClient extends BaseApiClient {
 
   /**
    * 根据ID批量获取Prompt模板
+   * @param ids Prompt模板ID数组
+   * @param signal 可选的 AbortSignal，用于取消请求
    */
-  async getPromptTemplatesByIds(ids: number[]): Promise<Map<number, PromptTemplate>> {
+  async getPromptTemplatesByIds(
+    ids: number[],
+    signal?: AbortSignal
+  ): Promise<Map<number, PromptTemplate>> {
     const result = new Map<number, PromptTemplate>();
     if (!ids || ids.length === 0) {
       return result;
@@ -157,7 +162,8 @@ class PromptTemplateApiClient extends BaseApiClient {
       // 使用批量查询接口
       const templates = await this.post<PromptTemplate[]>(
         '/api/v1/prompt-templates/batch',
-        ids
+        ids,
+        signal
       );
       
       if (templates && Array.isArray(templates)) {
@@ -166,6 +172,11 @@ class PromptTemplateApiClient extends BaseApiClient {
         });
       }
     } catch (error) {
+      // 如果是取消请求，不记录错误
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log('批量获取Prompt模板请求已取消');
+        return result;
+      }
       console.error('批量获取Prompt模板失败:', error);
     }
     

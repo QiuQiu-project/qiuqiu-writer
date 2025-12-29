@@ -3,16 +3,21 @@ AI接口路由
 提供章节分析、健康检查和默认提示词接口
 """
 
+# 标准库导入
 import json
 import traceback
 from datetime import datetime, timezone
 from typing import Optional
-from memos.api.models.template import WorkTemplate
+
+# 第三方库导入
 from fastapi import APIRouter, HTTPException, Depends, Query, Body
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
+from sqlalchemy import and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy.orm.attributes import flag_modified
 
+# 本地应用导入
 from memos.api.ai_models import (
     AnalyzeChapterRequest,
     AnalyzeChapterByFileRequest,
@@ -26,13 +31,16 @@ from memos.api.ai_models import (
     AnalysisSettings,
 )
 from memos.api.core.database import get_async_db
+from memos.api.models.chapter import Chapter
+from memos.api.models.prompt_template import PromptTemplate
+from memos.api.models.template import WorkTemplate
+from memos.api.routers.auth_router import get_current_user_id
 from memos.api.services.ai_service import get_ai_service
 from memos.api.services.book_analysis_service import BookAnalysisService
 from memos.api.services.chapter_service import ChapterService
 from memos.api.services.sharedb_service import ShareDBService
-from memos.api.routers.auth_router import get_current_user_id
+from memos.api.services.work_service import WorkService
 from memos.log import get_logger
-
 
 logger = get_logger(__name__)
 
@@ -144,7 +152,6 @@ async def analyze_chapters_incremental(
         book_analysis_service = BookAnalysisService(db)
         
         # 检查作品权限
-        from memos.api.services.work_service import WorkService
         work_service = WorkService(db)
         work = await work_service.get_work_by_id(work_id)
         if not work:
@@ -230,7 +237,6 @@ async def analyze_chapters_incremental(
                     })
             
             # 返回JSON响应
-            from fastapi.responses import JSONResponse
             return JSONResponse({
                 "success": True,
                 "message": f"所有章节分析完成，共 {len(chapters_content)} 章",
@@ -294,7 +300,6 @@ async def analyze_work_chapters(
         await sharedb_service.initialize()
         
         # 检查作品权限
-        from memos.api.services.work_service import WorkService
         work_service = WorkService(db)
         work = await work_service.get_work_by_id(work_id)
         if not work:
@@ -444,7 +449,6 @@ async def analyze_work_chapters(
                     })
             
             # 返回JSON响应
-            from fastapi.responses import JSONResponse
             return JSONResponse({
                 "success": True,
                 "message": f"所有章节分析完成，共 {total} 章",
@@ -615,7 +619,6 @@ async def analyze_book(
                     work_creation_error = str(e)
             
             # 返回JSON响应
-            from fastapi.responses import JSONResponse
             return JSONResponse({
                 "success": True,
                 "message": "分析完成" + ("，作品已创建" if work_result else ""),
@@ -864,9 +867,7 @@ async def generate_chapter_outlines(
     """
     try:
         # 验证作品是否存在
-        from memos.api.services.work_service import WorkService
-        from fastapi.responses import JSONResponse
-        
+
         work_service = WorkService(db)
         work = await work_service.get_work_by_id(work_id)
         if not work:
@@ -1007,9 +1008,7 @@ async def generate_chapter_outlines(
                             # 如果找到了 template_id，直接从 prompt_template 表查询 analysis 类型的 prompt
                             if template_id:
                                 try:
-                                    from memos.api.models.prompt_template import PromptTemplate
-                                    from sqlalchemy import and_
-                                    
+                          
                                     # 查询所有 work_template_id 匹配且 prompt_category 为 analysis 的 prompt
                                     prompt_stmt = select(PromptTemplate).where(
                                         and_(
@@ -1031,7 +1030,6 @@ async def generate_chapter_outlines(
                                             data_key = prompt_template.data_key
                                             component_id = prompt_template.component_id
                                             analysis_prompt = prompt_template.prompt_content
-                                            print(f"data_key: {data_key}, component_id: {component_id}, analysis_prompt: {analysis_prompt}")
                                             if not data_key:
                                                 logger.warning(f"⚠️ prompt_template (id: {prompt_template.id}, component_id: {component_id}) 没有定义 data_key，跳过")
                                                 continue
@@ -1069,15 +1067,19 @@ async def generate_chapter_outlines(
 """
                                                 
                                                 # 使用 format_prompt 方法处理变量替换（支持 @chapter.content 格式）
-                                                from memos.api.models.prompt_template import PromptTemplate
+
+                                                # 获取章节对象（ChapterService已在文件顶部导入）
+                                                chapter_service = ChapterService(db)
+                                                chapter_obj = await chapter_service.get_chapter_by_id(chapter_id)
+                                                
                                                 temp_template = PromptTemplate()
                                                 temp_template.prompt_content = analysis_prompt
                                                 logger.debug(f"使用组件的 analysisPrompt 进行变量替换，原始prompt长度: {len(analysis_prompt)}")
-                                                # 传递章节内容和章节数据，确保 @chapter.content 等变量能正确替换
+                                                # 传递章节对象和内容，确保 @chapter.content 等变量能正确替换
                                                 user_prompt = temp_template.format_prompt(
-                                                    chapter={"content": chapter_content} if chapter_content else {},
-                                                    content=chapter_content if chapter_content else "",  # 直接传递 content，format_prompt 会优先使用这个
-                                                    chapter_content=chapter_content if chapter_content else ""  # 备用键名
+                                                    chapter=chapter_obj if chapter_obj else None,
+                                                    content=chapter_content if chapter_content else "",
+                                                    chapter_content=chapter_content if chapter_content else ""
                                                 )
                                                 logger.debug(f"变量替换后的 user_prompt 长度: {len(user_prompt)}")
                                                 logger.debug(f"变量替换后的 user_prompt 前500字符: {user_prompt[:500] if user_prompt else '空'}")
@@ -1165,8 +1167,7 @@ async def generate_chapter_outlines(
                     # 保存该章节的组件数据到章节的 metadata.component_data 中，并立即整合保存到 work 的 component_data 中
                     if chapter_component_data:
                         try:
-                            from memos.api.models.chapter import Chapter
-                            from sqlalchemy.orm.attributes import flag_modified
+
                             # select 已经在文件顶部导入，不需要重复导入
                             
                             # 获取章节对象
@@ -1245,7 +1246,6 @@ async def generate_chapter_outlines(
             # 记录 all_component_data 的状态，帮助调试
             logger.info(f"准备最终统计组件数据保存结果（已逐章保存），all_component_data 包含 {len(all_component_data)} 个 data_key: {list(all_component_data.keys())}")
             for data_key, data_list in all_component_data.items():
-                print(f"检查 data_key: {data_key}，数据数量: {len(data_list) if data_list else 0}")
                 if not data_list:
                     logger.warning(f"⚠️ data_key {data_key} 的数据列表为空，跳过保存")
                     continue
@@ -1387,7 +1387,7 @@ async def generate_chapter_outlines(
             
             # 重新获取 work 对象以确保数据是最新的（避免访问过期对象）
             try:
-                from memos.api.services.work_service import WorkService
+
                 work_service = WorkService(db)
                 final_work = await work_service.get_work_by_id(work_id)
                 work_title = final_work.title if final_work else work.title if hasattr(work, 'title') else "未知"
@@ -1608,10 +1608,7 @@ async def create_work_from_file(
         Dict: 创建结果，包含作品ID、标题、创建的章节数等
     """
     try:
-        from memos.api.services.work_service import WorkService
-        from memos.api.services.chapter_service import ChapterService
-        from memos.api.services.sharedb_service import ShareDBService
-        
+   
         work_service = WorkService(db)
         chapter_service = ChapterService(db)
         sharedb_service = ShareDBService()
@@ -1648,10 +1645,7 @@ async def create_work_from_file(
         for chapter_data in request.chapters:
             try:
                 # 检查章节是否已存在（根据章节号和卷号）
-                from sqlalchemy import and_
-                from memos.api.models.chapter import Chapter
-                # select 已经在文件顶部导入，不需要重复导入
-                
+
                 existing_chapter_stmt = select(Chapter).where(
                     and_(
                         Chapter.work_id == work.id,

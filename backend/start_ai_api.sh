@@ -80,6 +80,21 @@ fi
 # 确保 src 目录在 PYTHONPATH 中
 export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$SRC_DIR"
 
+# 设置 Hugging Face 模型缓存配置
+# 如果模型已下载，强制只使用本地缓存（避免网络检查）
+export HF_LOCAL_FILES_ONLY=${HF_LOCAL_FILES_ONLY:-true}
+if [ "$HF_LOCAL_FILES_ONLY" = "true" ]; then
+    echo "✅ 模型缓存模式: 仅使用本地缓存（HF_LOCAL_FILES_ONLY=true）"
+    echo "   如果模型未下载，请先设置 HF_LOCAL_FILES_ONLY=false 进行首次下载"
+    echo ""
+fi
+
+# 设置 Hugging Face 缓存目录（可选，默认是 ~/.cache/huggingface）
+if [ -n "$HF_HOME" ]; then
+    export HF_HOME
+    echo "✅ 使用自定义缓存目录: $HF_HOME"
+fi
+
 # 已经在 backend 目录了，不需要再次切换
 
 # 检查Python环境并启动服务

@@ -202,7 +202,9 @@ class PromptContextService:
     
     async def build_context(
         self,
-        work_id: int,
+        work: Optional[Work] = None,
+        work_id: Optional[int] = None,
+        chapter: Optional[Chapter] = None,
         chapter_id: Optional[int] = None,
         include_previous_chapters: int = 3,  # 包含前N章（用于摘要等基本信息）
         include_previous_content: Optional[int] = None,  # 包含前N章的正文（None表示使用include_previous_chapters）
@@ -217,7 +219,9 @@ class PromptContextService:
         构建Prompt上下文（支持按需获取）
         
         Args:
-            work_id: 作品ID
+            work: 作品对象（可选，如果提供则直接使用，否则通过work_id查询）
+            work_id: 作品ID（如果work未提供则必需）
+            chapter: 章节对象（可选，如果提供则直接使用，否则通过chapter_id查询）
             chapter_id: 当前章节ID（可选）
             include_previous_chapters: 包含前N章的信息（用于摘要等基本信息）
             include_previous_content: 包含前N章的正文（None表示使用include_previous_chapters）
@@ -253,19 +257,31 @@ class PromptContextService:
             need_previous_detailed_outlines = True
         
         # 1. 获取作品信息（总是需要）
-        context.work = await self.work_service.get_work_by_id(work_id)
-        if not context.work:
-            raise ValueError(f"作品不存在: {work_id}")
+        if work:
+            context.work = work
+        elif work_id:
+            context.work = await self.work_service.get_work_by_id(work_id)
+            if not context.work:
+                raise ValueError(f"作品不存在: {work_id}")
+        else:
+            raise ValueError("必须提供 work 或 work_id")
         
-        # 2. 获取当前章节信息（如果提供了chapter_id）
-        if chapter_id:
+        # 2. 获取当前章节信息
+        if chapter:
+            context.current_chapter = chapter
+            # 验证章节是否属于作品
+            if context.current_chapter.work_id != context.work.id:
+                raise ValueError(f"章节 {context.current_chapter.id} 不属于作品 {context.work.id}")
+        elif chapter_id:
             context.current_chapter = await self.chapter_service.get_chapter_by_id(chapter_id)
-            if context.current_chapter and context.current_chapter.work_id != work_id:
-                raise ValueError(f"章节 {chapter_id} 不属于作品 {work_id}")
-            
-            # 获取当前章节的正文、大纲、细纲
+            if context.current_chapter and context.current_chapter.work_id != context.work.id:
+                raise ValueError(f"章节 {chapter_id} 不属于作品 {context.work.id}")
+        
+        # 获取当前章节的正文、大纲、细纲
+        if context.current_chapter:
+            chapter_id_for_content = context.current_chapter.id
             try:
-                document = await self.sharedb_service.get_document(f"chapter_{chapter_id}")
+                document = await self.sharedb_service.get_document(f"chapter_{chapter_id_for_content}")
                 if document:
                     context.current_chapter_content = document.get("content", "")
             except Exception as e:
@@ -273,10 +289,9 @@ class PromptContextService:
                 context.current_chapter_content = ""
             
             # 从章节metadata中获取大纲和细纲
-            if context.current_chapter:
-                metadata = context.current_chapter.chapter_metadata or {}
-                context.current_chapter_outline = metadata.get("outline", {})
-                context.current_chapter_detailed_outline = metadata.get("detailed_outline", {})
+            metadata = context.current_chapter.chapter_metadata or {}
+            context.current_chapter_outline = metadata.get("outline", {})
+            context.current_chapter_detailed_outline = metadata.get("detailed_outline", {})
         
         # 3. 获取所有角色（如果需要）- 从 work_metadata.component_data 中读取
         if need_characters:
@@ -328,7 +343,7 @@ class PromptContextService:
             
             previous_chapters, previous_content, previous_outlines, previous_detailed_outlines = \
                 await self._get_previous_chapters_info(
-                    work_id,
+                    context.work.id,
                     context.current_chapter.chapter_number,
                     context.current_chapter.volume_number,
                     include_previous_chapters,  # 基本信息数量
@@ -535,20 +550,28 @@ class PromptContextService:
         self,
         template: PromptTemplate,
         context: Optional[PromptContext] = None,
+        work: Optional[Work] = None,
         work_id: Optional[int] = None,
+        chapter: Optional[Chapter] = None,
         chapter_id: Optional[int] = None,
         additional_vars: Optional[Dict[str, Any]] = None,
         auto_build_context: bool = True
     ) -> str:
         """
         格式化prompt，替换变量（异步方法，可自动获取章节内容）
-        支持中文变量名：{所有角色}、{章节角色}等
-        支持从metadata获取：{作品.xxx}、{章节.xxx}
+        统一支持 @ 符号格式：
+        - @chapter.content: 当前章节的内容
+        - @chapter.metadata: 当前章节的metadata（JSON对象）
+        - @chapter.metadata.xxx: 访问metadata中的键（如 @chapter.metadata.character）
+        - @work.metadata: 当前作品的metadata（JSON对象）
+        - @work.metadata.xxx: 访问metadata中的键
         
         Args:
             template: Prompt模板
             context: 上下文数据（如果为None且auto_build_context=True，会根据prompt需要的变量自动构建）
-            work_id: 作品ID（当context为None时必需）
+            work: 作品对象（可选，如果提供则直接使用，否则通过work_id查询）
+            work_id: 作品ID（当context为None时，work或work_id必需）
+            chapter: 章节对象（可选，如果提供则直接使用，否则通过chapter_id查询）
             chapter_id: 章节ID（可选）
             additional_vars: 额外的变量
             auto_build_context: 是否根据prompt需要的变量自动构建上下文
@@ -558,21 +581,23 @@ class PromptContextService:
         """
         # 如果context为None，根据prompt需要的变量自动构建
         if context is None and auto_build_context:
-            if work_id is None:
-                raise ValueError("当context为None时，必须提供work_id")
+            if work is None and work_id is None:
+                raise ValueError("当context为None时，必须提供work或work_id")
             
             # 提取prompt需要的变量
             requirements = self.extract_required_variables(template.prompt_content)
             
             # 根据需要的变量构建上下文
             context = await self.build_context(
+                work=work,
                 work_id=work_id,
+                chapter=chapter,
                 chapter_id=chapter_id,
                 requirements=requirements
             )
         
         if context is None:
-            raise ValueError("必须提供context或work_id")
+            raise ValueError("必须提供context或work/work_id")
         
         context_dict = context.to_dict()
         vars_dict = {}

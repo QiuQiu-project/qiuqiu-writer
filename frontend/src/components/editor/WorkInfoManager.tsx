@@ -78,25 +78,12 @@ const fillPromptsForComponents = (components: ComponentConfig[], promptMap: Map<
 };
 
 // 为模板的所有组件加载 prompt 内容
-const loadPromptsForComponents = async (modules: ModuleConfig[]): Promise<ModuleConfig[]> => {
-  // 收集所有 promptId
-  const promptIds: number[] = [];
-  for (const module of modules) {
-    promptIds.push(...collectPromptIds(module.components));
-  }
-  
-  if (promptIds.length === 0) {
-    return modules; // 没有 promptId，直接返回
-  }
-  
-  // 批量获取 prompt 内容
-  const promptMap = await promptTemplateApi.getPromptTemplatesByIds(promptIds);
-  
-  // 填充 prompt 内容到组件
-  return modules.map(module => ({
-    ...module,
-    components: fillPromptsForComponents(module.components, promptMap)
-  }));
+// 注意：已移除批量获取 prompt 的请求，直接返回 modules
+const loadPromptsForComponents = async (
+  modules: ModuleConfig[]
+): Promise<ModuleConfig[]> => {
+  // 不再批量获取 prompt 内容，直接返回 modules
+  return modules;
 };
 
 // 势力数据类型
@@ -1150,7 +1137,7 @@ export default function WorkInfoManager({ workId }: WorkInfoManagerProps = {}) {
                 }
                 
                 if (dbModules.length > 0) {
-                  // 加载 prompt 内容
+                  // 加载 prompt 内容（支持取消）
                   const modulesWithPrompts = await loadPromptsForComponents(dbModules);
                   // 从 work_template 表加载模板结构（包含 dataKey）
                   baseTemplate = {

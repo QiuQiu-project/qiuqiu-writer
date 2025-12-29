@@ -527,27 +527,16 @@ class BookAnalysisService:
                         context_info.append(f"主要地点：{', '.join(locs_summary)}")
                 
                 if context_info:
-                    # 使用模板的 format_prompt 方法，支持 @chapter.content 和 {content} 格式
-                    try:
-                        # 创建临时模板对象用于格式化
-                        from memos.api.models.prompt_template import PromptTemplate
-                        temp_template = PromptTemplate()
-                        temp_template.prompt_content = prompt_template
-                        # 提供 chapter 对象和 content
-                        base_prompt = temp_template.format_prompt(
-                            chapter=chapter,
-                            content=chapter_content,
-                            **({"章节内容": chapter_content} if chapter_content else {})
-                        )
-                    except Exception as e:
-                        logger.warning(f"使用新格式替换失败，回退到旧格式: {e}")
-                        # 向后兼容：如果新格式失败，使用旧格式
-                        if "{content}" in prompt_template:
-                            base_prompt = prompt_template.replace("{content}", chapter_content)
-                        elif "@chapter.content" in prompt_template:
-                            base_prompt = prompt_template.replace("@chapter.content", chapter_content)
-                        else:
-                            base_prompt = prompt_template
+                    # 使用模板的 format_prompt 方法，支持 @chapter.content 格式
+                    from memos.api.models.prompt_template import PromptTemplate
+                    temp_template = PromptTemplate()
+                    temp_template.prompt_content = prompt_template
+                    # 提供 chapter 对象和 content
+                    base_prompt = temp_template.format_prompt(
+                        chapter=chapter,
+                        content=chapter_content,
+                        **({"章节内容": chapter_content} if chapter_content else {})
+                    )
                     
                     enhanced_prompt = f"""{base_prompt}
 
@@ -558,27 +547,6 @@ class BookAnalysisService:
 请严格按照上述JSON格式输出分析结果："""
                 else:
                     # 使用模板的 format_prompt 方法
-                    try:
-                        from memos.api.models.prompt_template import PromptTemplate
-                        temp_template = PromptTemplate()
-                        temp_template.prompt_content = prompt_template
-                        enhanced_prompt = temp_template.format_prompt(
-                            chapter=chapter,
-                            content=chapter_content,
-                            **({"章节内容": chapter_content} if chapter_content else {})
-                        )
-                    except Exception as e:
-                        logger.warning(f"使用新格式替换失败，回退到旧格式: {e}")
-                        # 向后兼容
-                        if "{content}" in prompt_template:
-                            enhanced_prompt = prompt_template.replace("{content}", chapter_content)
-                        elif "@chapter.content" in prompt_template:
-                            enhanced_prompt = prompt_template.replace("@chapter.content", chapter_content)
-                        else:
-                            enhanced_prompt = prompt_template
-            else:
-                # 使用模板的 format_prompt 方法
-                try:
                     from memos.api.models.prompt_template import PromptTemplate
                     temp_template = PromptTemplate()
                     temp_template.prompt_content = prompt_template
@@ -587,15 +555,16 @@ class BookAnalysisService:
                         content=chapter_content,
                         **({"章节内容": chapter_content} if chapter_content else {})
                     )
-                except Exception as e:
-                    logger.warning(f"使用新格式替换失败，回退到旧格式: {e}")
-                    # 向后兼容
-                    if "{content}" in prompt_template:
-                        enhanced_prompt = prompt_template.replace("{content}", chapter_content)
-                    elif "@chapter.content" in prompt_template:
-                        enhanced_prompt = prompt_template.replace("@chapter.content", chapter_content)
-                    else:
-                        enhanced_prompt = prompt_template
+            else:
+                # 使用模板的 format_prompt 方法
+                from memos.api.models.prompt_template import PromptTemplate
+                temp_template = PromptTemplate()
+                temp_template.prompt_content = prompt_template
+                enhanced_prompt = temp_template.format_prompt(
+                    chapter=chapter,
+                    content=chapter_content,
+                    **({"章节内容": chapter_content} if chapter_content else {})
+                )
             
             # 调用AI服务进行分析
             settings = settings or {}

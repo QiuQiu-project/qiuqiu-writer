@@ -4,7 +4,15 @@ WawaWriter API服务
 包含AI分析、产品API和服务器API等所有接口
 """
 
+import os
 import logging
+
+# 在导入其他模块之前设置 Hugging Face 缓存环境变量
+# 默认使用本地缓存模式，避免每次启动都尝试网络连接
+if os.getenv("HF_LOCAL_FILES_ONLY", "true").lower() in ("true", "1", "yes"):
+    os.environ["HF_LOCAL_FILES_ONLY"] = "1"
+    os.environ["TRANSFORMERS_OFFLINE"] = "1"
+    os.environ["HF_HUB_OFFLINE"] = "1"
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware

@@ -39,6 +39,7 @@ export class BaseApiClient {
     try {
       const response = await fetch(url, {
         ...options,
+        signal: options.signal, // 支持 AbortSignal
         headers: {
           ...this.getAuthHeaders(),
           ...options.headers,
@@ -92,10 +93,11 @@ export class BaseApiClient {
   /**
    * POST 请求的便捷方法
    */
-  protected async post<T>(endpoint: string, data?: any): Promise<T> {
+  protected async post<T>(endpoint: string, data?: any, signal?: AbortSignal): Promise<T> {
     return this.request<T>(endpoint, {
       method: 'POST',
       body: data ? JSON.stringify(data) : undefined,
+      signal,
     });
   }
 

@@ -43,6 +43,7 @@ class PromptTemplate(Base):
     data_key = Column(String(100), nullable=True, index=True)  # 数据存储键（用于在 component_data 中存储数据）
     work_id = Column(Integer, ForeignKey("works.id", ondelete="CASCADE"), nullable=True, index=True)  # 关联的作品ID（如果prompt是作品级别的，向后兼容）
     work_template_id = Column(Integer, ForeignKey("work_templates.id", ondelete="CASCADE"), nullable=True, index=True)  # 关联的模板ID（如果prompt是模板级别的）
+    chapter_id = Column(Integer, ForeignKey("chapters.id", ondelete="CASCADE"), nullable=True, index=True)  # 关联的章节ID（如果prompt是章节级别的）
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -50,6 +51,7 @@ class PromptTemplate(Base):
     # 关系
     creator = relationship("User")
     work = relationship("Work", foreign_keys=[work_id])
+    chapter = relationship("Chapter", foreign_keys=[chapter_id])
 
     def __repr__(self):
         return f"<PromptTemplate(id={self.id}, name='{self.name}', type='{self.template_type}')>"
@@ -75,188 +77,153 @@ class PromptTemplate(Base):
             "data_key": self.data_key,
             "work_id": self.work_id,
             "work_template_id": self.work_template_id,
+            "chapter_id": self.chapter_id,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
 
     def format_prompt(self, **kwargs) -> str:
         """格式化提示词，替换变量
-        支持 @ 符号格式：@chapter.content、@work.title 等
-        支持嵌套访问：@chapter.meta.outline、@work.meta.characters 等
-        支持旧格式兼容：{variable_name}、{作品.xxx} 等（向后兼容）
+        统一支持 @ 符号格式：
+        - @chapter.content: 当前章节的内容
+        - @chapter.metadata: 当前章节的metadata（JSON对象）
+        - @chapter.metadata.xxx: 访问metadata中的键（如 @chapter.metadata.character）
+        - @work.metadata: 当前作品的metadata（JSON对象）
+        - @work.metadata.xxx: 访问metadata中的键
         """
         content = self.prompt_content
         
-        # 首先处理新的 @ 符号格式
-        # 匹配 @对象.键.子键... 格式（如 @chapter.content、@work.meta.characters）
+        # 匹配 @对象.键.子键... 格式（如 @chapter.content、@chapter.metadata.character）
         at_pattern = r'@([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z0-9_]+)*)'
         
         def replace_at_var(match):
-            var_path = match.group(1)  # 如 "chapter.content" 或 "work.meta.characters"
+            var_path = match.group(1)  # 如 "chapter.content" 或 "chapter.metadata.character"
             parts = var_path.split('.')
             
-            # 从 kwargs 中获取数据
-            # 支持特殊对象：chapter, work
-            current_value = None
+            if len(parts) < 2:
+                return ''
             
-            # 处理特殊对象映射
+            # 处理 @chapter.xxx 格式
             if parts[0] == 'chapter':
-                # @chapter.xxx 格式
                 chapter_data = kwargs.get('chapter') or kwargs.get('章节')
                 if chapter_data is None:
                     # 尝试从 context 中获取
-                    if 'current_chapter' in kwargs:
-                        chapter_data = kwargs['current_chapter']
-                    elif 'context' in kwargs and hasattr(kwargs['context'], 'current_chapter'):
+                    if 'context' in kwargs and hasattr(kwargs['context'], 'current_chapter'):
                         chapter_data = kwargs['context'].current_chapter
                 
-                if chapter_data:
-                    if len(parts) == 1:
-                        # @chapter 本身，返回整个对象（JSON格式）
-                        if isinstance(chapter_data, dict):
-                            return json.dumps(chapter_data, ensure_ascii=False, indent=2)
-                        return json.dumps(chapter_data.to_dict() if hasattr(chapter_data, 'to_dict') else chapter_data, ensure_ascii=False, indent=2)
-                    elif len(parts) == 2:
-                        # @chapter.content 或 @chapter.title
-                        key = parts[1]
-                        if key == 'content':
-                            # 从 ShareDB 获取内容（如果提供了 sharedb_service）
-                            # 注意：这里不能直接调用异步方法，需要从 kwargs 中获取已准备好的内容
-                            # 优先使用 kwargs 中提供的 content
-                            if 'content' in kwargs:
-                                return str(kwargs['content']) if kwargs['content'] else ''
-                            if '章节内容' in kwargs:
-                                return str(kwargs['章节内容']) if kwargs['章节内容'] else ''
-                            if 'chapter_content' in kwargs:
-                                return str(kwargs['chapter_content']) if kwargs['chapter_content'] else ''
-                            # 如果都没有，尝试从 chapter_data 获取（支持字典和对象）
-                            if isinstance(chapter_data, dict):
-                                return str(chapter_data.get('content', '')) or ''
-                            return getattr(chapter_data, 'content', '') or ''
-                        elif key == 'title':
-                            if isinstance(chapter_data, dict):
-                                return str(chapter_data.get('title', '')) or ''
-                            return getattr(chapter_data, 'title', '') or ''
-                        elif key == 'meta':
-                            # @chapter.meta 返回整个元信息对象
-                            if isinstance(chapter_data, dict):
-                                metadata = chapter_data.get('chapter_metadata') or chapter_data.get('meta') or {}
-                            else:
-                                metadata = getattr(chapter_data, 'chapter_metadata', None) or {}
-                            return json.dumps(metadata, ensure_ascii=False, indent=2)
-                        else:
-                            # 其他属性
-                            if isinstance(chapter_data, dict):
-                                return str(chapter_data.get(key, '')) or ''
-                            return str(getattr(chapter_data, key, '')) or ''
-                    elif len(parts) >= 3 and parts[1] == 'meta':
-                        # @chapter.meta.outline 格式
-                        if isinstance(chapter_data, dict):
-                            metadata = chapter_data.get('chapter_metadata') or chapter_data.get('meta') or {}
-                        else:
-                            metadata = getattr(chapter_data, 'chapter_metadata', None) or {}
-                        # 从 metadata 中获取嵌套的键
-                        current_value = metadata
-                        for key in parts[2:]:
-                            if isinstance(current_value, dict):
-                                current_value = current_value.get(key)
-                            else:
-                                return ''
+                if not chapter_data:
+                    return ''
+                
+                # @chapter.content
+                if len(parts) == 2 and parts[1] == 'content':
+                    # 优先使用 kwargs 中提供的 content
+                    if 'content' in kwargs:
+                        return str(kwargs['content']) if kwargs['content'] else ''
+                    if '章节内容' in kwargs:
+                        return str(kwargs['章节内容']) if kwargs['章节内容'] else ''
+                    if 'chapter_content' in kwargs:
+                        return str(kwargs['chapter_content']) if kwargs['chapter_content'] else ''
+                    # 如果都没有，尝试从 chapter_data 获取（支持字典和对象）
+                    if isinstance(chapter_data, dict):
+                        return str(chapter_data.get('content', '')) or ''
+                    return getattr(chapter_data, 'content', '') or ''
+                
+                # @chapter.metadata 或 @chapter.metadata.xxx
+                elif parts[1] == 'metadata':
+                    # 获取 metadata
+                    if isinstance(chapter_data, dict):
+                        metadata = chapter_data.get('chapter_metadata') or chapter_data.get('metadata') or {}
                     else:
+                        metadata = getattr(chapter_data, 'chapter_metadata', None) or {}
+                    
+                    if not isinstance(metadata, dict):
+                        metadata = {}
+                    
+                    # @chapter.metadata（返回整个metadata）
+                    if len(parts) == 2:
+                        return json.dumps(metadata, ensure_ascii=False, indent=2)
+                    
+                    # @chapter.metadata.xxx（访问metadata中的键）
+                    current_value = metadata
+                    for key in parts[2:]:
+                        if isinstance(current_value, dict):
+                            current_value = current_value.get(key)
+                        else:
+                            return ''
+                    
+                    # 处理获取到的值
+                    if current_value is None:
                         return ''
+                    if isinstance(current_value, (dict, list)):
+                        return json.dumps(current_value, ensure_ascii=False, indent=2)
+                    return str(current_value)
+                
+                # @chapter.其他属性（如 @chapter.title）
+                elif len(parts) == 2:
+                    key = parts[1]
+                    if isinstance(chapter_data, dict):
+                        value = chapter_data.get(key, '')
+                    else:
+                        value = getattr(chapter_data, key, '') or ''
+                    return str(value) if value else ''
+                
+                return ''
             
+            # 处理 @work.xxx 格式
             elif parts[0] == 'work':
-                # @work.xxx 格式
                 work_data = kwargs.get('work') or kwargs.get('作品')
                 if work_data is None:
-                    if 'work' in kwargs:
-                        work_data = kwargs['work']
-                    elif 'context' in kwargs and hasattr(kwargs['context'], 'work'):
+                    if 'context' in kwargs and hasattr(kwargs['context'], 'work'):
                         work_data = kwargs['context'].work
                 
-                if work_data:
-                    if len(parts) == 1:
-                        # @work 本身
-                        return json.dumps(work_data.to_dict() if hasattr(work_data, 'to_dict') else work_data, ensure_ascii=False, indent=2)
-                    elif len(parts) == 2:
-                        # @work.title 等
-                        key = parts[1]
-                        if key == 'title':
-                            return getattr(work_data, 'title', '') or ''
-                        elif key == 'meta':
-                            # @work.meta 返回整个元信息对象
-                            metadata = getattr(work_data, 'work_metadata', None) or {}
-                            return json.dumps(metadata, ensure_ascii=False, indent=2)
-                        else:
-                            return str(getattr(work_data, key, ''))
-                    elif len(parts) >= 3 and parts[1] == 'meta':
-                        # @work.meta.characters 格式
+                if not work_data:
+                    return ''
+                
+                # @work.metadata 或 @work.metadata.xxx
+                if len(parts) >= 2 and parts[1] == 'metadata':
+                    # 获取 metadata
+                    if isinstance(work_data, dict):
+                        metadata = work_data.get('work_metadata') or work_data.get('metadata') or {}
+                    else:
                         metadata = getattr(work_data, 'work_metadata', None) or {}
-                        # 从 metadata 中获取嵌套的键
-                        current_value = metadata
-                        for key in parts[2:]:
-                            if isinstance(current_value, dict):
-                                current_value = current_value.get(key)
-                            else:
-                                return ''
-                    else:
+                    
+                    if not isinstance(metadata, dict):
+                        metadata = {}
+                    
+                    # @work.metadata（返回整个metadata）
+                    if len(parts) == 2:
+                        return json.dumps(metadata, ensure_ascii=False, indent=2)
+                    
+                    # @work.metadata.xxx（访问metadata中的键）
+                    current_value = metadata
+                    for key in parts[2:]:
+                        if isinstance(current_value, dict):
+                            current_value = current_value.get(key)
+                        else:
+                            return ''
+                    
+                    # 处理获取到的值
+                    if current_value is None:
                         return ''
-            
-            else:
-                # 其他对象，从 kwargs 中直接获取
-                current_value = kwargs.get(parts[0])
-                for key in parts[1:]:
-                    if isinstance(current_value, dict):
-                        current_value = current_value.get(key)
-                    elif hasattr(current_value, key):
-                        current_value = getattr(current_value, key)
+                    if isinstance(current_value, (dict, list)):
+                        return json.dumps(current_value, ensure_ascii=False, indent=2)
+                    return str(current_value)
+                
+                # @work.其他属性（如 @work.title）
+                elif len(parts) == 2:
+                    key = parts[1]
+                    if isinstance(work_data, dict):
+                        value = work_data.get(key, '')
                     else:
-                        return ''
-            
-            # 处理获取到的值
-            if current_value is None:
+                        value = getattr(work_data, key, '') or ''
+                    return str(value) if value else ''
+                
                 return ''
-            if isinstance(current_value, (dict, list)):
-                return json.dumps(current_value, ensure_ascii=False, indent=2)
-            return str(current_value)
+            
+            return ''
         
         # 替换所有 @ 格式的变量
         content = re.sub(at_pattern, replace_at_var, content)
-        
-        # 向后兼容：处理旧的 {变量名} 格式
-        old_pattern = r'\{([^}]+)\}'
-        
-        def replace_old_var(match):
-            var_expr = match.group(1)
-            
-            # 处理 {对象.键} 格式（如 {作品.xxx}、{章节.xxx}）
-            if '.' in var_expr:
-                parts = var_expr.split('.', 1)
-                obj_name = parts[0]
-                key = parts[1]
-                
-                # 从kwargs中获取对象数据
-                obj_data = kwargs.get(obj_name)
-                if isinstance(obj_data, dict):
-                    value = obj_data.get(key, '')
-                    if value is None:
-                        return ''
-                    # 如果是复杂对象（字典或列表），格式化为JSON字符串
-                    if isinstance(value, (dict, list)):
-                        return json.dumps(value, ensure_ascii=False, indent=2)
-                    return str(value)
-                return ''
-            
-            # 处理普通变量（包括中文）
-            if var_expr in kwargs:
-                value = kwargs[var_expr]
-                return str(value) if value is not None else ''
-            
-            # 如果变量不存在，返回空字符串（而不是保留原变量）
-            return ''
-        
-        # 替换所有旧的 {变量} 格式（向后兼容）
-        content = re.sub(old_pattern, replace_old_var, content)
         
         return content
 
@@ -268,5 +235,6 @@ Index("idx_prompt_templates_active", PromptTemplate.is_active)
 Index("idx_prompt_templates_component", PromptTemplate.component_id, PromptTemplate.component_type)
 Index("idx_prompt_templates_work_component", PromptTemplate.work_id, PromptTemplate.component_id, PromptTemplate.prompt_category)
 Index("idx_prompt_templates_template_component", PromptTemplate.work_template_id, PromptTemplate.component_id, PromptTemplate.prompt_category)
+Index("idx_prompt_templates_chapter_component", PromptTemplate.chapter_id, PromptTemplate.component_id, PromptTemplate.prompt_category)
 Index("idx_prompt_templates_data_key", PromptTemplate.data_key)
 
