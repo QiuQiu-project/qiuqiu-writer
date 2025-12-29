@@ -357,6 +357,8 @@ function CharacterRelations({ data, onChange }: CharacterRelationsProps) {
                       setEditForm({
                         relationType: relation.type,
                         relationDescription: relation.description,
+                        relationFrom: relation.from,
+                        relationTo: relation.to,
                       });
                     }
                   }
@@ -405,6 +407,8 @@ function CharacterRelations({ data, onChange }: CharacterRelationsProps) {
                   setEditForm({
                     relationType: relation.type,
                     relationDescription: relation.description,
+                    relationFrom: relation.from,
+                    relationTo: relation.to,
                   });
                 }
               }
@@ -653,12 +657,35 @@ function CharacterRelations({ data, onChange }: CharacterRelationsProps) {
   };
 
   const handleSaveRelation = () => {
-    if (editingRelation) {
+    if (editingRelation && editForm.relationFrom && editForm.relationTo && editForm.relationType) {
+      // 检查是否修改了角色，如果修改了，需要检查是否会产生重复关系
+      const currentRelation = relations.find((r) => r.id === editingRelation);
+      if (currentRelation) {
+        const fromChanged = currentRelation.from !== editForm.relationFrom;
+        const toChanged = currentRelation.to !== editForm.relationTo;
+        
+        // 如果修改了角色，检查是否会产生重复关系
+        if (fromChanged || toChanged) {
+          const wouldConflict = relations.some(
+            (r) =>
+              r.id !== editingRelation && // 排除当前关系
+              ((r.from === editForm.relationFrom && r.to === editForm.relationTo) ||
+               (r.from === editForm.relationTo && r.to === editForm.relationFrom))
+          );
+          if (wouldConflict) {
+            alert('这两个角色之间已经存在关系');
+            return;
+          }
+        }
+      }
+
       const newRelations = relations.map((r) =>
         r.id === editingRelation
           ? {
               ...r,
-              type: editForm.relationType || r.type,
+              from: editForm.relationFrom,
+              to: editForm.relationTo,
+              type: editForm.relationType,
               description: editForm.relationDescription || r.description,
             }
           : r
@@ -752,6 +779,8 @@ function CharacterRelations({ data, onChange }: CharacterRelationsProps) {
                         setEditForm({
                           relationType: relationData.type,
                           relationDescription: relationData.description,
+                          relationFrom: relationData.from,
+                          relationTo: relationData.to,
                         });
                       }
                     }}
@@ -864,22 +893,27 @@ function CharacterRelations({ data, onChange }: CharacterRelationsProps) {
       {/* 编辑关系弹窗 */}
       {editingRelation && (() => {
         const relation = relations.find((r) => r.id === editingRelation);
-        const fromChar = characters.find((c) => c.id === relation?.from);
-        const toChar = characters.find((c) => c.id === relation?.to);
+        const fromChar = characters.find((c) => c.id === editForm.relationFrom || relation?.from);
+        const toChar = characters.find((c) => c.id === editForm.relationTo || relation?.to);
         return relation ? (
           <div className="edit-modal-overlay" onClick={() => { setEditingRelation(null); setEditForm({}); }}>
             <div className="edit-modal" onClick={(e) => e.stopPropagation()}>
               <h4>编辑关系</h4>
               <div className="modal-form">
-                <div className="relation-info-display" style={{ marginBottom: '16px' }}>
-                  <div className="relation-characters">
-                    <span className="relation-char-name">{fromChar?.name || '未知'}</span>
-                    <ArrowRight size={20} />
-                    <span className="relation-type-display">{relation.type}</span>
-                    <ArrowRight size={20} />
-                    <span className="relation-char-name">{toChar?.name || '未知'}</span>
-                  </div>
-                </div>
+                <label>
+                  <span>起始角色</span>
+                  <select
+                    value={editForm.relationFrom || relation.from || ''}
+                    onChange={(e) => setEditForm({ ...editForm, relationFrom: e.target.value })}
+                    className="edit-select"
+                  >
+                    {characters.map((char) => (
+                      <option key={char.id} value={char.id}>
+                        {char.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <label>
                   <span>关系类型</span>
                   <input
@@ -890,6 +924,20 @@ function CharacterRelations({ data, onChange }: CharacterRelationsProps) {
                     placeholder="例如：朋友、恋人、对手等"
                     autoFocus
                   />
+                </label>
+                <label>
+                  <span>目标角色</span>
+                  <select
+                    value={editForm.relationTo || relation.to || ''}
+                    onChange={(e) => setEditForm({ ...editForm, relationTo: e.target.value })}
+                    className="edit-select"
+                  >
+                    {characters.map((char) => (
+                      <option key={char.id} value={char.id}>
+                        {char.name}
+                      </option>
+                    ))}
+                  </select>
                 </label>
                 <label>
                   <span>关系描述（可选）</span>
