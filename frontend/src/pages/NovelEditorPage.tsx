@@ -77,7 +77,6 @@ export default function NovelEditorPage(){
   const [findText, setFindText] = useState('');
   const [replaceText, setReplaceText] = useState('');
   const [matchCase, setMatchCase] = useState(false);
-  const [wholeWord, setWholeWord] = useState(false);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
   const [matches, setMatches] = useState<Array<{ start: number; end: number }>>([]);
   
@@ -437,20 +436,10 @@ export default function NovelEditorPage(){
       const { doc } = state;
       
       // 构建正则表达式
-      let regex: RegExp;
-      if (wholeWord) {
-        // 全字匹配
-        const escaped = findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        regex = matchCase 
-          ? new RegExp(`\\b${escaped}\\b`, 'g')
-          : new RegExp(`\\b${escaped}\\b`, 'gi');
-      } else {
-        // 普通匹配
-        const escaped = findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        regex = matchCase 
-          ? new RegExp(escaped, 'g')
-          : new RegExp(escaped, 'gi');
-      }
+      const escaped = findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = matchCase 
+        ? new RegExp(escaped, 'g')
+        : new RegExp(escaped, 'gi');
 
       const foundMatches: Array<{ start: number; end: number }> = [];
       
@@ -579,19 +568,10 @@ export default function NovelEditorPage(){
 
     try {
       const htmlContent = editor.getHTML();
-      let regex: RegExp;
-      
-      if (wholeWord) {
-        const escaped = findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        regex = matchCase 
-          ? new RegExp(`\\b${escaped}\\b`, 'g')
-          : new RegExp(`\\b${escaped}\\b`, 'gi');
-      } else {
-        const escaped = findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        regex = matchCase 
-          ? new RegExp(escaped, 'g')
-          : new RegExp(escaped, 'gi');
-      }
+      const escaped = findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = matchCase 
+        ? new RegExp(escaped, 'g')
+        : new RegExp(escaped, 'gi');
 
       // 简单处理：直接替换 HTML 中的文本（保持格式）
       const newHtmlContent = htmlContent.replace(regex, replaceText);
@@ -619,7 +599,7 @@ export default function NovelEditorPage(){
       setCurrentMatchIndex(-1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [findText, matchCase, wholeWord, isReplacePanelOpen, editor]);
+  }, [findText, matchCase, isReplacePanelOpen, editor]);
 
   // 分析本书（后台运行，不显示弹窗）
   const handleAnalyzeWork = async () => {
@@ -2257,14 +2237,6 @@ export default function NovelEditorPage(){
                   onChange={(e) => setMatchCase(e.target.checked)}
                 />
                 <span>区分大小写</span>
-              </label>
-              <label className="option-checkbox">
-                <input
-                  type="checkbox"
-                  checked={wholeWord}
-                  onChange={(e) => setWholeWord(e.target.checked)}
-                />
-                <span>全字匹配</span>
               </label>
               <button
                 className="close-panel-btn"
