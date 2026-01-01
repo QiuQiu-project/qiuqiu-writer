@@ -8,8 +8,29 @@ import { worksApi } from '../../utils/worksApi';
 import MarkdownIt from 'markdown-it';
 import './AIAssistant.css';
 
+interface ChapterAnalysisCommandResult {
+  chapterId: number;
+  chapterNumber?: number;
+  title?: string;
+  outline?: string;
+  detailedOutline?: string;
+  success: boolean;
+  error?: string;
+}
+
+interface WorkAnalysisCommandResult {
+  success: boolean;
+  message: string;
+  analyzedCount?: number;
+  errors?: string[];
+}
+
 interface AIAssistantProps {
   workId?: number | string | null;
+  onAnalyzeChapterCommand?: (
+    chapters: Array<{ id: number; chapter_number?: number; title?: string }>
+  ) => Promise<ChapterAnalysisCommandResult[]>;
+  onAnalyzeWorkCommand?: () => Promise<WorkAnalysisCommandResult | undefined>;
 }
 
 const md = new MarkdownIt({
@@ -36,6 +57,7 @@ interface MentionOption {
   name: string;
   subtitle?: string;
   isCommand?: boolean; // 是否为指令选项
+  commandKind?: 'mention' | 'slash';
 }
 
 interface CharacterFromMetadata {
@@ -134,8 +156,50 @@ export default function AIAssistant({ workId }: AIAssistantProps) {
     setMessage(value);
     setCharCount(value.length);
     
-    // 检测 @ 提及
+    // Slash 命令补全
+    const commandOptions: MentionOption[] = [
+      { type: 'command', id: 'analysis-chapter', name: '/analysis-chapter', subtitle: '分析指定章节', isCommand: true, commandKind: 'slash' },
+      { type: 'command', id: 'analysis-work', name: '/analysis-work', subtitle: '分析全书章节', isCommand: true, commandKind: 'slash' },
+      { type: 'command', id: 'analysis-chapter-info', name: '/analysis-chapter-info', subtitle: '分析章节组件信息', isCommand: true, commandKind: 'slash' },
+    ];
     const textBeforeCursor = value.substring(0, cursorPos);
+    const lastSlashIndex = textBeforeCursor.lastIndexOf('/');
+    if (lastSlashIndex !== -1) {
+      const textAfterSlash = textBeforeCursor.substring(lastSlashIndex + 1);
+      const hasSpace = textAfterSlash.includes(' ') || textAfterSlash.includes('\n');
+      if (!hasSpace) {
+        const query = textAfterSlash.toLowerCase();
+        const filtered = commandOptions.filter((cmd) =>
+          cmd.name.toLowerCase().includes(`/${query}`)
+        );
+        if (filtered.length > 0) {
+          setMentionOptions(filtered);
+          setSelectedMentionIndex(0);
+
+          const textarea = textareaRef.current;
+          if (textarea) {
+            const rect = textarea.getBoundingClientRect();
+            const lineHeight = 20;
+            const lines = textBeforeCursor.split('\n').length;
+            const menuHeight = 200;
+            const menuWidth = 320;
+            let top = rect.top + lines * lineHeight + 30;
+            let left = rect.left + 10;
+            if (top + menuHeight > window.innerHeight) {
+              top = rect.top + lines * lineHeight - menuHeight - 10;
+            }
+            if (left + menuWidth > window.innerWidth) {
+              left = window.innerWidth - menuWidth - 10;
+            }
+            setMentionPosition({ top, left });
+          }
+          setShowMentionMenu(true);
+          return;
+        }
+      }
+    }
+
+    // 检测 @ 提及
     const lastAtIndex = textBeforeCursor.lastIndexOf('@');
     
     if (lastAtIndex !== -1) {
@@ -426,13 +490,16 @@ export default function AIAssistant({ workId }: AIAssistantProps) {
     const cursorPos = textarea.selectionStart;
     const textBeforeCursor = message.substring(0, cursorPos);
     const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+    const lastSlashIndex = textBeforeCursor.lastIndexOf('/');
+    const targetIndex = option.commandKind === 'slash' ? lastSlashIndex : lastAtIndex;
     
-    if (lastAtIndex !== -1) {
+    if (targetIndex !== -1) {
       // 如果选择的是指令，则插入指令名称并继续显示对应的内容列表
       if (option.isCommand) {
-        const commandText = `@${option.name} `;
+        const commandText =
+          option.commandKind === 'slash' ? `/${option.id} ` : `@${option.name} `;
         const newMessage = 
-          message.substring(0, lastAtIndex) + 
+          message.substring(0, targetIndex) + 
           commandText + 
           message.substring(cursorPos);
         
@@ -440,7 +507,7 @@ export default function AIAssistant({ workId }: AIAssistantProps) {
         
         // 设置光标位置并手动触发输入处理以显示内容列表
         setTimeout(() => {
-          const newCursorPos = lastAtIndex + commandText.length;
+          const newCursorPos = targetIndex + commandText.length;
           textarea.setSelectionRange(newCursorPos, newCursorPos);
           textarea.focus();
           
@@ -458,7 +525,7 @@ export default function AIAssistant({ workId }: AIAssistantProps) {
           : `@character:${option.name}`; // 角色使用名称作为标识
         
         const newMessage = 
-          message.substring(0, lastAtIndex) + 
+          message.substring(0, targetIndex) + 
           mentionText + ' ' + 
           message.substring(cursorPos);
         
@@ -467,7 +534,7 @@ export default function AIAssistant({ workId }: AIAssistantProps) {
         
         // 设置光标位置
         setTimeout(() => {
-          const newCursorPos = lastAtIndex + mentionText.length + 1;
+          const newCursorPos = targetIndex + mentionText.length + 1;
           textarea.setSelectionRange(newCursorPos, newCursorPos);
           textarea.focus();
         }, 0);
@@ -909,7 +976,7 @@ export default function AIAssistant({ workId }: AIAssistantProps) {
                   <textarea
                     ref={textareaRef}
                     className="chat-input"
-                    placeholder="输入你的问题... 使用 @ 引用章节或角色 (Shift+Enter 或 Ctrl+Enter 发送)"
+                    placeholder="输入你的问题... 支持 /analysis-chapter、/analysis-work、/analysis-chapter-info，@ 引用章节或角色"
                     value={message}
                     onChange={handleInputChange}
                     onKeyDown={handleKeyDown}

@@ -11,6 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from memos.api.config import APIConfig
 from memos.api.core.database import get_async_db
 from memos.api.services.mention_service import MentionService
+from memos.api.services.book_analysis_service import BookAnalysisService
+from memos.api.services.chapter_service import ChapterService
+from memos.api.services.work_service import WorkService
+from memos.api.ai_models import AnalysisSettings
+from memos.api.services.ai_service import get_ai_service
 
 
 # 辅助函数：确保返回的是 AsyncSession 对象，而不是生成器
@@ -85,6 +90,53 @@ def get_mos_product_instance():
         )
         logger.info("MOSProduct instance created successfully with inheritance architecture")
     return MOS_PRODUCT_INSTANCE
+
+
+def _parse_work_id_from_user_id(user_id: str) -> int | None:
+    """
+    解析形如 user_{uid}_work_{workId} 的 user_id，提取 workId
+    """
+    try:
+        if "_work_" in user_id:
+            parts = user_id.split("_work_")
+            work_part = parts[-1]
+            work_id = int(work_part)
+            return work_id
+    except Exception:
+        pass
+    return None
+
+
+def _parse_chapter_ids_from_command(query: str) -> list[int]:
+    """
+    从命令文本中提取章节ID/编号
+    优先识别 @chapter:数字 格式，然后提取纯数字
+    """
+    import re
+
+    ids = []
+    
+    # 优先识别 @chapter:数字 格式
+    chapter_mention_pattern = r'@chapter:(\d+)'
+    for match in re.findall(chapter_mention_pattern, query):
+        try:
+            chapter_id = int(match)
+            if chapter_id not in ids:
+                ids.append(chapter_id)
+        except ValueError:
+            continue
+    
+    # 如果没有找到 @chapter 格式，再提取所有数字（向后兼容）
+    if not ids:
+        for match in re.findall(r"\d+", query):
+            try:
+                chapter_id = int(match)
+                if chapter_id not in ids:
+                    ids.append(chapter_id)
+            except ValueError:
+                continue
+    
+    return ids
 
 
 get_mos_product_instance()
@@ -426,24 +478,241 @@ async def chat(chat_req: ChatRequest, db: AsyncSession = Depends(get_db_session)
         # 确保用户存在，如果不存在则自动注册
         ensure_memos_user_exists(chat_req.user_id)
 
+        # 如果是命令，需要先提取章节ID（在替换提及之前）
+        command_prefixes = ("/analysis-chapter", "/analysis-work", "/analysis-chapter-info")
+        is_command = chat_req.query.strip().lower().startswith(command_prefixes)
+        
         # 处理提及替换
         mention_service = MentionService(db)
         processed_query = await mention_service.replace_mentions_in_text(chat_req.query, chat_req.user_id)
         processed_history = await mention_service.replace_mentions_in_history(chat_req.history or [], chat_req.user_id)
 
-        def generate_chat_response():
+        # 如果是命令或用户要求禁用记忆，则走无记忆流程
+        disable_memory = not chat_req.use_memory or is_command
+
+        async def run_generate_outlines_stream():
+            """调用章节大纲生成服务并流式返回结果文本。"""
+            work_id = _parse_work_id_from_user_id(chat_req.user_id)
+            if not work_id:
+                yield f"data: {json.dumps({'type': 'error', 'content': '未能从 user_id 解析出 work_id，无法执行章节分析'})}\n\n"
+                return
+
+            chapter_ids = None
+            if chat_req.query.strip().lower().startswith("/analysis-chapter"):
+                # 使用原始的 chat_req.query 而不是 processed_query，因为 processed_query 已经替换了 @chapter:2122
+                ids = _parse_chapter_ids_from_command(chat_req.query)
+                chapter_ids = ids if ids else None
+
+            try:
+                yield f"data: {json.dumps({'type': 'status', 'data': '0'})}\n\n"
+
+                # 权限与服务检查
+                work_service = WorkService(db)
+                work = await work_service.get_work_by_id(work_id)
+                if not work:
+                    raise HTTPException(status_code=404, detail=f"作品 {work_id} 不存在")
+
+                chapter_service = ChapterService(db)
+                if not await chapter_service.can_edit_work(user_id=int(work.owner_id), work_id=work_id):
+                    raise HTTPException(status_code=403, detail="没有编辑该作品的权限")
+
+                ai_service = get_ai_service()
+                if not ai_service.is_healthy():
+                    raise HTTPException(status_code=503, detail="AI服务不可用，请检查配置")
+
+                analysis_settings = AnalysisSettings()
+                book_analysis_service = BookAnalysisService(db)
+
+                # 组装章节ID
+                chapter_id_list = chapter_ids
+                # 执行生成（复用服务内部逻辑）
+                success_count = 0
+                error_count = 0
+                total = 0
+                async for result in book_analysis_service.generate_outlines_for_all_chapters(
+                    work_id=work_id,
+                    ai_service=ai_service,
+                    prompt=None,
+                    settings={
+                        "model": analysis_settings.model,
+                        "temperature": analysis_settings.temperature,
+                        "max_tokens": analysis_settings.max_tokens,
+                    },
+                    chapter_ids=chapter_id_list,
+                ):
+                    total += 1
+                    if "error" in result:
+                        error_count += 1
+                        error_msg = f"章节 {result.get('chapter_number') or result.get('chapter_id')} 失败: {result.get('error')}"
+                        yield f"data: {json.dumps({'type': 'text', 'data': error_msg}, ensure_ascii=False)}\n\n"
+                    else:
+                        success_count += 1
+                        success_msg = f"章节 {result.get('chapter_number') or result.get('chapter_id')} 完成"
+                        yield f"data: {json.dumps({'type': 'text', 'data': success_msg}, ensure_ascii=False)}\n\n"
+
+                summary = f"章节大纲生成完成：成功 {success_count}，失败 {error_count}，总计 {total}"
+                yield f"data: {json.dumps({'type': 'text', 'data': summary}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'type': 'end'})}\n\n"
+            except Exception as e:
+                logger.error(f"Error in analysis stream: {e}", exc_info=True)
+                error_data = f"data: {json.dumps({'type': 'error', 'content': str(traceback.format_exc())})}\n\n"
+                yield error_data
+
+        async def run_chapter_info_analysis_stream():
+            """调用章节组件信息分析服务并流式返回结果文本。"""
+            work_id = _parse_work_id_from_user_id(chat_req.user_id)
+            if not work_id:
+                yield f"data: {json.dumps({'type': 'error', 'content': '未能从 user_id 解析出 work_id，无法执行章节组件信息分析'})}\n\n"
+                return
+
+            try:
+                yield f"data: {json.dumps({'type': 'status', 'data': '0'})}\n\n"
+
+                # 权限与服务检查
+                work_service = WorkService(db)
+                work = await work_service.get_work_by_id(work_id)
+                if not work:
+                    raise HTTPException(status_code=404, detail=f"作品 {work_id} 不存在")
+
+                chapter_service = ChapterService(db)
+                if not await chapter_service.can_edit_work(user_id=int(work.owner_id), work_id=work_id):
+                    raise HTTPException(status_code=403, detail="没有编辑该作品的权限")
+
+                # 解析章节ID（从原始命令中提取，在替换提及之前）
+                # 使用原始的 chat_req.query 而不是 processed_query，因为 processed_query 已经替换了 @chapter:2122
+                chapter_ids = _parse_chapter_ids_from_command(chat_req.query)
+                if not chapter_ids:
+                    # 如果没有指定章节，尝试获取第一个章节
+                    chapters, _ = await chapter_service.get_chapters(
+                        filters={"work_id": work_id},
+                        page=1,
+                        size=1,
+                        sort_by="chapter_number",
+                        sort_order="asc"
+                    )
+                    if chapters:
+                        chapter_ids = [chapters[0].id]
+                    else:
+                        yield f"data: {json.dumps({'type': 'error', 'content': '作品中没有章节，无法执行组件信息分析'})}\n\n"
+                        return
+
+                ai_service = get_ai_service()
+                if not ai_service.is_healthy():
+                    raise HTTPException(status_code=503, detail="AI服务不可用，请检查配置")
+
+                analysis_settings = AnalysisSettings()
+                book_analysis_service = BookAnalysisService(db)
+
+                # 解析当前用户ID
+                current_user_id = int(work.owner_id)
+
+                # 处理每个章节
+                total = len(chapter_ids)
+                success_count = 0
+                error_count = 0
+                all_summaries = []
+
+                for idx, chapter_id in enumerate(chapter_ids, 1):
+                    try:
+                        yield f"data: {json.dumps({'type': 'text', 'data': f'正在分析章节 {idx}/{total} (ID: {chapter_id})...'}, ensure_ascii=False)}\n\n"
+
+                        # 调用组件信息分析
+                        result = await book_analysis_service.component_data_insert_to_work(
+                            work_id=work_id,
+                            chapter_id=chapter_id,
+                            ai_service=ai_service,
+                            current_user_id=current_user_id,
+                            analysis_settings={
+                                "model": analysis_settings.model,
+                                "temperature": analysis_settings.temperature,
+                                "max_tokens": analysis_settings.max_tokens,
+                            },
+                            build_text_summary=True,
+                        )
+
+                        # 提取 summary_text
+                        summary_text = result.get("summary_text", "")
+                        if summary_text:
+                            all_summaries.append(f"章节 {chapter_id}:\n{summary_text}")
+                            yield f"data: {json.dumps({'type': 'text', 'data': summary_text}, ensure_ascii=False)}\n\n"
+
+                        success_count += 1
+                        yield f"data: {json.dumps({'type': 'text', 'data': f'章节 {chapter_id} 分析完成'}, ensure_ascii=False)}\n\n"
+
+                    except Exception as e:
+                        error_count += 1
+                        error_msg = str(e)
+                        logger.error(f"分析章节 {chapter_id} 失败: {e}", exc_info=True)
+                        yield f"data: {json.dumps({'type': 'text', 'data': f'章节 {chapter_id} 分析失败: {error_msg}'}, ensure_ascii=False)}\n\n"
+
+                # 生成最终摘要
+                final_summary = f"\n章节组件信息分析完成：成功 {success_count}，失败 {error_count}，总计 {total}"
+                if all_summaries:
+                    final_summary += "\n\n" + "\n\n".join(all_summaries)
+                yield f"data: {json.dumps({'type': 'text', 'data': final_summary}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'type': 'end'})}\n\n"
+
+            except Exception as e:
+                logger.error(f"Error in chapter info analysis stream: {e}", exc_info=True)
+                error_data = f"data: {json.dumps({'type': 'error', 'content': str(traceback.format_exc())})}\n\n"
+                yield error_data
+
+        async def generate_simple_stream():
+            """流式直接调用大模型（无记忆检索）。"""
+            try:
+                yield f"data: {json.dumps({'type': 'status', 'data': '0'})}\n\n"
+                # 构建消息列表（保留最多20条历史）
+                history_msgs = processed_history[-20:] if processed_history else []
+                messages = [*history_msgs, {"role": "user", "content": processed_query}]
+
+                backend = mos_product.config.chat_model.backend
+                if backend in ["huggingface", "vllm", "openai"]:
+                    response_stream = mos_product.chat_llm.generate_stream(messages)
+                else:
+                    response_stream = mos_product.chat_llm.generate(messages)
+
+                buffer = ""
+                for chunk in response_stream:
+                    if chunk in ["<think>", "</think>"]:
+                        continue
+                    buffer += chunk
+                    if len(buffer) >= 16:
+                        yield f"data: {json.dumps({'type': 'text', 'data': buffer}, ensure_ascii=False)}\n\n"
+                        buffer = ""
+
+                if buffer:
+                    yield f"data: {json.dumps({'type': 'text', 'data': buffer}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'type': 'end'})}\n\n"
+            except Exception as e:
+                logger.error(f"Error in simple chat stream: {e}", exc_info=True)
+                error_data = f"data: {json.dumps({'type': 'error', 'content': str(traceback.format_exc())})}\n\n"
+                yield error_data
+
+        async def generate_chat_response():
             """Generate chat response as SSE stream."""
             try:
-                # Directly yield from the generator without async wrapper
-                yield from mos_product.chat_with_references(
-                    query=processed_query,
-                    user_id=chat_req.user_id,
-                    cube_id=chat_req.mem_cube_id,
-                    history=processed_history,
-                    internet_search=chat_req.internet_search,
-                    moscube=chat_req.moscube,
-                    session_id=chat_req.session_id,
-                )
+                query_lower = processed_query.strip().lower()
+                if disable_memory and query_lower.startswith("/analysis-chapter-info"):
+                    async for chunk in run_chapter_info_analysis_stream():
+                        yield chunk
+                elif disable_memory and query_lower.startswith(("/analysis-chapter", "/analysis-work")):
+                    async for chunk in run_generate_outlines_stream():
+                        yield chunk
+                elif disable_memory:
+                    async for chunk in generate_simple_stream():
+                        yield chunk
+                else:
+                    # Directly yield from the generator without async wrapper
+                    for chunk in mos_product.chat_with_references(
+                        query=processed_query,
+                        user_id=chat_req.user_id,
+                        cube_id=chat_req.mem_cube_id,
+                        history=processed_history,
+                        internet_search=chat_req.internet_search,
+                        moscube=chat_req.moscube,
+                        session_id=chat_req.session_id,
+                    ):
+                        yield chunk
 
             except Exception as e:
                 logger.error(f"Error in chat stream: {e}")
@@ -479,24 +748,179 @@ async def chat_complete(chat_req: ChatCompleteRequest, db: AsyncSession = Depend
         # 确保用户存在，如果不存在则自动注册
         ensure_memos_user_exists(chat_req.user_id)
 
+        # 如果是命令，需要先提取章节ID（在替换提及之前）
+        command_prefixes = ("/analysis-chapter", "/analysis-work", "/analysis-chapter-info")
+        is_command = chat_req.query.strip().lower().startswith(command_prefixes)
+        
         # 处理提及替换
         mention_service = MentionService(db)
         processed_query = await mention_service.replace_mentions_in_text(chat_req.query, chat_req.user_id)
         processed_history = await mention_service.replace_mentions_in_history(chat_req.history or [], chat_req.user_id)
 
-        # Collect all responses from the generator
-        content, references = mos_product.chat(
-            query=processed_query,
-            user_id=chat_req.user_id,
-            cube_id=chat_req.mem_cube_id,
-            history=processed_history,
-            internet_search=chat_req.internet_search,
-            moscube=chat_req.moscube,
-            base_prompt=chat_req.base_prompt,
-            top_k=chat_req.top_k,
-            threshold=chat_req.threshold,
-            session_id=chat_req.session_id,
-        )
+        disable_memory = not chat_req.use_memory or is_command
+
+        query_lower = chat_req.query.strip().lower()
+        if disable_memory and query_lower.startswith("/analysis-chapter-info"):
+            # 处理章节组件信息分析命令
+            work_id = _parse_work_id_from_user_id(chat_req.user_id)
+            if not work_id:
+                raise HTTPException(status_code=400, detail="未能从 user_id 解析 work_id，无法执行章节组件信息分析")
+
+            # 使用原始的 chat_req.query 而不是 processed_query，因为 processed_query 已经替换了 @chapter:2122
+            chapter_ids = _parse_chapter_ids_from_command(chat_req.query)
+            if not chapter_ids:
+                # 如果没有指定章节，尝试获取第一个章节
+                chapter_service = ChapterService(db)
+                chapters, _ = await chapter_service.get_chapters(
+                    filters={"work_id": work_id},
+                    page=1,
+                    size=1,
+                    sort_by="chapter_number",
+                    sort_order="asc"
+                )
+                if chapters:
+                    chapter_ids = [chapters[0].id]
+                else:
+                    raise HTTPException(status_code=400, detail="作品中没有章节，无法执行组件信息分析")
+
+            # 权限与服务检查
+            work_service = WorkService(db)
+            work = await work_service.get_work_by_id(work_id)
+            if not work:
+                raise HTTPException(status_code=404, detail=f"作品 {work_id} 不存在")
+
+            if not await chapter_service.can_edit_work(user_id=int(work.owner_id), work_id=work_id):
+                raise HTTPException(status_code=403, detail="没有编辑该作品的权限")
+
+            ai_service = get_ai_service()
+            if not ai_service.is_healthy():
+                raise HTTPException(status_code=503, detail="AI服务不可用，请检查配置")
+
+            analysis_settings = AnalysisSettings()
+            book_analysis_service = BookAnalysisService(db)
+            current_user_id = int(work.owner_id)
+
+            # 处理每个章节
+            all_summaries = []
+            success_count = 0
+            error_count = 0
+            for chapter_id in chapter_ids:
+                try:
+                    result = await book_analysis_service.component_data_insert_to_work(
+                        work_id=work_id,
+                        chapter_id=chapter_id,
+                        ai_service=ai_service,
+                        current_user_id=current_user_id,
+                        analysis_settings={
+                            "model": analysis_settings.model,
+                            "temperature": analysis_settings.temperature,
+                            "max_tokens": analysis_settings.max_tokens,
+                        },
+                        build_text_summary=True,
+                    )
+                    summary_text = result.get("summary_text", "")
+                    if summary_text:
+                        all_summaries.append(f"章节 {chapter_id}:\n{summary_text}")
+                    success_count += 1
+                except Exception as e:
+                    error_count += 1
+                    logger.error(f"分析章节 {chapter_id} 失败: {e}", exc_info=True)
+                    all_summaries.append(f"章节 {chapter_id} 分析失败: {str(e)}")
+
+            # 构建返回消息
+            response_text = f"章节组件信息分析完成：成功 {success_count}，失败 {error_count}，总计 {len(chapter_ids)}"
+            if all_summaries:
+                response_text += "\n\n" + "\n\n".join(all_summaries)
+
+            return {
+                "code": 200,
+                "message": "分析完成",
+                "data": response_text,
+            }
+
+        elif disable_memory and query_lower.startswith(("/analysis-chapter", "/analysis-work")):
+            work_id = _parse_work_id_from_user_id(chat_req.user_id)
+            if not work_id:
+                raise HTTPException(status_code=400, detail="未能从 user_id 解析 work_id，无法执行章节分析")
+
+            # 使用原始的 chat_req.query 而不是 processed_query，因为 processed_query 已经替换了 @chapter:2122
+            ids = _parse_chapter_ids_from_command(chat_req.query) if chat_req.query.strip().lower().startswith("/analysis-chapter") else None
+            chapter_id_list = ids if ids else None
+
+            # 权限与服务检查
+            work_service = WorkService(db)
+            work = await work_service.get_work_by_id(work_id)
+            if not work:
+                raise HTTPException(status_code=404, detail=f"作品 {work_id} 不存在")
+
+            chapter_service = ChapterService(db)
+            if not await chapter_service.can_edit_work(user_id=int(work.owner_id), work_id=work_id):
+                raise HTTPException(status_code=403, detail="没有编辑该作品的权限")
+
+            ai_service = get_ai_service()
+            if not ai_service.is_healthy():
+                raise HTTPException(status_code=503, detail="AI服务不可用，请检查配置")
+
+            analysis_settings = AnalysisSettings()
+            book_analysis_service = BookAnalysisService(db)
+
+            success_count = 0
+            error_count = 0
+            total = 0
+            messages_log = []
+            async for result in book_analysis_service.generate_outlines_for_all_chapters(
+                work_id=work_id,
+                ai_service=ai_service,
+                prompt=None,
+                settings={
+                    "model": analysis_settings.model,
+                    "temperature": analysis_settings.temperature,
+                    "max_tokens": analysis_settings.max_tokens,
+                },
+                chapter_ids=chapter_id_list,
+            ):
+                total += 1
+                if "error" in result:
+                    error_count += 1
+                    messages_log.append(f"章节 {result.get('chapter_number') or result.get('chapter_id')} 失败: {result.get('error')}")
+                else:
+                    success_count += 1
+                    messages_log.append(f"章节 {result.get('chapter_number') or result.get('chapter_id')} 完成")
+
+            summary = f"章节大纲生成完成：成功 {success_count}，失败 {error_count}，总计 {total}"
+            content = "\n".join(messages_log + [summary])
+            references = []
+        elif disable_memory:
+            # 无记忆模式：直接调用大模型
+            history_msgs = processed_history[-20:] if processed_history else []
+            messages = [*history_msgs, {"role": "user", "content": processed_query}]
+
+            backend = mos_product.config.chat_model.backend
+            if backend in ["huggingface", "vllm", "openai"]:
+                resp_stream = mos_product.chat_llm.generate_stream(messages)
+                content = ""
+                for chunk in resp_stream:
+                    if chunk in ["<think>", "</think>"]:
+                        continue
+                    content += chunk
+                references = []
+            else:
+                content = mos_product.chat_llm.generate(messages)
+                references = []
+        else:
+            # Collect all responses from the generator
+            content, references = mos_product.chat(
+                query=processed_query,
+                user_id=chat_req.user_id,
+                cube_id=chat_req.mem_cube_id,
+                history=processed_history,
+                internet_search=chat_req.internet_search,
+                moscube=chat_req.moscube,
+                base_prompt=chat_req.base_prompt,
+                top_k=chat_req.top_k,
+                threshold=chat_req.threshold,
+                session_id=chat_req.session_id,
+            )
 
         # Return the complete response
         return {

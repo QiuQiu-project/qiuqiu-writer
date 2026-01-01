@@ -77,6 +77,7 @@ class ChatRequest(BaseRequest):
     internet_search: bool = Field(True, description="Whether to use internet search")
     moscube: bool = Field(False, description="Whether to use MemOSCube")
     session_id: str | None = Field(None, description="Session ID for soft-filtering memories")
+    use_memory: bool = Field(True, description="Whether to use memory search; set False to bypass vector DB")
 
 
 class ChatCompleteRequest(BaseRequest):
@@ -92,6 +93,7 @@ class ChatCompleteRequest(BaseRequest):
     top_k: int = Field(10, description="Number of results to return")
     threshold: float = Field(0.5, description="Threshold for filtering references")
     session_id: str | None = Field(None, description="Session ID for soft-filtering memories")
+    use_memory: bool = Field(True, description="Whether to use memory search; set False to bypass vector DB")
 
 
 class UserCreate(BaseRequest):

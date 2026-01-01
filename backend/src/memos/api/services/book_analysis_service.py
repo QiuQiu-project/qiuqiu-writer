@@ -6,12 +6,14 @@
 import json
 import re
 from typing import Dict, Any, List, Optional, AsyncGenerator
+from sqlalchemy import and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from memos.api.models.work import Work
 from memos.api.models.chapter import Chapter
 from memos.api.models.prompt_template import PromptTemplate
+from memos.api.models.template import WorkInfoExtended
 from memos.api.services.chapter_service import ChapterService
 from memos.api.services.sharedb_service import ShareDBService
 from memos.api.services.prompt_context_service import PromptContextService, PromptContext
@@ -696,372 +698,367 @@ class BookAnalysisService:
     async def incremental_insert_to_work(
         self,
         work_id: int,
-        analysis_data: Dict[str, Any],
+        analysis_data: Dict[str, List[Any]],
         user_id: int,
-        chapter_index: Optional[int] = None
+        chapter_index: Optional[int] = None,
+        build_text_summary: bool = False,
     ) -> Dict[str, Any]:
         """
-        渐进式插入分析结果到作品（角色、地点、章节）
+        将分析数据增量插入到作品的 metadata.component_data 中，支持去重和合并。
         
         Args:
             work_id: 作品ID
-            analysis_data: 分析数据，包含characters、locations、chapters
+            analysis_data: 分析数据字典，格式为 {data_key: [list of items]}
             user_id: 用户ID
             chapter_index: 章节索引（可选）
+            build_text_summary: 是否生成文本摘要
         
         Returns:
-            插入结果统计
+            包含统计信息的字典，如果 build_text_summary=True 则包含 summary_text
         """
-        try:
-            # 检查analysis_data是否为None
-            if analysis_data is None:
-                raise ValueError("analysis_data不能为None，AI响应解析失败")
-            
-            # 获取作品（刷新会话以确保数据是最新的）
+        from memos.api.services.work_service import WorkService
+        from sqlalchemy.orm.attributes import flag_modified
+        
+        work_service = WorkService(self.db)
+        work = await work_service.get_work_by_id(work_id)
+        if not work:
+            raise ValueError(f"作品 {work_id} 不存在")
+        
+        # 获取模板ID，用于确定允许的 data_key
+        template_id = None
+        work_metadata = work.work_metadata or {}
+        template_config = work_metadata.get("template_config")
+        if template_config and isinstance(template_config, dict):
+            template_id_str = template_config.get("templateId")
+            if template_id_str:
+                if isinstance(template_id_str, str) and template_id_str.startswith("db-"):
+                    try:
+                        template_id = int(template_id_str.replace("db-", ""))
+                    except ValueError:
+                        pass
+                elif isinstance(template_id_str, (int, str)):
+                    try:
+                        template_id = int(template_id_str)
+                    except (ValueError, TypeError):
+                        pass
+        
+        # 查询允许的 data_key（从 PromptTemplate 中获取）
+        allowed_data_keys = set()
+        if template_id:
             try:
-                # 先尝试直接查询
-                stmt = select(Work).where(Work.id == work_id)
-                result = await self.db.execute(stmt)
-                work = result.scalar_one_or_none()
-                
-                if not work:
-                    logger.warning(f"第一次查询未找到作品 {work_id}，尝试刷新会话")
-                    # 刷新会话，清除可能的过期对象
-                    await self.db.expire_all()
-                    result = await self.db.execute(stmt)
-                    work = result.scalar_one_or_none()
-                
-                if not work:
-                    logger.warning(f"刷新会话后仍未找到作品 {work_id}，尝试使用 WorkService")
-                    # 最后尝试：使用 WorkService 获取
-                    from memos.api.services.work_service import WorkService
-                    work_service = WorkService(self.db)
-                    work = await work_service.get_work_by_id(work_id)
-                
-                if not work:
-                    # 记录详细的错误信息
-                    logger.error(
-                        f"作品 {work_id} 不存在。"
-                        f"数据库会话状态: is_active={self.db.is_active if hasattr(self.db, 'is_active') else 'unknown'}, "
-                        f"bind={self.db.bind.url if hasattr(self.db, 'bind') and self.db.bind else 'unknown'}"
+                prompt_stmt = select(PromptTemplate).where(
+                    and_(
+                        PromptTemplate.work_template_id == template_id,
+                        PromptTemplate.prompt_category == "analysis",
+                        PromptTemplate.is_active.is_(True),
                     )
-                    raise ValueError(f"作品 {work_id} 不存在")
-                
-                logger.debug(f"成功获取作品 {work_id}: {work.title}")
-            except ValueError:
-                # 重新抛出 ValueError
-                raise
+                )
+                prompt_result = await self.db.execute(prompt_stmt)
+                prompt_templates = prompt_result.scalars().all()
+                for pt in prompt_templates:
+                    if pt.data_key:
+                        allowed_data_keys.add(pt.data_key)
             except Exception as e:
-                logger.error(f"获取作品 {work_id} 失败: {e}", exc_info=True)
-                raise ValueError(f"获取作品 {work_id} 失败: {str(e)}")
+                logger.warning(f"查询 PromptTemplate 失败: {e}")
+        
+        # 如果没有找到模板，允许所有 data_key（向后兼容）
+        if not allowed_data_keys:
+            allowed_data_keys = set(analysis_data.keys())
+            logger.warning(f"未找到模板限制，允许所有 data_key: {allowed_data_keys}")
+        
+        # 获取或初始化 component_data
+        if "component_data" not in work_metadata:
+            work_metadata["component_data"] = {}
+        component_data = work_metadata["component_data"]
+        if not isinstance(component_data, dict):
+            component_data = {}
+            work_metadata["component_data"] = component_data
+        
+        # 处理统计信息
+        processed_stats: Dict[str, Dict[str, int]] = {}
+        
+        # 处理每个 data_key
+        for data_key, data_list in analysis_data.items():
+            if data_key not in allowed_data_keys:
+                logger.warning(f"跳过不允许的 data_key: {data_key}（允许的: {allowed_data_keys}）")
+                continue
             
-            work_metadata = work.work_metadata or {}
+            if not isinstance(data_list, list):
+                logger.warning(f"跳过无效的 data_key {data_key}（不是列表）")
+                continue
             
-            # 确保 component_data 存在
-            if "component_data" not in work_metadata:
-                work_metadata["component_data"] = {}
-            component_data = work_metadata["component_data"]
+            # 初始化统计
+            processed_count = 0
+            updated_count = 0
             
-            # 从 work_template 中获取所有组件的 dataKey 映射
-            data_key_mapping = {}  # {dataKey: component_info}
-            try:
-                from memos.api.models.template import WorkTemplate, WorkInfoExtended
-                # select 已经在文件顶部导入，不需要重复导入
-                
-                # 获取 work_extended_info
-                stmt = select(WorkInfoExtended).where(WorkInfoExtended.work_id == work_id)
-                result = await self.db.execute(stmt)
-                work_extended_info = result.scalar_one_or_none()
-                
-                if work_extended_info and work_extended_info.template_id:
-                    # 获取 work_template
-                    template_stmt = select(WorkTemplate).where(WorkTemplate.id == work_extended_info.template_id)
-                    template_result = await self.db.execute(template_stmt)
-                    work_template = template_result.scalar_one_or_none()
-                    
-                    if work_template and work_template.template_config:
-                        template_config = work_template.template_config
-                        
-                        # 递归查找所有组件的 dataKey
-                        def find_all_data_keys(components, path=""):
-                            """递归查找所有组件的 dataKey"""
-                            for comp in components:
-                                if comp.get("dataKey"):
-                                    data_key = comp.get("dataKey")
-                                    data_key_mapping[data_key] = {
-                                        "component": comp,
-                                        "path": path
-                                    }
-                                # 递归检查 tabs 中的组件
-                                if comp.get("type") == "tabs" and comp.get("config", {}).get("tabs"):
-                                    for tab in comp["config"]["tabs"]:
-                                        if tab.get("components"):
-                                            find_all_data_keys(
-                                                tab["components"],
-                                                f"{path} > {comp.get('label', comp.get('id', 'unknown'))} > {tab.get('label', tab.get('id', 'unknown'))}"
-                                            )
-                        
-                        if "modules" in template_config:
-                            for module in template_config.get("modules", []):
-                                if "components" in module:
-                                    module_name = module.get("name", module.get("id", "unknown"))
-                                    find_all_data_keys(module["components"], module_name)
-            except Exception as e:
-                logger.warning(f"获取模板配置失败，将使用默认逻辑: {e}")
+            # 获取现有的数据
+            existing_list = component_data.get(data_key, [])
+            if not isinstance(existing_list, list):
+                existing_list = []
             
-            # 处理所有 analysis_data 中的数据，根据 dataKey 保存到 component_data
-            processed_stats = {}  # 记录每个 dataKey 的处理统计
+            # 构建现有数据的映射（基于标识符）
+            existing_map = {}
+            identifier_key = None
+            if existing_list and isinstance(existing_list[0], dict):
+                for key in ["name", "id", "title", "identifier", "key"]:
+                    if key in existing_list[0]:
+                        identifier_key = key
+                        break
             
-            # 遍历 analysis_data 中的所有键
-            for data_key, data_list in analysis_data.items():
-                # 跳过 chapters，它需要特殊处理
-                if data_key == "chapters":
+            if identifier_key:
+                for item in existing_list:
+                    if isinstance(item, dict) and identifier_key in item:
+                        existing_map[item[identifier_key]] = item
+            
+            # 处理新数据
+            for item in data_list:
+                if not isinstance(item, dict):
                     continue
                 
-                # 检查是否有对应的 dataKey 配置
-                if data_key in data_key_mapping:
-                    # 有对应的 dataKey，保存到 component_data[dataKey]
-                    if not isinstance(data_list, list):
-                        logger.warning(f"数据键 '{data_key}' 的值不是列表，跳过处理")
-                        continue
-                    
-                    existing_data = component_data.get(data_key, [])
-                    
-                    # 根据数据类型选择合并策略
-                    # 如果是对象列表，使用 name 字段作为唯一标识
-                    # 如果是其他类型，直接追加
-                    if data_list and isinstance(data_list[0], dict):
-                        # 对象列表，需要合并
-                        data_map = {}
-                        # 尝试找到唯一标识字段（name, id, title 等）
-                        identifier_key = None
-                        for key in ["name", "id", "title", "identifier"]:
-                            if key in data_list[0]:
-                                identifier_key = key
-                                break
-                        
-                        # 构建现有数据的映射
-                        for item in existing_data:
-                            if isinstance(item, dict) and identifier_key and identifier_key in item:
-                                data_map[item[identifier_key]] = item
-                            else:
-                                # 如果没有唯一标识，使用索引
-                                data_map[f"item_{len(data_map)}"] = item
-                        
-                        # 处理新数据
-                        processed_count = 0
-                        updated_count = 0
-                        for item_data in data_list:
-                            if not isinstance(item_data, dict):
-                                continue
-                            
-                            if identifier_key and identifier_key in item_data:
-                                item_id = item_data[identifier_key]
-                                if item_id in data_map:
-                                    # 合并现有数据
-                                    existing_item = data_map[item_id]
-                                    has_update = False
-                                    for key, value in item_data.items():
-                                        if key in existing_item and isinstance(existing_item[key], dict) and isinstance(value, dict):
-                                            # 深度合并字典
-                                            existing_item[key].update(value)
-                                            has_update = True
-                                        elif key not in existing_item or existing_item[key] != value:
-                                            existing_item[key] = value
-                                            has_update = True
-                                    if has_update:
-                                        updated_count += 1
-                                else:
-                                    # 添加新数据
-                                    data_map[item_id] = item_data
-                                    processed_count += 1
-                            else:
-                                # 没有唯一标识，直接添加
-                                data_map[f"item_{len(data_map)}"] = item_data
-                                processed_count += 1
-                        
-                        component_data[data_key] = list(data_map.values())
-                        processed_stats[data_key] = {
-                            "processed": processed_count,
-                            "updated": updated_count,
-                            "total": len(data_map)
-                        }
-                    else:
-                        # 非对象列表，直接追加（去重）
-                        existing_set = set(str(item) for item in existing_data)
-                        new_items = []
-                        for item in data_list:
-                            item_str = str(item)
-                            if item_str not in existing_set:
-                                existing_set.add(item_str)
-                                new_items.append(item)
-                        component_data[data_key] = existing_data + new_items
-                        processed_stats[data_key] = {
-                            "processed": len(new_items),
-                            "updated": 0,
-                            "total": len(component_data[data_key])
-                        }
-                else:
-                    # 没有对应的 dataKey，使用向后兼容逻辑
-                    # 对于 characters，保存到 component_data.characters
-                    # 对于 locations，保存到 work_metadata.locations
-                    if data_key == "characters":
-                        existing_characters = component_data.get("characters", [])
-                        character_map = {char.get("name", ""): char for char in existing_characters if isinstance(char, dict)}
-                        
-                        processed_count = 0
-                        updated_count = 0
-                        for char_data in data_list:
-                            if not isinstance(char_data, dict):
-                                continue
-                            
-                            char_name = char_data.get("name", "")
-                            if char_name:
-                                if char_name in character_map:
-                                    # 合并现有角色
-                                    existing_char = character_map[char_name]
-                                    has_update = False
-                                    for key, value in char_data.items():
-                                        if key in existing_char and isinstance(existing_char[key], dict) and isinstance(value, dict):
-                                            existing_char[key].update(value)
-                                            has_update = True
-                                        elif key not in existing_char or existing_char[key] != value:
-                                            existing_char[key] = value
-                                            has_update = True
-                                    if has_update:
-                                        updated_count += 1
-                                else:
-                                    character_map[char_name] = char_data
-                                    processed_count += 1
-                        
-                        component_data["characters"] = list(character_map.values())
-                        processed_stats["characters"] = {
-                            "processed": processed_count,
-                            "updated": updated_count,
-                            "total": len(character_map)
-                        }
-                    elif data_key == "locations":
-                        # locations 保存到 work_metadata.locations（向后兼容）
-                        existing_locations = work_metadata.get("locations", [])
-                        location_map = {loc.get("name", ""): loc for loc in existing_locations if isinstance(loc, dict)}
-                        
-                        processed_count = 0
-                        for loc_data in data_list:
-                            if not isinstance(loc_data, dict):
-                                continue
-                            
-                            loc_name = loc_data.get("name", "")
-                            if loc_name:
-                                if loc_name in location_map:
-                                    # 合并现有地点
-                                    existing_loc = location_map[loc_name]
-                                    for key, value in loc_data.items():
-                                        existing_loc[key] = value
-                                else:
-                                    location_map[loc_name] = loc_data
-                                    processed_count += 1
-                        
-                        work_metadata["locations"] = list(location_map.values())
-                        processed_stats["locations"] = {
-                            "processed": processed_count,
-                            "updated": 0,
-                            "total": len(location_map)
-                        }
-                    else:
-                        # 其他未知的键，直接保存到 component_data
-                        logger.info(f"未知的数据键 '{data_key}'，保存到 component_data[{data_key}]")
-                        component_data[data_key] = data_list
-                        processed_stats[data_key] = {
-                            "processed": len(data_list),
-                            "updated": 0,
-                            "total": len(data_list)
-                        }
-            
-            work_metadata["component_data"] = component_data
-            
-            # 更新work的metadata
-            work.work_metadata = work_metadata
-            # 使用 flag_modified 明确标记 JSON 字段已被修改
-            from sqlalchemy.orm.attributes import flag_modified
-            flag_modified(work, "work_metadata")
-            await self.db.commit()
-            await self.db.refresh(work)
-            
-            # 处理章节（更新章节的大纲和细纲）
-            chapters_created = 0
-            if analysis_data.get("chapters"):
-                for chapter_data in analysis_data["chapters"]:
-                    if not isinstance(chapter_data, dict):
-                        continue
-                    
-                    chapter_number = chapter_data.get("chapter_number")
-                    if chapter_number is None:
-                        continue
-                    
-                    # 查找对应的章节
-                    stmt = select(Chapter).where(
-                        Chapter.work_id == work_id,
-                        Chapter.chapter_number == chapter_number
-                    )
-                    result = await self.db.execute(stmt)
-                    chapter = result.scalar_one_or_none()
-                    
-                    if chapter:
-                        # 更新章节的metadata
-                        chapter_metadata = chapter.chapter_metadata or {}
-                        if chapter_data.get("outline"):
-                            chapter_metadata["outline"] = chapter_data["outline"]
-                        if chapter_data.get("detailed_outline"):
-                            chapter_metadata["detailed_outline"] = chapter_data["detailed_outline"]
-                        if chapter_data.get("summary"):
-                            chapter.summary = chapter_data["summary"]
-                        if chapter_data.get("title"):
-                            chapter.title = chapter_data["title"]
-                        
-                        chapter.chapter_metadata = chapter_metadata
-                        chapters_created += 1
+                # 尝试找到标识符
+                item_id = None
+                if identifier_key and identifier_key in item:
+                    item_id = item[identifier_key]
                 
-                await self.db.commit()
+                if item_id and item_id in existing_map:
+                    # 更新现有数据
+                    existing_item = existing_map[item_id]
+                    # 深度合并
+                    for key, value in item.items():
+                        if key in existing_item and isinstance(existing_item[key], dict) and isinstance(value, dict):
+                            existing_item[key].update(value)
+                        else:
+                            existing_item[key] = value
+                    updated_count += 1
+                else:
+                    # 添加新数据
+                    if item_id:
+                        existing_map[item_id] = item
+                    existing_list.append(item)
+                    processed_count += 1
             
-            # 构建返回结果，包含所有处理的数据统计
-            result = {
-                "chapters_created": chapters_created,
+            # 更新 component_data
+            component_data[data_key] = existing_list
+            processed_stats[data_key] = {
+                "processed": processed_count,
+                "updated": updated_count,
+                "total": len(existing_list),
             }
-            
-            # 添加每个 dataKey 的处理统计
+        
+        # 更新 work_metadata
+        work.work_metadata = work_metadata
+        flag_modified(work, "work_metadata")
+        await self.db.commit()
+        
+        # 构建返回结果
+        result: Dict[str, Any] = {}
+        for data_key, stats in processed_stats.items():
+            result[f"{data_key}_processed"] = stats["processed"]
+            result[f"{data_key}_updated"] = stats["updated"]
+            result[f"{data_key}_total"] = stats["total"]
+        
+        # 生成文本摘要
+        if build_text_summary:
+            summary_parts = []
             for data_key, stats in processed_stats.items():
-                result[f"{data_key}_processed"] = stats["processed"]
-                result[f"{data_key}_updated"] = stats["updated"]
-                result[f"{data_key}_total"] = stats["total"]
-            
-            # 向后兼容：如果没有处理任何数据，返回默认值
-            if "characters" in processed_stats:
-                result["characters_processed"] = processed_stats["characters"]["processed"] + processed_stats["characters"]["updated"]
+                if stats["processed"] > 0 or stats["updated"] > 0:
+                    summary_parts.append(
+                        f"{data_key}：新增 {stats['processed']}，更新 {stats['updated']}，总计 {stats['total']}"
+                    )
+            if summary_parts:
+                result["summary_text"] = "\n".join(summary_parts)
             else:
-                result["characters_processed"] = 0
-            
-            if "locations" in processed_stats:
-                result["locations_processed"] = processed_stats["locations"]["processed"]
-            else:
-                result["locations_processed"] = 0
-            
-            return result
-            
-        except Exception as e:
-            error_msg = str(e)
-            logger.error(
-                f"渐进式插入失败: {error_msg}",
-                extra={
-                    "work_id": work_id,
-                    "user_id": user_id,
-                    "chapter_index": chapter_index,
-                    "error_type": type(e).__name__,
-                },
-                exc_info=True
-            )
-            await self.db.rollback()
-            raise
+                result["summary_text"] = "未写入组件数据。"
+        
+        return result
     
+    async def component_data_insert_to_work(
+        self,
+        work_id: int,
+        chapter_id: int,
+        ai_service,
+        current_user_id: int,
+        analysis_settings: Optional[Dict[str, Any]] = None,
+        build_text_summary: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        基于 PromptTemplate（category='analysis'）对单章进行组件信息分析，写入章节与作品 metadata，并返回统计与 summary_text。
+        """
+        analysis_settings = analysis_settings or {}
+        chapter_component_data: Dict[str, List[Any]] = {}
+        all_stats: Dict[str, Dict[str, int]] = {}
+
+        # 获取章节与内容
+        chapter = await self.chapter_service.get_chapter_by_id(chapter_id)
+        if not chapter or chapter.work_id != work_id:
+            raise ValueError(f"章节 {chapter_id} 不存在或不属于作品 {work_id}")
+
+        chapter_content = await self.get_chapter_content(chapter_id)
+        if not chapter_content:
+            logger.warning(f"章节 {chapter_id} 内容为空，跳过组件数据提取")
+            return {"summary_text": "章节内容为空，未写入任何组件数据。"}
+
+        # 获取模板ID（从 work_metadata.template_config.templateId 中获取）
+        template_id = None
+        try:
+            from memos.api.services.work_service import WorkService
+            work_service = WorkService(self.db)
+            work = await work_service.get_work_by_id(work_id)
+            if work:
+                work_metadata = work.work_metadata or {}
+                template_config = work_metadata.get("template_config")
+                if template_config and isinstance(template_config, dict):
+                    template_id_str = template_config.get("templateId")
+                    if template_id_str:
+                        # templateId 可能是 "db-1" 格式，需要提取数字
+                        if isinstance(template_id_str, str) and template_id_str.startswith("db-"):
+                            try:
+                                template_id = int(template_id_str.replace("db-", ""))
+                                logger.info(f"✅ 从 work_metadata.template_config.templateId 中获取到 template_id: {template_id_str} -> {template_id}")
+                            except ValueError:
+                                logger.warning(f"无法解析 templateId: {template_id_str}")
+                        elif isinstance(template_id_str, (int, str)):
+                            try:
+                                template_id = int(template_id_str)
+                                logger.info(f"✅ 从 work_metadata.template_config.templateId 中获取到 template_id: {template_id}")
+                            except (ValueError, TypeError):
+                                logger.warning(f"无法解析 templateId: {template_id_str}")
+        except Exception as e:
+            logger.error(f"获取 template_id 失败: {e}")
+
+        if not template_id:
+            logger.warning(f"作品 {work_id} 没有关联的 template_id，跳过组件数据提取")
+            return {"summary_text": "未关联模板，未写入组件数据。"}
+
+        # 查询 PromptTemplate
+        try:
+            prompt_stmt = select(PromptTemplate).where(
+                and_(
+                    PromptTemplate.work_template_id == template_id,
+                    PromptTemplate.prompt_category == "analysis",
+                    PromptTemplate.is_active.is_(True),
+                )
+            )
+            prompt_result = await self.db.execute(prompt_stmt)
+            prompt_templates = prompt_result.scalars().all()
+        except Exception as e:
+            logger.error(f"查询 PromptTemplate 失败: {e}")
+            prompt_templates = []
+
+        if not prompt_templates:
+            logger.warning(f"作品 {work_id} 的模板（template_id: {template_id}）未找到 analysis prompt，跳过组件数据提取")
+            return {"summary_text": "未找到分析模板，未写入组件数据。"}
+
+        # 准备 work metadata / component_data
+        work = await self.chapter_service.get_chapter_by_id(chapter_id)
+        work_obj_stmt = select(Work).where(Work.id == work_id)
+        work_obj_res = await self.db.execute(work_obj_stmt)
+        work_obj = work_obj_res.scalar_one_or_none()
+        if not work_obj:
+            raise ValueError(f"作品 {work_id} 不存在")
+        work_metadata = work_obj.work_metadata or {}
+        component_data = work_metadata.get("component_data", {})
+
+        # 遍历 prompt_templates
+        for prompt_template in prompt_templates:
+            data_key = prompt_template.data_key
+            analysis_prompt = prompt_template.prompt_content
+            if not data_key or not analysis_prompt:
+                continue
+
+            existing_data = component_data.get(data_key, [])
+            existing_data_context = ""
+            if existing_data and isinstance(existing_data, list):
+                example_data = existing_data[:3]
+                existing_data_context = (
+                    "# 现有作品数据结构参考\n"
+                    f"以下是该作品已有的 {data_key} 数据结构示例（请参考此结构生成新数据）：\n\n"
+                    f"```json\n{json.dumps(example_data, ensure_ascii=False, indent=2)}\n```\n"
+                    "**重要提示：**\n"
+                    "1. 新提取的数据应与上述结构一致\n"
+                    "2. 若匹配到已存在数据（如 name/id/title），保持结构，仅补充/更新\n"
+                    "3. 若有新数据，按照示例结构生成完整信息\n"
+                )
+
+            # 构造 prompt
+            temp_tpl = PromptTemplate()
+            temp_tpl.prompt_content = analysis_prompt
+            user_prompt = temp_tpl.format_prompt(
+                chapter=chapter,
+                content=chapter_content,
+                chapter_content=chapter_content,
+            )
+            if existing_data_context:
+                user_prompt = existing_data_context + "\n\n" + user_prompt
+
+            system_prompt = f"你是一位专业的小说分析专家，请从章节内容中提取 {data_key} 相关的数据，返回 JSON。"
+
+            # 调用 AI
+            ai_response = await ai_service.analyze_chapter_stream(
+                content=chapter_content,
+                prompt=user_prompt,
+                system_prompt=system_prompt,
+                model=analysis_settings.get("model"),
+                temperature=analysis_settings.get("temperature", 0.7),
+                max_tokens=analysis_settings.get("max_tokens", 4000),
+            )
+
+            parsed_data = self.parse_single_chapter_response(ai_response)
+            if not parsed_data or data_key not in parsed_data or not isinstance(parsed_data[data_key], list):
+                logger.warning(f"章节 {chapter_id} 未提取到 {data_key} 数据")
+                continue
+
+            data_list = parsed_data[data_key]
+            chapter_component_data.setdefault(data_key, []).extend(data_list)
+
+            # 写入作品 metadata（合并去重）
+            save_result = await self.incremental_insert_to_work(
+                work_id=work_id,
+                analysis_data={data_key: data_list},
+                user_id=current_user_id,
+                chapter_index=None,
+                build_text_summary=False,
+            )
+            all_stats[data_key] = {
+                "processed": save_result.get(f"{data_key}_processed", 0),
+                "updated": save_result.get(f"{data_key}_updated", 0),
+                "total": save_result.get(f"{data_key}_total", 0),
+            }
+
+        # 写回章节 metadata.component_data
+        if chapter_component_data:
+            chapter_metadata = chapter.chapter_metadata or {}
+            if "component_data" not in chapter_metadata:
+                chapter_metadata["component_data"] = {}
+            for data_key, data_list in chapter_component_data.items():
+                existing = chapter_metadata["component_data"].get(data_key, [])
+                if not isinstance(existing, list):
+                    existing = []
+                existing_set = {json.dumps(item, sort_keys=True, ensure_ascii=False) for item in existing if isinstance(item, dict)}
+                for item in data_list:
+                    if isinstance(item, dict):
+                        item_str = json.dumps(item, sort_keys=True, ensure_ascii=False)
+                        if item_str not in existing_set:
+                            existing_set.add(item_str)
+                            existing.append(item)
+                chapter_metadata["component_data"][data_key] = existing
+            chapter.chapter_metadata = chapter_metadata
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(chapter, "chapter_metadata")
+            await self.db.commit()
+
+        # 构建返回
+        summary_lines = []
+        for key, stats in all_stats.items():
+            summary_lines.append(f"{key}：新增 {stats['processed']}，更新 {stats['updated']}，总 {stats['total']}")
+        summary_text = "\n".join(summary_lines) if summary_lines else "未写入组件数据。"
+
+        return {
+            "chapter_id": chapter_id,
+            "stats": all_stats,
+            "summary_text": summary_text,
+        }
+
     async def create_work_from_analysis(
         self,
         analysis_data: Dict[str, Any],

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Trash2, Sparkles, Loader2, ChevronLeft, ChevronRight, Info, Menu, X, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Trash2, Sparkles, ChevronLeft, ChevronRight, Info, Menu, X, MessageSquare } from 'lucide-react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import UnderlineExtension from '@tiptap/extension-underline';
@@ -20,7 +20,7 @@ import { useWorkInfoCache } from '../hooks/useWorkInfoCache';
 import { useChapterAutoSave } from '../hooks/useChapterAutoSave';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { worksApi, type Work } from '../utils/worksApi';
-import { chaptersApi, type Chapter } from '../utils/chaptersApi';
+import { chaptersApi, type Chapter, type ChapterUpdate } from '../utils/chaptersApi';
 import { syncManager } from '../utils/syncManager';
 import { useIntelligentSync } from '../utils/intelligentSync';
 import { analyzeChapter } from '../utils/bookAnalysisApi';
@@ -601,13 +601,27 @@ export default function NovelEditorPage(){
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [findText, matchCase, isReplacePanelOpen, editor]);
 
+  type WorkAnalysisCommandResult = {
+    success: boolean;
+    message: string;
+    analyzedCount?: number;
+    errors?: string[];
+  };
+
   // 分析本书（后台运行，不显示弹窗）
-  const handleAnalyzeWork = async () => {
+  const handleAnalyzeWork = async (options?: { quiet?: boolean }): Promise<WorkAnalysisCommandResult | undefined> => {
     if (!workId) {
-      console.warn('没有选择作品');
-      return;
+      const message = '没有选择作品';
+      console.warn(message);
+      return { success: false, message };
     }
     
+    const notify = (msg: string) => {
+      if (!options?.quiet) {
+        alert(msg);
+      }
+    };
+
     // 后台运行，不显示确认弹窗
     setIsAnalyzing(true);
     
@@ -642,8 +656,6 @@ export default function NovelEditorPage(){
         // JSON响应（非流式）
         const data = await response.json();
         
-        setIsAnalyzing(false);
-        
         if (data.success) {
           const successCount = data.success_count || 0;
           const errorCount = data.error_count || 0;
@@ -660,7 +672,7 @@ export default function NovelEditorPage(){
             console.warn('分析错误详情:', errorMessages);
           }
           
-          alert(message);
+          notify(message);
           
           // 静默刷新数据（不刷新整个页面）
           if (workId) {
@@ -674,8 +686,17 @@ export default function NovelEditorPage(){
               console.error('刷新数据失败:', refreshError);
             }
           }
+
+          return {
+            success: true,
+            message,
+            analyzedCount: successCount,
+            errors: data.errors?.map((e: any) => e.message || e.error).filter(Boolean),
+          };
         } else {
-          alert(`分析失败: ${data.message || '未知错误'}`);
+          const message = `分析失败: ${data.message || '未知错误'}`;
+          notify(message);
+          return { success: false, message };
         }
       } else {
         // SSE流式响应（兼容旧版本）
@@ -708,10 +729,8 @@ export default function NovelEditorPage(){
                   
                 } else if (data.type === 'all_chapters_complete') {
                   // 分析完成，显示结果
-                  setIsAnalyzing(false);
-                  
-                  // 显示简单的提示信息
-                  alert(`分析完成！共分析了 ${analyzedCount} 章。`);
+                  const message = `分析完成！共分析了 ${analyzedCount} 章。`;
+                  notify(message);
                   // 静默刷新数据（不刷新整个页面）
                   if (workId) {
                     // 重新加载作品和章节数据
@@ -720,10 +739,11 @@ export default function NovelEditorPage(){
                     // 触发章节列表重新加载
                     window.dispatchEvent(new Event('chapters-updated'));
                   }
+                  return { success: true, message, analyzedCount };
                 } else if (data.type === 'error' || data.type === 'chapter_insert_error') {
                   console.error('分析错误:', data.message);
-                  setIsAnalyzing(false);
-                  alert(`分析失败: ${data.message}`);
+                  notify(`分析失败: ${data.message}`);
+                  return { success: false, message: data.message };
                 }
               } catch (e) {
                 // 忽略解析错误
@@ -732,11 +752,20 @@ export default function NovelEditorPage(){
             }
           }
         }
+
+        const message = `分析完成！共分析了 ${analyzedCount} 章。`;
+        notify(message);
+        return { success: true, message, analyzedCount };
       }
     } catch (err) {
       console.error('分析失败:', err);
+      const message = err instanceof Error ? err.message : '分析失败';
+      if (!options?.quiet) {
+        alert(message);
+      }
+      return { success: false, message };
+    } finally {
       setIsAnalyzing(false);
-      alert(err instanceof Error ? err.message : '分析失败');
     }
   };
 
@@ -1502,107 +1531,180 @@ export default function NovelEditorPage(){
     }
   };
 
-  // 分析章节（生成大纲和细纲）
-  const handleAnalyzeChapter = async (chapterId: string) => {
+  // 章节/作品分析结果类型（供对话命令使用）
+  type ChapterAnalysisCommandResult = {
+    chapterId: number;
+    chapterNumber?: number;
+    title?: string;
+    outline?: string;
+    detailedOutline?: string;
+    success: boolean;
+    error?: string;
+  };
+
+  // 将 outline 对象转换为可读文本
+  const formatOutlineText = (outline: any): string => {
+    if (!outline) return '';
+    if (typeof outline === 'string') return outline;
+    if (typeof outline === 'object') {
+      const outlineObj = outline as any;
+      const parts: string[] = [];
+      if (outlineObj.core_function) {
+        parts.push(`核心功能：${outlineObj.core_function}`);
+      }
+      if (outlineObj.key_points && Array.isArray(outlineObj.key_points)) {
+        parts.push(
+          `关键情节点：\n${outlineObj.key_points
+            .map((p: string, i: number) => `${i + 1}. ${p}`)
+            .join('\n')}`
+        );
+      }
+      if (outlineObj.visual_scenes && Array.isArray(outlineObj.visual_scenes)) {
+        parts.push(
+          `画面感：\n${outlineObj.visual_scenes
+            .map((s: string, i: number) => `${i + 1}. ${s}`)
+            .join('\n')}`
+        );
+      }
+      if (outlineObj.atmosphere && Array.isArray(outlineObj.atmosphere)) {
+        parts.push(`氛围：${outlineObj.atmosphere.join('、')}`);
+      }
+      if (outlineObj.hook) {
+        parts.push(`结尾钩子：${outlineObj.hook}`);
+      }
+      return parts.filter(Boolean).join('\n\n');
+    }
+    return String(outline);
+  };
+
+  // 将 detailed_outline 对象转换为可读文本
+  const formatDetailedOutlineText = (detailed: any): string => {
+    if (!detailed) return '';
+    if (typeof detailed === 'string') return detailed;
+    if (typeof detailed === 'object') {
+      const detailedObj = detailed as any;
+      if (detailedObj.sections && Array.isArray(detailedObj.sections)) {
+        return detailedObj.sections
+          .map((section: any) => {
+            const sectionNum = section.section_number || '';
+            const sectionTitle = section.title || '';
+            const sectionContent = section.content || '';
+            return `${sectionNum}. ${sectionTitle}\n${sectionContent}`;
+          })
+          .join('\n\n');
+      }
+      return JSON.stringify(detailedObj, null, 2);
+    }
+    return String(detailed);
+  };
+
+  // 统一的单章分析执行逻辑，供按钮和对话命令复用
+  const runChapterAnalysis = async (
+    chapterIdNum: number,
+    options?: { silent?: boolean }
+  ): Promise<ChapterAnalysisCommandResult> => {
     if (!workId) {
-      alert('没有选择作品');
-      return;
+      throw new Error('没有选择作品');
     }
 
-    // 检查章节ID是否为数字（真实章节），草稿章节不能分析
-    const chapterIdNum = parseInt(chapterId);
-    if (isNaN(chapterIdNum)) {
-      alert('草稿章节无法分析，请先保存为正式章节');
-      return;
-    }
+    const chapterIdStr = String(chapterIdNum);
+    const chapterData = chaptersDataRef.current[chapterIdStr];
+    const chapterFromList = allChaptersRef.current.find((c) => c.id === chapterIdNum);
+    const chapterNumber = chapterData?.chapter_number ?? chapterFromList?.chapter_number;
+    const chapterTitle =
+      chapterData?.title ||
+      chapterFromList?.title ||
+      (chapterNumber ? `第${chapterNumber}章` : `章节 ${chapterIdNum}`);
 
-    // 显示开始分析提示
-    const chapterTitle = chaptersData[chapterId]?.title || `第${chapterIdNum}章`;
-    alert(`开始分析章节：${chapterTitle}\n正在生成大纲和细纲，请稍候...`);
+    if (!options?.silent) {
+      alert(`开始分析章节：${chapterTitle}\n正在生成大纲和细纲，请稍候...`);
+    }
 
     try {
-      // 调用分析API
       const result = await analyzeChapter(
         Number(workId),
         chapterIdNum,
         (progress) => {
-          // 可以在这里显示进度信息（如果需要）
           if (progress.message) {
             console.log('分析进度:', progress.message);
           }
         }
       );
 
-      
+      const outlineText = formatOutlineText(result.outline);
+      const detailedOutlineText = formatDetailedOutlineText(result.detailed_outline);
 
-      // 将结果保存到章节的 metadata 中
-      const updateData: any = {
-        chapter_metadata: {
-          outline: result.outline,
-          detailed_outline: result.detailed_outline,
-        }
+      const updateData: ChapterUpdate = {
+        chapter_metadata: {},
       };
-
-      // 如果 outline 是对象，转换为字符串格式
-      if (result.outline && typeof result.outline === 'object') {
-        const outlineObj = result.outline as any;
-        const parts: string[] = [];
-        if (outlineObj.core_function) {
-          parts.push(`核心功能：${outlineObj.core_function}`);
-        }
-        if (outlineObj.key_points && Array.isArray(outlineObj.key_points)) {
-          parts.push(`关键情节点：\n${outlineObj.key_points.map((p: string, i: number) => `${i + 1}. ${p}`).join('\n')}`);
-        }
-        if (outlineObj.visual_scenes && Array.isArray(outlineObj.visual_scenes)) {
-          parts.push(`画面感：\n${outlineObj.visual_scenes.map((s: string, i: number) => `${i + 1}. ${s}`).join('\n')}`);
-        }
-        if (outlineObj.atmosphere && Array.isArray(outlineObj.atmosphere)) {
-          parts.push(`氛围：${outlineObj.atmosphere.join('、')}`);
-        }
-        if (outlineObj.hook) {
-          parts.push(`结尾钩子：${outlineObj.hook}`);
-        }
-        updateData.chapter_metadata.outline = parts.join('\n\n');
+      if (outlineText) {
+        updateData.chapter_metadata!.outline = outlineText;
+      }
+      if (detailedOutlineText) {
+        updateData.chapter_metadata!.detailed_outline = detailedOutlineText;
       }
 
-      // 如果 detailed_outline 是对象，转换为字符串格式
-      if (result.detailed_outline && typeof result.detailed_outline === 'object') {
-        const detailedObj = result.detailed_outline as any;
-        if (detailedObj.sections && Array.isArray(detailedObj.sections)) {
-          updateData.chapter_metadata.detailed_outline = detailedObj.sections.map((section: any) => {
-            const sectionNum = section.section_number || '';
-            const sectionTitle = section.title || '';
-            const sectionContent = section.content || '';
-            return `${sectionNum}. ${sectionTitle}\n${sectionContent}`;
-          }).join('\n\n');
-        } else {
-          updateData.chapter_metadata.detailed_outline = JSON.stringify(detailedObj, null, 2);
-        }
-      }
-
-      // 更新章节
       await chaptersApi.updateChapter(chapterIdNum, updateData);
 
-      // 更新本地状态
-      const chapterData = chaptersData[chapterId];
-      if (chapterData) {
-        setChaptersData({
-          ...chaptersData,
-          [chapterId]: {
-            ...chapterData,
-            outline: updateData.chapter_metadata?.outline || chapterData.outline || '',
-            detailOutline: updateData.chapter_metadata.detailed_outline || '',
-          }
-        });
+      setChaptersData((prev) => {
+        const existing = prev[chapterIdStr];
+        const nextChapter: ChapterFullData = {
+          ...(existing || {}),
+          id: chapterIdStr,
+          chapter_number: existing?.chapter_number ?? chapterNumber,
+          title: existing?.title ?? chapterTitle,
+          outline: outlineText || existing?.outline || '',
+          detailOutline: detailedOutlineText || existing?.detailOutline || '',
+        };
+        return {
+          ...prev,
+          [chapterIdStr]: nextChapter,
+        };
+      });
+
+      if (!options?.silent) {
+        alert(`章节分析完成！\n章节：${chapterTitle}\n大纲和细纲已保存到章节信息中。`);
       }
 
-      alert(`章节分析完成！\n章节：${chapterTitle}\n大纲和细纲已保存到章节信息中。`);
+      return {
+        chapterId: chapterIdNum,
+        chapterNumber,
+        title: chapterTitle,
+        outline: outlineText,
+        detailedOutline: detailedOutlineText,
+        success: true,
+      };
     } catch (error) {
-      console.error('分析章节失败:', error);
       const errorMessage = error instanceof Error ? error.message : '分析章节失败';
-      alert(`分析失败：${errorMessage}\n请检查网络连接或稍后重试。`);
-      throw error;
+      if (!options?.silent) {
+        alert(`分析失败：${errorMessage}\n请检查网络连接或稍后重试。`);
+      }
+      throw new Error(errorMessage);
     }
+  };
+
+  // 对话命令：批量分析章节
+  const handleAnalyzeChaptersCommand = async (
+    targetChapters: Array<{ id: number; chapter_number?: number; title?: string }>
+  ): Promise<ChapterAnalysisCommandResult[]> => {
+    const results: ChapterAnalysisCommandResult[] = [];
+
+    for (const chapter of targetChapters) {
+      try {
+        const result = await runChapterAnalysis(chapter.id, { silent: true });
+        results.push(result);
+      } catch (error) {
+        results.push({
+          chapterId: chapter.id,
+          chapterNumber: chapter.chapter_number,
+          title: chapter.title,
+          success: false,
+          error: error instanceof Error ? error.message : '分析失败',
+        });
+      }
+    }
+
+    return results;
   };
 
   const handleDeleteChapter = async (chapterId: string) => {
@@ -1907,24 +2009,6 @@ export default function NovelEditorPage(){
                 </span>
                 <ThemeSelector />
                 <button 
-                  className="action-btn analyze-work-btn" 
-                  onClick={handleAnalyzeWork}
-                  disabled={isAnalyzing || !workId}
-                  title="分析本书的所有章节"
-                >
-                  {isAnalyzing ? (
-                    <>
-                      <Loader2 size={16} className="spinner" />
-                      <span>分析中...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles size={16} />
-                      <span>分析本书</span>
-                    </>
-                  )}
-                </button>
-                <button 
                   className="action-btn delete-work-btn" 
                   onClick={handleDeleteWork}
                   title="删除作品"
@@ -1991,13 +2075,11 @@ export default function NovelEditorPage(){
               }}
               onOpenChapterModal={handleOpenChapterModal}
               onChapterDelete={handleDeleteChapter}
-              onChapterAnalyze={handleAnalyzeChapter}
               drafts={drafts}
               onDraftsChange={setDrafts}
               volumes={volumes}
               onVolumesChange={setVolumes}
               workType={work?.work_type}
-              workId={workId}
             />
           </div>
         )}
@@ -2027,13 +2109,11 @@ export default function NovelEditorPage(){
                   }}
                   onOpenChapterModal={handleOpenChapterModal}
                   onChapterDelete={handleDeleteChapter}
-                  onChapterAnalyze={handleAnalyzeChapter}
                   drafts={drafts}
                   onDraftsChange={setDrafts}
                   volumes={volumes}
                   onVolumesChange={setVolumes}
                   workType={work?.work_type}
-                  workId={workId}
                 />
                 <div className="mobile-menu-actions">
                   <div className="mobile-menu-section">
@@ -2167,7 +2247,11 @@ export default function NovelEditorPage(){
         {/* 右侧边栏 - 桌面端 */}
         {!isMobile && (
           <div className={`sidebar-wrapper right-sidebar-wrapper ${rightSidebarCollapsed ? 'collapsed' : ''}`}>
-            <AIAssistant workId={workId} />
+            <AIAssistant 
+              workId={workId} 
+              onAnalyzeChapterCommand={handleAnalyzeChaptersCommand}
+              onAnalyzeWorkCommand={() => handleAnalyzeWork({ quiet: true })}
+            />
           </div>
         )}
         
@@ -2182,7 +2266,11 @@ export default function NovelEditorPage(){
                 </button>
               </div>
               <div className="mobile-chat-content">
-                <AIAssistant workId={workId} />
+                <AIAssistant 
+                  workId={workId} 
+                  onAnalyzeChapterCommand={handleAnalyzeChaptersCommand}
+                  onAnalyzeWorkCommand={() => handleAnalyzeWork({ quiet: true })}
+                />
               </div>
             </div>
           </div>
