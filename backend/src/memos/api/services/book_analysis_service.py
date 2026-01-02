@@ -1223,6 +1223,7 @@ class BookAnalysisService:
                     model=analysis_settings.get("model"),
                     temperature=analysis_settings.get("temperature", 0.7),
                     max_tokens=analysis_settings.get("max_tokens", 4000),
+                    use_json_format=False,  # 验证功能不需要 JSON 格式，使用文本输出
                 )
 
                 # 直接使用 AI 的原始文本响应
@@ -1289,6 +1290,7 @@ class BookAnalysisService:
                     model=analysis_settings.get("model"),
                     temperature=analysis_settings.get("temperature", 0.7),
                     max_tokens=analysis_settings.get("max_tokens", 4000),
+                    use_json_format=False,  # 总结功能不需要 JSON 格式，使用文本输出
                 )
                 
                 # 直接使用 AI 的原始文本响应
