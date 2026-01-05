@@ -252,6 +252,7 @@ class WorksApiClient extends BaseApiClient {
 
   /**
    * 获取作品详情
+   * 支持缓存降级：数据库查询失败时自动从缓存加载
    */
   async getWork(
     workId: number,
@@ -259,20 +260,55 @@ class WorksApiClient extends BaseApiClient {
     include_chapters?: boolean,
     check_recovery?: boolean
   ): Promise<Work> {
-    const response = await this.get<any>(`/api/v1/works/${workId}`, {
-      include_collaborators,
-      include_chapters,
-      check_recovery,
-    });
-    
-    // 转换作品类型
-    const work: Work = {
-      ...response,
-      work_type: mapWorkTypeToFrontend(response.work_type as BackendWorkType),
-    };
-    
-    // 关键修复：缓存作品信息到本地，即使后端返回的是恢复建议（needs_recovery=true）
-    // 这样即使后端数据库中的作品被删除，前端也能从本地缓存恢复
+    try {
+      // 先尝试从数据库获取
+      const response = await this.get<any>(`/api/v1/works/${workId}`, {
+        include_collaborators,
+        include_chapters,
+        check_recovery,
+      });
+      
+      // 转换作品类型
+      const work: Work = {
+        ...response,
+        work_type: mapWorkTypeToFrontend(response.work_type as BackendWorkType),
+      };
+      
+      // 缓存作品信息到本地
+      if (work && work.id) {
+        await this.cacheWork(work);
+      }
+      
+      return work;
+    } catch (error) {
+      // 数据库查询失败，尝试从缓存加载
+      console.warn('⚠️ [WorksApi] 数据库查询失败，尝试从缓存加载:', {
+        workId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      
+      const cacheKey = `work_${workId}_info`;
+      const cachedWork = await localCacheManager.get<Work>(cacheKey);
+      
+      if (cachedWork) {
+        console.log('✅ [WorksApi] 从缓存加载作品数据:', cacheKey);
+        // 标记为缓存数据，以便调用方知道这是缓存数据
+        return {
+          ...cachedWork,
+          _fromCache: true, // 标记为缓存数据
+        } as Work & { _fromCache?: boolean };
+      }
+      
+      // 缓存也没有，抛出原始错误
+      console.error('❌ [WorksApi] 数据库查询失败且缓存中无数据:', workId);
+      throw error;
+    }
+  }
+
+  /**
+   * 缓存作品信息
+   */
+  private async cacheWork(work: Work): Promise<void> {
     if (work && work.id) {
       const cacheKey = `work_${work.id}_info`;
       try {
@@ -285,8 +321,6 @@ class WorksApiClient extends BaseApiClient {
         console.warn(`⚠️ [WorksApi] 缓存作品信息失败: ${error}`);
       }
     }
-    
-    return work;
   }
 
   /**

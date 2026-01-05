@@ -196,7 +196,14 @@ export default function NovelEditorPage(){
         setLoading(true);
         const workData = await worksApi.getWork(Number(workId), true, true);
         setWork(workData);
-        setError(null);
+        
+        // 检查是否来自缓存
+        if ((workData as any)._fromCache) {
+          setError('使用缓存数据（数据库不可用）');
+          console.warn('⚠️ [NovelEditorPage] 使用缓存数据，数据库可能不可用');
+        } else {
+          setError(null);
+        }
       } catch (err) {
         console.error('加载作品失败:', err);
         setError(err instanceof Error ? err.message : '加载作品失败');

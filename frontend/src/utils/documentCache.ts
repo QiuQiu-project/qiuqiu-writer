@@ -23,18 +23,72 @@ export const documentCache = {
   // 关键修复：防止重复同步的锁
   syncLocks: new Map<string, Promise<SyncResponse>>(),
   
-  // 获取文档（本地优先，然后从服务器）
+  // 获取文档（本地优先策略：优先使用缓存，后台刷新）
   async getDocument(documentId: string): Promise<ShareDBDocument | null> {
+    // 1. 优先从本地缓存获取（立即响应）
+    try {
+      let cached = await localCacheManager.get<ShareDBDocument>(documentId);
+      
+      // 关键修复：如果新格式缓存不存在，尝试从旧格式迁移
+      if (!cached && documentId.startsWith('work_') && documentId.includes('_chapter_')) {
+        const match = documentId.match(/work_(\d+)_chapter_(\d+)/);
+        if (match) {
+          const [, , chapterId] = match;
+          const oldFormatKey = `chapter_${chapterId}`;
+          const oldCached = await localCacheManager.get<ShareDBDocument>(oldFormatKey);
+          
+          if (oldCached) {
+            console.log(`🔄 [DocumentCache] 从旧格式迁移: ${oldFormatKey} -> ${documentId}`);
+            
+            // 统一格式：content 必须是字符串
+            const contentStr = typeof oldCached.content === 'string' ? oldCached.content : '';
+            
+            // 创建标准格式的缓存
+            cached = {
+              document_id: documentId,
+              content: contentStr,
+              version: oldCached.version || 1,
+              metadata: oldCached.metadata || {},
+            };
+            
+            // 保存到标准格式
+            await localCacheManager.set(documentId, cached, cached.version || 1);
+          }
+        }
+      }
+      
+      if (cached) {
+        // 统一格式：content 必须是字符串
+        if (typeof cached.content !== 'string') {
+          console.warn('⚠️ [DocumentCache] 缓存内容格式错误，应为字符串:', typeof cached.content);
+          cached.content = '';
+          await localCacheManager.set(documentId, cached, cached.version || 1);
+        }
+        
+        // 更新内存缓存
+        documentCache.currentVersion.set(documentId, cached.version || 1);
+        documentCache.currentContent.set(documentId, cached.content);
+        
+        console.log('✅ [DocumentCache] 从缓存加载文档（本地优先）:', documentId);
+        
+        // 后台异步刷新（不阻塞用户）
+        this.refreshDocumentFromServer(documentId).catch(err => {
+          console.warn('⚠️ [DocumentCache] 后台刷新文档失败:', err);
+        });
+        
+        return cached;
+      }
+    } catch (error) {
+      console.warn('⚠️ [DocumentCache] 从缓存获取文档失败:', error);
+    }
     
-    
-    // 关键修复：先检查内存缓存，如果已有数据且正在请求中，等待请求完成而不是发起新请求
+    // 2. 缓存没有，从服务器获取
     const requestKey = documentId.includes('_chapter_') 
       ? `chapter_doc_${documentId.match(/work_\d+_chapter_(\d+)/)?.[1] || ''}`
       : `chapter_doc_${documentId.replace('chapter_', '')}`;
     
     // 如果已经有相同章节的请求正在进行，等待该请求完成
     if (documentCache.pendingRequests.has(requestKey)) {
-      
       try {
         const existingResult = await documentCache.pendingRequests.get(requestKey);
         if (existingResult) {
@@ -65,7 +119,7 @@ export const documentCache = {
       }
     }
     
-    // 先尝试从服务器获取最新版本
+    // 从服务器获取最新版本
     let serverDoc: ShareDBDocument | null = null;
     
     try {
@@ -778,11 +832,11 @@ export const documentCache = {
       // 关键修复：传递 document_exists 信息
       const serverDocumentExists = (result as any).document_exists === true;
       
-      return {
+      const serverDoc: ShareDBDocument = {
         document_id: documentId,
         content: htmlContent,
         version: result.chapter_info?.id || chapterId,
-        document_exists: serverDocumentExists, // 关键修复：传递 document_exists 字段
+        document_exists: serverDocumentExists,
         metadata: {
           work_id: result.chapter_info?.work_id,
           chapter_id: result.chapter_info?.id || chapterId,
@@ -791,9 +845,73 @@ export const documentCache = {
           detailed_outline: result.chapter_info?.metadata?.detailed_outline,
         },
       };
+      
+      // 关键修复：确保从服务器获取的数据被缓存（如果服务器有数据）
+      if (serverDocumentExists && htmlContent && htmlContent.trim().length > 0) {
+        try {
+          await localCacheManager.set(documentId, {
+            ...serverDoc,
+            cached_at: new Date().toISOString(),
+          }, serverDoc.version || 1);
+          console.log('✅ [DocumentCache] 已缓存服务器文档:', documentId);
+          
+          // 更新版本号
+          documentCache.currentVersion.set(documentId, serverDoc.version || 1);
+          documentCache.currentContent.set(documentId, htmlContent);
+        } catch (error) {
+          console.warn('⚠️ [DocumentCache] 缓存服务器文档失败:', error);
+        }
+      }
+      
+      return serverDoc;
     } catch (error) {
       console.error('❌ [DocumentCache] 从章节 API 获取文档失败:', error);
       return null;
+    }
+  },
+
+  /**
+   * 后台刷新文档（不阻塞用户）
+   * 从服务器获取最新版本并更新缓存
+   */
+  async refreshDocumentFromServer(documentId: string): Promise<void> {
+    try {
+      const serverDoc = await this.fetchFromServer(documentId);
+      
+      if (serverDoc) {
+        // 根据 document_exists 字段判断是否更新缓存
+        const documentExists = serverDoc.document_exists !== false;
+        const contentStr = typeof serverDoc.content === 'string' ? serverDoc.content : '';
+        
+        if (documentExists && contentStr && contentStr.trim().length > 0) {
+          // 服务器有数据，更新缓存
+          const previousVersion = documentCache.currentVersion.get(documentId);
+          
+          // 只有服务器版本更新时才更新缓存
+          const serverVersion = serverDoc.version || 1;
+          if (!previousVersion || serverVersion > previousVersion) {
+            documentCache.lastSyncedVersion.set(documentId, serverVersion);
+            documentCache.lastSyncedContent.set(documentId, contentStr);
+            documentCache.currentVersion.set(documentId, serverVersion);
+            documentCache.currentContent.set(documentId, contentStr);
+            
+            await localCacheManager.set(documentId, serverDoc, serverVersion).catch(console.error);
+            console.log('✅ [DocumentCache] 后台刷新成功，已更新缓存:', {
+              documentId,
+              version: serverVersion,
+              contentLength: contentStr.length,
+            });
+          } else {
+            console.log('ℹ️ [DocumentCache] 服务器版本未更新，跳过缓存更新:', {
+              documentId,
+              cachedVersion: previousVersion,
+              serverVersion,
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('⚠️ [DocumentCache] 后台刷新失败:', error);
     }
   },
 };
