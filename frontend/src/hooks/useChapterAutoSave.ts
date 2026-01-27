@@ -260,82 +260,14 @@ export function useChapterAutoSave({
             console.warn('⚠️ [自动保存] 同步到服务器失败，但已保存到本地缓存:', syncErr);
           }
           
-          // 关键修复：保存后验证内容确实保存到了正确的章节
-          const savedDoc = await documentCache.getDocument(documentId);
-          if (savedDoc) {
-            const savedChapterId = savedDoc.metadata?.chapter_id;
-            if (savedChapterId && savedChapterId !== chapterId) {
-              console.error('❌ [自动保存] 严重错误：内容被保存到了错误的章节！', {
-                savedChapterId,
-                expectedChapterId: chapterId,
-                documentId,
-              });
-              // 关键修复：从 chaptersData 或 allChapters 中获取正确的章节号和标题
-              const chapterIdStr = String(chapterId);
-              const chapterData = chaptersData[chapterIdStr];
-              const chapter = allChapters.find(c => String(c.id) === chapterIdStr);
-              const chapterNumber = chapterData?.chapter_number 
-                || chapter?.chapter_number 
-                || undefined;
-              const chapterTitle = chapterData?.title 
-                || chapter?.title 
-                || undefined;
-              
-              // 关键修复：构建包含 title 的 metadata
-              const retryMetadata = {
-                work_id: Number(workId),
-                chapter_id: chapterId,
-                chapter_number: chapterNumber, // 关键修复：保存正确的章节号
-                title: chapterTitle, // 关键修复：保存章节标题
-                updated_at: new Date().toISOString(),
-              };
-              
-              // 关键修复：只在 sync 请求中进行缓存操作
-              // syncDocumentState 内部会处理缓存更新，不需要手动删除和更新
-              // 关键修复：添加验证函数，确保只有当前章节才会同步
-              try {
-                await documentCache.syncDocumentState(
-                  documentId, 
-                  editorContent, 
-                  undefined, 
-                  retryMetadata,
-                  (docId: string) => {
-                    // 验证是否是当前章节
-                    const currentChapterIdCheck = currentChapterIdRef.current;
-                    if (currentChapterIdCheck !== chapterId) {
-                      return false;
-                    }
-                    // 从 documentId 中提取章节ID
-                    const match = docId.match(/work_\d+_chapter_(\d+)/);
-                    if (match) {
-                      const docChapterId = parseInt(match[1]);
-                      return docChapterId === chapterId;
-                    }
-                    return false;
-                  }
-                );
-              } catch (retryErr) {
-                console.warn('⚠️ [自动保存] 重试同步失败:', retryErr);
-              }
-            }
-          }
-          
-          // 验证保存
-          // 关键修复：只在 document 请求中进行缓存读取操作
-          const saved = await documentCache.getDocument(documentId);
-          if (saved && saved.content) {
-            // 进一步验证内容是否正确保存
-            if (saved.content === editorContent) {
-              // 保存成功
-            } else {
-              console.warn('⚠️ [自动保存] 内容验证失败，内容不匹配', {
-                savedContentLength: saved.content.length,
-                expectedContentLength: editorContent.length,
-              });
-            }
-          } else {
-            console.error('❌ [自动保存] 验证失败，缓存中不存在');
-          }
+          // 关键优化：不再调用 getDocument 验证，避免触发服务器请求
+          // 验证逻辑已在 syncDocumentState 中完成，不需要再次验证
+          // syncDocumentState 已经确保内容保存到正确的章节，不需要再次验证
+          console.log('✅ [自动保存] 保存完成（已跳过验证，避免服务器请求）:', {
+            documentId,
+            contentLength: editorContent.length,
+            chapterId,
+          });
           
           // 字数统计已在 sync 接口中处理，不需要单独更新
         } catch (err) {

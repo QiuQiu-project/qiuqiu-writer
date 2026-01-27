@@ -76,6 +76,7 @@ export function useIntelligentSync(
   const lastSyncTime = useRef<Date | null>(null);
   const documentStateRef = useRef<{ version: number; content: string } | null>(null);
   const appliedVersions = useRef<Set<number>>(new Set()); // 记录已应用的版本，避免重复应用
+  const lastSyncTimestamp = useRef<number>(0); // 记录最后一次 sync 的时间戳，用于跳过 sync 后的轮询
   
   // 清理旧版本记录，避免内存泄漏
   const cleanupOldVersions = useCallback(() => {
@@ -163,6 +164,14 @@ export function useIntelligentSync(
         
         lastSyncedVersion.current = result.version;
         lastSyncTime.current = new Date();
+        // 关键优化：记录 sync 时间戳，用于跳过 sync 后的轮询
+        lastSyncTimestamp.current = Date.now();
+        
+        // 关键优化：更新 documentStateRef，这样轮询时如果版本没有变化，就不会触发更新
+        documentStateRef.current = {
+          version: result.version,
+          content: syncedContent
+        };
         
         // 清理旧版本记录
         cleanupOldVersions();
@@ -205,6 +214,19 @@ export function useIntelligentSync(
 
     if (syncInProgress.current) {
       console.log('⏸️ [pollForUpdates] 同步正在进行中，跳过');
+      return;
+    }
+
+    // 关键优化：如果刚刚完成 sync（3秒内），跳过轮询，避免重复请求
+    // sync 操作已经返回了最新的版本号和内容，不需要立即再调用 document 请求
+    const timeSinceLastSync = Date.now() - lastSyncTimestamp.current;
+    const SYNC_COOLDOWN = 3000; // 3秒冷却时间
+    if (timeSinceLastSync < SYNC_COOLDOWN) {
+      console.log('⏸️ [pollForUpdates] 刚刚完成 sync，跳过轮询（避免重复请求）:', {
+        timeSinceLastSync,
+        cooldown: SYNC_COOLDOWN,
+        timestamp: new Date().toISOString(),
+      });
       return;
     }
 

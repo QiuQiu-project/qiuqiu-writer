@@ -5,7 +5,7 @@
 
 import { Editor } from '@tiptap/react';
 import { documentCache } from './documentCache';
-// 关键修复：移除直接使用 localCacheManager，只在 sync/document 请求中进行缓存操作
+import { localCacheManager } from './localCacheManager';
 import { chaptersApi } from './chaptersApi';
 import { countCharacters } from './textUtils';
 import type { ShareDBDocument, ChapterFullData } from '../types/document';
@@ -267,54 +267,46 @@ export async function loadChapterContent(params: LoadChapterContentParams): Prom
       const documentId = `work_${workId}_chapter_${chapterId}`;
       
       let content: string | null = null;
-      let serverDoc: ShareDBDocument | null = null; // 保存服务器文档，用于后续复用
       
-      // 关键修复：先从服务器强制拉取最新版本，确保获取的是最新内容
-      // 但要注意：如果服务器返回 document_exists: false，应该使用本地缓存
-      
-      try {
-        serverDoc = await documentCache.forcePullFromServer(documentId);
-        // 关键修复：检查服务器文档是否存在，如果不存在，不覆盖 content
-        // forcePullFromServer 会调用 fetchFromServer，它会返回 document_exists 信息
-        // 但 forcePullFromServer 返回的是 ShareDBDocument，不包含 document_exists
-        // 所以我们需要在后续的 docResult 检查中处理
-        if (serverDoc && serverDoc.content) {
-          // 统一格式：content 必须是字符串
-          const serverContent = typeof serverDoc.content === 'string' ? serverDoc.content : '';
-          
-          if (serverContent && serverContent.trim().length > 0) {
-            content = serverContent;
-            
-            // 关键修复：只在 sync 请求中进行缓存操作
-            // 这里只是从服务器获取内容，不需要立即同步，所以不进行缓存操作
-            // 缓存会在后续的 getDocument 或 syncDocumentState 中自动更新
-          }
-        }
-      } catch (pullErr) {
-        console.warn('⚠️ [切换章节] 从服务器拉取失败，将使用本地缓存:', pullErr);
-      }
-      
-      // 1. 如果服务器拉取失败，从本地缓存获取（即时响应）- 优先新格式，兼容旧格式
-      // 关键修复：如果 serverDoc 已经存在，直接使用它，避免再次调用 getDocument（会重复请求）
+      // 关键优化：本地优先策略 - 优先使用本地缓存，避免不必要的服务器请求
+      // 1. 先从本地存储缓存获取
       let cachedDoc: ShareDBDocument | null = null;
       
-      if (serverDoc) {
-        // 如果 forcePullFromServer 已经成功获取，直接使用它，避免重复请求
-        cachedDoc = serverDoc;
-      } else {
-        // 关键修复：如果 forcePullFromServer 失败，直接从本地缓存获取，不再调用 getDocument
-        // getDocument 会再次调用 fetchFromServer，导致重复请求
-        try {
-          // 关键修复：直接从本地缓存获取，不调用 getDocument（避免重复请求）
-          console.log('🔍 [缓存检查] 从本地缓存获取，文档ID:', {
-            documentId,
-            chapterId,
-            workId,
-          });
-          
-          // 关键修复：如果 forcePullFromServer 失败，不再调用 getDocument（会再次请求服务器）
-          // 直接从 documentCache 的内存缓存获取，如果内存缓存也没有，就返回 null
-          // 这样不会触发额外的服务器请求
+      try {
+        console.log('🔍 [缓存检查] 从本地缓存获取，文档ID:', {
+          documentId,
+          chapterId,
+          workId,
+        });
+        
+        // 1.1 先从本地存储缓存获取
+        cachedDoc = await localCacheManager.get<ShareDBDocument>(documentId);
+        
+        // 1.2 如果本地存储缓存没有，尝试从旧格式迁移
+        if (!cachedDoc && documentId.startsWith('work_') && documentId.includes('_chapter_')) {
+          const match = documentId.match(/work_(\d+)_chapter_(\d+)/);
+          if (match) {
+            const [, , chapterIdStr] = match;
+            const oldFormatKey = `chapter_${chapterIdStr}`;
+            const oldCached = await localCacheManager.get<ShareDBDocument>(oldFormatKey);
+            
+            if (oldCached) {
+              console.log(`🔄 [loadChapterContent] 从旧格式迁移: ${oldFormatKey} -> ${documentId}`);
+              const contentStr = typeof oldCached.content === 'string' ? oldCached.content : '';
+              cachedDoc = {
+                document_id: documentId,
+                content: contentStr,
+                version: oldCached.version || 1,
+                metadata: oldCached.metadata || {},
+              };
+              // 保存到新格式
+              await localCacheManager.set(documentId, cachedDoc, cachedDoc.version || 1);
+            }
+          }
+        }
+        
+        // 1.3 如果本地存储缓存也没有，尝试从内存缓存获取
+        if (!cachedDoc) {
           const memoryContent = documentCache.currentContent.get(documentId);
           const memoryVersion = documentCache.currentVersion.get(documentId);
           if (memoryContent !== undefined && memoryVersion !== undefined) {
@@ -325,9 +317,9 @@ export async function loadChapterContent(params: LoadChapterContentParams): Prom
               metadata: {},
             };
           }
-        } catch (cacheErr) {
-          console.warn('⚠️ 从缓存加载失败:', cacheErr);
         }
+      } catch (cacheErr) {
+        console.warn('⚠️ [loadChapterContent] 从缓存加载失败:', cacheErr);
       }
       
       // 验证缓存内容是否属于当前章节
@@ -410,55 +402,14 @@ export async function loadChapterContent(params: LoadChapterContentParams): Prom
       const hasOutlineInCache = chaptersData[chapterIdStr]?.outline && chaptersData[chapterIdStr].outline.trim().length > 0;
       const hasDetailOutlineInCache = chaptersData[chapterIdStr]?.detailOutline && chaptersData[chapterIdStr].detailOutline.trim().length > 0;
       
-      // 只有当缓存中没有大纲或细纲时，才从服务器获取
+      // 关键优化：本地优先策略 - 只有当缓存中完全没有大纲和细纲时，才从服务器获取
+      // 避免频繁请求，优先使用已缓存的数据
       if (!hasOutlineInCache || !hasDetailOutlineInCache) {
+        // 关键优化：不再自动从服务器获取，避免不必要的请求
+        // 如果用户需要最新的大纲/细纲，可以通过手动刷新或编辑章节设置来获取
+        console.log('ℹ️ [loadChapterContent] 缓存中没有大纲/细纲，跳过自动获取（本地优先策略）');
+
         try {
-          // 关键修复：优先使用 forcePullFromServer 已经获取的结果，避免重复请求
-          // 如果 serverDoc 中已经有 metadata，直接使用它
-          if (serverDoc && serverDoc.metadata && (serverDoc.metadata.outline || serverDoc.metadata.detailed_outline)) {
-            // 构造 docResult 格式，与 API 返回格式保持一致
-            // 关键修复：使用 serverDoc.document_exists 的真实值
-            // 注意：如果 serverDoc.document_exists 为 false，说明 MongoDB 没有数据
-            docResult = {
-              content: serverDoc.content,
-              document_exists: serverDoc.document_exists === true, // 只有当明确为 true 时才认为存在
-              chapter_info: {
-                id: serverDoc.metadata.chapter_id || chapterId,
-                work_id: serverDoc.metadata.work_id,
-                chapter_number: serverDoc.metadata.chapter_number,
-                metadata: {
-                  outline: serverDoc.metadata.outline,
-                  detailed_outline: serverDoc.metadata.detailed_outline,
-                },
-              },
-            };
-          } else {
-            // 如果 serverDoc 中没有 metadata，使用 fetchFromServer（有去重机制）
-            const fetchedDoc = await documentCache.fetchFromServer(documentId);
-            if (fetchedDoc && fetchedDoc.metadata) {
-              // 构造 docResult 格式
-              // 关键修复：使用 fetchedDoc.document_exists 的真实值
-              // 注意：如果 fetchedDoc.document_exists 为 false，说明 MongoDB 没有数据
-              docResult = {
-                content: fetchedDoc.content,
-                document_exists: fetchedDoc.document_exists === true, // 只有当明确为 true 时才认为存在
-                chapter_info: {
-                  id: fetchedDoc.metadata.chapter_id || chapterId,
-                  work_id: fetchedDoc.metadata.work_id,
-                  chapter_number: fetchedDoc.metadata.chapter_number,
-                  metadata: {
-                    outline: fetchedDoc.metadata.outline,
-                    detailed_outline: fetchedDoc.metadata.detailed_outline,
-                  },
-                },
-              };
-            } else {
-              // 如果 fetchFromServer 也没有 metadata，才直接调用 API（这种情况应该很少）
-              docResult = await chaptersApi.getChapterDocument(chapterId);
-              // docResult 应该已经包含 document_exists 字段（从后端返回）
-            }
-          }
-          
           // 更新章节的 outline 和 detailed_outline 到设置中
           if (docResult.chapter_info?.metadata) {
             const chapterIdStr = String(docResult.chapter_info.id);
@@ -1103,170 +1054,8 @@ export async function loadChapterContent(params: LoadChapterContentParams): Prom
       // 注意：这里不立即重新启动智能同步，因为 useIntelligentSync 的 useEffect 会在 documentId 变化时自动重新启动
       isChapterLoadingRef.current = false;
 
-      // 关键修复：章节切换后延迟从服务器拉取最新更新
-      // 延迟执行，避免与轮询冲突，减少频繁请求
-      // 轮询会在10秒后自动检查更新，这里延迟5秒，给轮询留出时间
-      // 使用一个标记来跟踪这个定时器，方便在切换章节时清除
-      const pullTimer = setTimeout(async () => {
-        try {
-          // 关键修复：再次验证章节ID，确保没有切换章节
-          const currentChapterIdCheck = currentChapterIdRef.current;
-          if (currentChapterIdCheck !== chapterId) {
-            console.warn('⚠️ [自动拉取] 章节已切换，跳过拉取:', {
-              currentChapterIdRef: currentChapterIdCheck,
-              expectedChapterId: chapterId,
-            });
-            return;
-          }
-          
-          const serverDoc = await documentCache.forcePullFromServer(documentId);
-          
-          // 再次验证章节ID（可能在异步操作期间切换了）
-          const currentChapterIdCheck2 = currentChapterIdRef.current;
-          if (currentChapterIdCheck2 !== chapterId) {
-            console.warn('⚠️ [自动拉取] 章节在拉取期间已切换，跳过更新:', {
-              currentChapterIdRef: currentChapterIdCheck2,
-              expectedChapterId: chapterId,
-            });
-            return;
-          }
-          
-          if (serverDoc && serverDoc.content) {
-            const serverContent = typeof serverDoc.content === 'string' 
-              ? serverDoc.content 
-              : '';
-            
-            // 关键修复：验证服务器内容确实属于当前章节
-            const serverChapterId = serverDoc.metadata?.chapter_id;
-            if (serverChapterId && serverChapterId !== chapterId) {
-              console.error('❌ [自动拉取] 严重错误：服务器内容属于其他章节！', {
-                serverChapterId,
-                expectedChapterId: chapterId,
-                documentId,
-              });
-              return; // 不更新，避免覆盖错误的内容
-            }
-            
-            // 关键修复：如果正在加载章节，不更新内容，避免干扰章节加载
-            if (isChapterLoadingRef.current) {
-              return;
-            }
-            
-            // 关键修复：防止频闪 - 检查是否与上次设置的内容相同
-            if (lastSetContentRef.current === serverContent) {
-              return;
-            }
-            
-            // 关键修复：使用相同的HTML格式转换逻辑，确保格式一致
-            const convertTextToHtml = (text: string): string => {
-              if (!text || text.trim() === '') {
-                return '<p></p>';
-              }
-              
-              // 更准确地检测HTML格式：检查是否包含HTML标签
-              const htmlTagPattern = /<\/?[a-z][\s\S]*>/i;
-              const hasHtmlTags = htmlTagPattern.test(text);
-              
-              // 如果已经是 HTML 格式（包含HTML标签），直接返回
-              if (hasHtmlTags) {
-                const trimmed = text.trim();
-                if (trimmed.startsWith('<') && trimmed.endsWith('>')) {
-                  return text;
-                }
-                if (trimmed.includes('<p>') || trimmed.includes('<br>') || trimmed.includes('<div>')) {
-                  return text;
-                }
-              }
-              
-              // 将纯文本转换为 HTML：换行符转换为段落
-              return text
-                .split(/\n\s*\n/) // 按双换行符分割段落
-                .map(para => para.trim())
-                .filter(para => para.length > 0)
-                .map(para => {
-                  // 段落内的单换行符转换为 <br>
-                  return `<p>${para.replace(/\n/g, '<br>')}</p>`;
-                })
-                .join('') || '<p></p>';
-            };
-            
-            // 确保服务器内容是 HTML 格式
-            const htmlServerContent = convertTextToHtml(serverContent);
-            
-            // 如果服务器内容与当前编辑器内容不同，更新编辑器
-            const currentContent = editor.getHTML();
-            
-            // 关键修复：更严格的内容比较
-            const normalizeContent = (content: string) => {
-              return content.trim().replace(/\s+/g, ' ');
-            };
-            
-            const normalizedCurrent = normalizeContent(currentContent);
-            const normalizedServer = normalizeContent(htmlServerContent);
-            
-            if (normalizedCurrent !== normalizedServer) {
-              // 🔍 [调试] 自动拉取更新编辑器内容
-              console.log('🔍 [自动拉取-调试] 检测到服务器有新内容，准备更新编辑器:', {
-                chapterId,
-                serverVersion: serverDoc.version,
-                serverContentLength: htmlServerContent.length,
-                serverContentPreview: htmlServerContent.substring(0, 100),
-                currentContentLength: currentContent.length,
-                currentContentPreview: currentContent.substring(0, 100),
-                timestamp: new Date().toISOString(),
-              });
-              
-              // 关键修复：检查服务器内容是否为空
-              if (!htmlServerContent || htmlServerContent.trim() === '' || htmlServerContent.trim() === '<p></p>') {
-                console.warn('⚠️ [自动拉取-调试] 服务器内容为空，跳过更新，保留编辑器现有内容:', {
-                  chapterId,
-                  currentContentLength: currentContent.length,
-                  timestamp: new Date().toISOString(),
-                });
-                lastSetContentRef.current = serverContent; // 更新记录，避免下次重复检查
-                return; // 不更新，避免清空编辑器
-              }
-              
-              // 关键修复：设置内容时确保格式被正确解析和保留
-              editor.commands.setContent(htmlServerContent, { 
-                emitUpdate: false
-              });
-              
-              // 🔍 [调试] 验证设置后的内容
-              setTimeout(() => {
-                const editorContentAfterPull = editor.getHTML();
-                console.log('🔍 [自动拉取-调试] 设置后的编辑器内容:', {
-                  chapterId,
-                  editorContentLength: editorContentAfterPull.length,
-                  editorContentPreview: editorContentAfterPull.substring(0, 100),
-                  serverContentLength: htmlServerContent.length,
-                  isContentEmpty: editorContentAfterPull.trim() === '<p></p>' || editorContentAfterPull.trim() === '',
-                  timestamp: new Date().toISOString(),
-                });
-                
-                if (editorContentAfterPull.trim() === '<p></p>' || editorContentAfterPull.trim() === '') {
-                  console.error('❌ [自动拉取-调试] 设置后编辑器内容为空！', {
-                    chapterId,
-                    serverContentLength: htmlServerContent.length,
-                    serverContentPreview: htmlServerContent.substring(0, 200),
-                    timestamp: new Date().toISOString(),
-                  });
-                }
-              }, 100);
-              
-              lastSetContentRef.current = serverContent; // 记录已设置的内容
-            } else {
-              lastSetContentRef.current = serverContent; // 更新记录，避免下次重复检查
-            }
-          }
-        } catch (pullErr) {
-          // 拉取失败不影响编辑器使用，只记录错误
-          console.warn('⚠️ [自动拉取] 从服务器拉取更新失败（不影响使用）:', pullErr);
-        }
-      }, 5000); // 延迟5秒，避免与轮询冲突
-      
-      // 将定时器存储到 ref 中，方便在切换章节时清除
-      (window as any).__chapterPullTimer = pullTimer;
+      // 关键优化：移除延迟拉取逻辑，避免额外的 document 请求
+      // 章节加载时已经从服务器获取了最新内容（通过 forcePullFromServer），不需要再次拉取
       
       // 隐藏加载动画
       setChapterLoading(false);

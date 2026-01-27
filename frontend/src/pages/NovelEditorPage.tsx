@@ -1329,7 +1329,7 @@ export default function NovelEditorPage(){
       pollInterval: 10000,          // 每 10 秒轮询一次
       userInputWindow: 5000,        // 5 秒内有输入视为用户正在编辑
       syncCheckInterval: 5000,      // 每 5 秒检查一次是否需要同步（降低频率）
-      enablePolling: true,          // 始终启用轮询（内部会根据 documentId 判断）
+      enablePolling: false,          // 暂时禁用轮询，避免频繁请求
       onSyncSuccess: () => {
         // 更新同步状态
         setSyncStatus(syncManager.getStatus());

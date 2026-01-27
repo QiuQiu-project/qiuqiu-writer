@@ -71,10 +71,8 @@ export const documentCache = {
         
         console.log('✅ [DocumentCache] 从缓存加载文档（本地优先）:', documentId);
         
-        // 后台异步刷新（不阻塞用户）
-        this.refreshDocumentFromServer(documentId).catch(err => {
-          console.warn('⚠️ [DocumentCache] 后台刷新文档失败:', err);
-        });
+        // 关键优化：移除后台刷新，避免不必要的服务器请求
+        // 本地优先策略：优先使用本地缓存，不自动刷新
         
         return cached;
       }
