@@ -300,7 +300,7 @@ function CharacterRelations({ data, onChange }: CharacterRelationsProps) {
             type: 'react', // 使用 react 节点类型
             style: {
               size: [80, 80] as [number, number], // 节点大小 [width, height]
-              component: (data: any) => <CharacterNode data={data} />, // React 组件
+              component: (data: unknown) => <CharacterNode data={data as NodeData} />, // React 组件
             },
           } as any,
           edge: {
@@ -313,7 +313,7 @@ function CharacterRelations({ data, onChange }: CharacterRelationsProps) {
                 fill: '#10b981',
               },
             },
-            labelText: (d: any) => d.data?.label || '',
+            labelText: (d: unknown) => (d as any).data?.label || '',
             labelFill: '#10b981',
             labelFontSize: 11,
             labelFontWeight: 500,
@@ -405,8 +405,9 @@ function CharacterRelations({ data, onChange }: CharacterRelationsProps) {
             // 节点点击事件已移除 - 角色不允许编辑
 
             // 边点击事件 - 直接进入编辑界面
-            graph.on('edge:click', (e: any) => {
-              const edgeId = e.item?.getID?.() || e.target?.id || e.item?.id;
+            graph.on('edge:click', (e: unknown) => {
+              const event = e as any;
+              const edgeId = event.item?.getID?.() || event.target?.id || event.item?.id;
               if (edgeId) {
                 const relation = relations.find((r) => r.id === edgeId);
                 if (relation) {
@@ -532,8 +533,8 @@ function CharacterRelations({ data, onChange }: CharacterRelationsProps) {
           node: {
             type: 'react',
             style: {
-              size: [80, 80] as [number, number],
-              component: (data: any) => <CharacterNode data={data} />,
+              size: [80, 80] as [number, number], // 节点大小 [width, height]
+              component: (data: unknown) => <CharacterNode data={data as NodeData} />, // React 组件
             },
           } as any,
           edge: {
@@ -546,7 +547,7 @@ function CharacterRelations({ data, onChange }: CharacterRelationsProps) {
                 fill: '#10b981',
               },
             },
-            labelText: (d: any) => d.data?.label || '',
+            labelText: (d: unknown) => (d as any).data?.label || '',
             labelFill: '#10b981',
             labelFontSize: 12,
             labelFontWeight: 500,
@@ -690,9 +691,9 @@ function CharacterRelations({ data, onChange }: CharacterRelationsProps) {
         r.id === editingRelation
           ? {
               ...r,
-              from: editForm.relationFrom,
-              to: editForm.relationTo,
-              type: editForm.relationType,
+              from: editForm.relationFrom || r.from,
+              to: editForm.relationTo || r.to,
+              type: editForm.relationType || r.type,
               description: editForm.relationDescription || r.description,
             }
           : r

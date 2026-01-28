@@ -113,7 +113,7 @@ export default function AIAssistant({ workId }: AIAssistantProps) {
         const workData = await worksApi.getWork(workIdNum);
         
         // 从作品metadata的component_data中提取角色信息
-        const componentData = workData.metadata?.component_data || {};
+        const componentData = workData.metadata?.component_data || {characters: []};
         const charactersFromComponentData = componentData.characters || [];
         setCharacters(charactersFromComponentData);
       } catch (err) {

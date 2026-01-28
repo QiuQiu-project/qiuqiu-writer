@@ -1,4 +1,3 @@
-import { Bell, User, Coins } from 'lucide-react';
 import './HomeHeader.css';
 
 export default function HomeHeader() {

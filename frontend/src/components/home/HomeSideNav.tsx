@@ -1,4 +1,4 @@
-import { Home, BookOpen, FileText, Video, PenTool, GraduationCap, HelpCircle, Sparkles, Wrench } from 'lucide-react';
+import { Home, BookOpen } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import './HomeSideNav.css';
 

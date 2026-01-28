@@ -1,4 +1,4 @@
-import { Heart, MessageCircle, Eye, User, Calendar } from 'lucide-react';
+import { Heart, MessageCircle, Eye, Calendar } from 'lucide-react';
 import { getUserAvatarUrl } from '../../utils/avatarUtils';
 import './ContentCard.css';
 

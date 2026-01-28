@@ -1,4 +1,4 @@
-import { FileText, Video, Film, PenTool, ChevronRight } from 'lucide-react';
+import { FileText, ChevronRight } from 'lucide-react';
 import './WritingTools.css';
 
 const tools = [

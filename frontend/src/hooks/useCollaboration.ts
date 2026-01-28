@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { CollaborationClient, CollaborationClientOptions } from '../utils/collaborationClient'
+import { CollaborationClient } from '../utils/collaborationClient'
 import { YjsClient } from '../utils/yjsClient'
 
 export interface UseCollaborationOptions {
@@ -33,6 +33,7 @@ export function useCollaboration(options: UseCollaborationOptions): UseCollabora
   const [content, setContentState] = useState<string>('')
   const [connected, setConnected] = useState<boolean>(false)
   const [error, setError] = useState<Error | null>(null)
+  const [yjsClient, setYjsClient] = useState<YjsClient | null>(null)
 
   // 初始化客户端
   useEffect(() => {
@@ -60,20 +61,28 @@ export function useCollaboration(options: UseCollaborationOptions): UseCollabora
 
       clientRef.current = client
       client.connect()
-
-      // 初始化内容
-      const initialContent = client.getContent()
-      if (initialContent) {
-        setContentState(initialContent)
-      }
+      
+      // 使用 setTimeout 避免在 effect 中直接同步设置 state
+      setTimeout(() => {
+        setYjsClient(client.getYjsClient() || null)
+        
+        // 初始化内容
+        const initialContent = client.getContent()
+        if (initialContent) {
+          setContentState(initialContent)
+        }
+      }, 0)
     } catch (err) {
-      setError(err instanceof Error ? err : new Error(String(err)))
+      setTimeout(() => {
+        setError(err instanceof Error ? err : new Error(String(err)))
+      }, 0)
     }
 
     return () => {
       if (clientRef.current) {
         clientRef.current.destroy()
         clientRef.current = null
+        setYjsClient(null)
       }
     }
   }, [documentId, userId, type, enabled, onContentChange])
@@ -85,9 +94,6 @@ export function useCollaboration(options: UseCollaborationOptions): UseCollabora
       setContentState(newContent)
     }
   }, [])
-
-  // 获取Yjs客户端（用于TipTap集成）
-  const yjsClient = clientRef.current?.getYjsClient() || null
 
   return {
     content,

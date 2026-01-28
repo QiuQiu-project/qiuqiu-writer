@@ -10,6 +10,23 @@ export interface TemplateConfig {
   modules: unknown[];
 }
 
+export interface WorkTemplate {
+  id: number;
+  name: string;
+  description?: string;
+  work_type: string;
+  category?: string;
+  template_config?: TemplateConfig | Record<string, unknown>; // 这里可以是 TemplateConfig 或更复杂的结构
+  is_public?: boolean;
+  is_system?: boolean;
+  settings?: Record<string, unknown>;
+  tags?: string[];
+  created_at?: string;
+  updated_at?: string;
+  creator_id?: number;
+  usage_count?: number;
+}
+
 class TemplatesApiClient extends BaseApiClient {
 
   /**
@@ -43,8 +60,8 @@ class TemplatesApiClient extends BaseApiClient {
     is_public?: boolean;
     settings?: Record<string, unknown>;
     tags?: string[];
-  }): Promise<unknown> {
-    return this.post<unknown>('/api/v1/templates/', templateData);
+  }): Promise<WorkTemplate> {
+    return this.post<WorkTemplate>('/api/v1/templates/', templateData);
   }
 
   /**
@@ -61,8 +78,8 @@ class TemplatesApiClient extends BaseApiClient {
       is_public?: boolean;
       tags?: string[];
     }
-  ): Promise<unknown> {
-    return this.put<unknown>(`/api/v1/templates/${templateId}`, templateData);
+  ): Promise<WorkTemplate> {
+    return this.put<WorkTemplate>(`/api/v1/templates/${templateId}`, templateData);
   }
 
   /**
@@ -79,8 +96,8 @@ class TemplatesApiClient extends BaseApiClient {
     sort_by?: string;
     sort_order?: 'asc' | 'desc';
     include_fields?: boolean;
-  }): Promise<unknown[]> {
-    return this.get<unknown[]>('/api/v1/templates', params);
+  }): Promise<WorkTemplate[]> {
+    return this.get<WorkTemplate[]>('/api/v1/templates', params);
   }
 }
 

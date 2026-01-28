@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react';
 import { Editor } from '@tiptap/react';
 import { documentCache } from '../utils/documentCache';
 import { countCharacters } from '../utils/textUtils';
+import type { Work } from '../utils/worksApi';
+import type { Chapter } from '../utils/chaptersApi';
 
 export function useAutoSave(
   editor: Editor | null,
@@ -10,8 +12,8 @@ export function useAutoSave(
   currentChapterIdRef: React.MutableRefObject<number | null>,
   isChapterLoadingRef: React.MutableRefObject<boolean>,
   onWordCountUpdate: (count: number) => void,
-  onWorkUpdate?: (work: Work) => void,
-  onChapterUpdate?: (chapter: Chapter) => void
+  onWorkUpdate?: (work: Partial<Work>) => void,
+  onChapterUpdate?: (chapter: Partial<Chapter>) => void
 ) {
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -79,5 +81,5 @@ export function useAutoSave(
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [editor, workId, selectedChapter]);
+  }, [editor, workId, selectedChapter, onWorkUpdate, onChapterUpdate, currentChapterIdRef, isChapterLoadingRef, onWordCountUpdate]);
 }

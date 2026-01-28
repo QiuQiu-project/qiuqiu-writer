@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import type { ModuleConfig, ComponentConfig } from '../components/editor/WorkInfoManager';
 
 export interface Character {
   id: string;
@@ -13,6 +14,14 @@ export interface Character {
 export interface Location {
   id: string;
   name: string;
+}
+
+interface CharacterCardData {
+  name?: string;
+  avatar?: string;
+  gender?: string;
+  description?: string;
+  type?: string;
 }
 
 export interface UseWorkInfoCacheResult {
@@ -38,10 +47,13 @@ export function useWorkInfoCache(
 
   useEffect(() => {
     if (!workId) {
-      setHasLocationModule(false);
-      setAvailableLocations([]);
-      setHasCharacterModule(false);
-      setAvailableCharacters([]);
+      // 避免在 effect 中直接调用 setState，使用 setTimeout
+      setTimeout(() => {
+        setHasLocationModule(false);
+        setAvailableLocations([]);
+        setHasCharacterModule(false);
+        setAvailableCharacters([]);
+      }, 0);
       return;
     }
 
@@ -68,8 +80,8 @@ export function useWorkInfoCache(
                 // 只检查character-card组件（不再检查table组件）
                 if (comp.type === 'character-card' && comp.value) {
                   // 角色卡片数据格式：数组，每个对象有name字段
-                  const cardChars = (Array.isArray(comp.value) ? comp.value : []).map((char: any) => ({
-                    id: char.name || String(Date.now() + Math.random()),
+                const cardChars = (Array.isArray(comp.value) ? comp.value : []).map((char: CharacterCardData) => ({
+                  id: char.name || String(Date.now() + Math.random()),
                     name: char.name || '',
                     avatar: char.avatar || undefined,
                     gender: char.gender || undefined,
@@ -145,21 +157,21 @@ export function useWorkInfoCache(
           }
           
           // 查找地点数据（可能在world模块的card-list组件中，或者有"地点"关键词的组件）
-          const findLocationData = (components: any[]): Location[] => {
+          const findLocationData = (components: ComponentConfig[]): Location[] => {
             for (const comp of components) {
               // 检查card-list组件，且label包含"地点"相关关键词
               if (comp.type === 'card-list' && comp.value) {
                 const label = (comp.label || '').toLowerCase();
                 if (label.includes('地点') || label.includes('location') || label.includes('场景')) {
                   // 卡片列表数据格式：数组，每个对象有name字段（或第一个字段）
-                  return (comp.value as any[]).map((card) => {
+                  return (Array.isArray(comp.value) ? comp.value : []).map((card: Record<string, unknown>) => {
                     // 尝试从name字段获取，如果没有则从第一个字段获取
-                    const name = card.name || card[Object.keys(card)[0]] || '';
+                    const name = (card['name'] as string) || (card[Object.keys(card)[0]] as string) || '';
                     return {
                       id: name || String(Date.now() + Math.random()),
                       name: name,
                     };
-                  }).filter(loc => loc.name);
+                  }).filter((loc: Location) => loc.name);
                 }
               }
               
@@ -177,7 +189,7 @@ export function useWorkInfoCache(
           };
           
           // 查找world模块
-          const worldModule = modules.find((m: any) => m.id === 'world');
+          const worldModule = modules.find((m: ModuleConfig) => m.id === 'world');
           if (worldModule) {
             const locationData = findLocationData(worldModule.components || []);
             if (locationData.length > 0) {

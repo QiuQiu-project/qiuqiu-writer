@@ -48,6 +48,16 @@ export function useChapterAutoSave({
   wordCountSaveTimeoutRef,
 }: UseChapterAutoSaveOptions) {
   useEffect(() => {
+    // 拷贝 ref 到局部变量，避免 cleanup 时 ref.current 已经改变（虽然对于 Timeout ID 来说通常不会有问题，但这是最佳实践）
+    const updateContentTimeoutRefCurrent = updateContentTimeoutRef;
+    const wordCountSaveTimeoutRefCurrent = wordCountSaveTimeoutRef;
+    
+    // 自定义 Window 接口以包含 __chapterSaveTimeout
+    interface CustomWindow extends Window {
+      __chapterSaveTimeout?: { current: ReturnType<typeof setTimeout> | null };
+    }
+    const win = window as unknown as CustomWindow;
+
     if (!editor || !selectedChapter || !workId) {
       console.log('⚠️ 自动保存未启动:', {
         hasEditor: !!editor,
@@ -284,16 +294,16 @@ export function useChapterAutoSave({
         clearTimeout(saveTimeoutRef.current);
       }
       // 清除更新内容的防抖定时器
-      if (updateContentTimeoutRef.current) {
-        clearTimeout(updateContentTimeoutRef.current);
+      if (updateContentTimeoutRefCurrent.current) {
+        clearTimeout(updateContentTimeoutRefCurrent.current);
       }
       // 清除字数统计保存定时器
-      if (wordCountSaveTimeoutRef.current) {
-        clearTimeout(wordCountSaveTimeoutRef.current);
+      if (wordCountSaveTimeoutRefCurrent.current) {
+        clearTimeout(wordCountSaveTimeoutRefCurrent.current);
       }
       // 清除全局引用
-      if ((window as any).__chapterSaveTimeout) {
-        (window as any).__chapterSaveTimeout.current = null;
+      if (win.__chapterSaveTimeout) {
+        win.__chapterSaveTimeout.current = null;
       }
       // 停止智能同步
       stopSync();

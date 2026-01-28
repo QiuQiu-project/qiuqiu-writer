@@ -6,14 +6,21 @@ import { useState, useEffect } from 'react';
  * @returns 是否匹配该媒体查询
  */
 export function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(false);
+  // 使用 lazy initial state 来避免 hydration mismatch 问题 (如果使用了 SSR)
+  // 但这是一个纯客户端应用，所以我们可以直接获取初始值
+  const [matches, setMatches] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.matchMedia(query).matches;
+    }
+    return false;
+  });
 
   useEffect(() => {
     const media = window.matchMedia(query);
     
-    // 初始化状态
+    // 确保状态同步 - 使用 setTimeout 避免在 effect 中直接同步设置 state
     if (media.matches !== matches) {
-      setMatches(media.matches);
+      setTimeout(() => setMatches(media.matches), 0);
     }
     
     // 监听变化

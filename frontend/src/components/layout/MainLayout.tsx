@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Search, User, Plus, Menu, X } from 'lucide-react';
+import { User, Plus, Menu, X } from 'lucide-react';
 import LoginModal from '../auth/LoginModal';
 import { authApi, type UserInfo } from '../../utils/authApi';
 import { worksApi } from '../../utils/worksApi';
@@ -32,7 +32,7 @@ export default function MainLayout() {
             setUserInfo(user);
             setIsAuthenticated(true);
             authApi.setUserInfo(user);
-          } catch (error) {
+          } catch {
             authApi.clearToken();
             setIsAuthenticated(false);
             setUserInfo(null);

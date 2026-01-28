@@ -234,8 +234,9 @@ export default function MapView() {
       });
 
       // 边点击事件
-      graph.on('edge:click', (e: any) => {
-        const edgeId = e.item?.getID?.() || e.target?.id || e.item?.id;
+      graph.on('edge:click', (e: unknown) => {
+        const event = e as any;
+        const edgeId = event.item?.getID?.() || event.target?.id || event.item?.id;
         if (edgeId) {
           setEditingConnection(edgeId);
           const connection = connections.find((c) => c.id === edgeId);

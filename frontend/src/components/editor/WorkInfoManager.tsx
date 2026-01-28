@@ -13,70 +13,30 @@ import type { SelectOption } from '../CustomSelect';
 import { templatesApi } from '../../utils/templatesApi';
 import { worksApi } from '../../utils/worksApi';
 import { promptTemplateApi } from '../../utils/promptTemplateApi';
+import type { WorkTemplate } from '../../utils/templatesApi';
 import { generateComponentData } from '../../utils/bookAnalysisApi';
 import './WorkInfoManager.css';
 
-// 递归收集所有组件的 promptId
-const collectPromptIds = (components: ComponentConfig[]): number[] => {
-  const promptIds: number[] = [];
-  
-  for (const comp of components) {
-    if (comp.generatePromptId) promptIds.push(comp.generatePromptId);
-    if (comp.validatePromptId) promptIds.push(comp.validatePromptId);
-    if (comp.analysisPromptId) promptIds.push(comp.analysisPromptId);
-    
-    // 递归处理 tabs 中的组件
-    if (comp.type === 'tabs' && comp.config?.tabs) {
-      for (const tab of comp.config.tabs) {
-        if (tab.components) {
-          promptIds.push(...collectPromptIds(tab.components));
-        }
-      }
-    }
-  }
-  
-  return promptIds;
-};
+// 预览数据项接口
+interface PreviewItem {
+  [key: string]: unknown;
+  name?: string;
+  gender?: string;
+  type?: string;
+  description?: string;
+}
 
-// 递归填充组件的 prompt 内容
-const fillPromptsForComponents = (components: ComponentConfig[], promptMap: Map<number, PromptTemplate>): ComponentConfig[] => {
-  return components.map(comp => {
-    const updatedComp: ComponentConfig = { ...comp };
-    
-    // 填充 prompt 内容
-    if (comp.generatePromptId) {
-      const prompt = promptMap.get(comp.generatePromptId);
-      if (prompt) {
-        updatedComp.generatePrompt = prompt.prompt_content;
-      }
-    }
-    if (comp.validatePromptId) {
-      const prompt = promptMap.get(comp.validatePromptId);
-      if (prompt) {
-        updatedComp.validatePrompt = prompt.prompt_content;
-      }
-    }
-    if (comp.analysisPromptId) {
-      const prompt = promptMap.get(comp.analysisPromptId);
-      if (prompt) {
-        updatedComp.analysisPrompt = prompt.prompt_content;
-      }
-    }
-    
-    // 递归处理 tabs 中的组件
-    if (comp.type === 'tabs' && comp.config?.tabs) {
-      updatedComp.config = {
-        ...comp.config,
-        tabs: comp.config.tabs.map(tab => ({
-          ...tab,
-          components: tab.components ? fillPromptsForComponents(tab.components, promptMap) : []
-        }))
-      };
-    }
-    
-    return updatedComp;
-  });
-};
+// 角色数据接口
+export interface CharacterData {
+  id: string;
+  name: string;
+  gender: string;
+  [key: string]: unknown;
+}
+
+// 生成数据类型
+type GeneratedDataType = string | unknown[] | Record<string, unknown>;
+
 
 // 为模板的所有组件加载 prompt 内容
 // 注意：已移除批量获取 prompt 的请求，直接返回 modules
@@ -146,11 +106,11 @@ export interface ComponentConfig {
   analysisPrompt?: string;   // 用于分析内容的提示词（向后兼容：直接存储内容）
   analysisPromptId?: number; // prompt_templates 表的 id（新方式）
   // 组件数据
-  value: any;
+  value: unknown;
 }
 
 // 模块定义
-interface ModuleConfig {
+export interface ModuleConfig {
   id: string;
   name: string;
   icon: string;
@@ -165,6 +125,123 @@ interface TemplateConfig {
   description: string;
   modules: ModuleConfig[];
 }
+
+interface WorkMetadata {
+  template_config?: {
+    templateId?: string;
+    modules?: ModuleConfig[];
+    lastModified?: number;
+  };
+  component_data?: Record<string, unknown>;
+}
+
+interface WorkData {
+  metadata?: WorkMetadata;
+}
+
+interface TimelineEditForm {
+  characterIds: string[];
+  characters: string[];
+  time: string;
+  event: string;
+  description: string;
+  location: string;
+}
+
+const getModulesFromTemplateConfig = (templateConfig?: unknown): ModuleConfig[] => {
+  if (!templateConfig) return [];
+  if (Array.isArray(templateConfig)) return templateConfig as ModuleConfig[];
+  if (typeof templateConfig === 'object' && templateConfig !== null) {
+    const maybeModules = (templateConfig as { modules?: unknown }).modules;
+    if (Array.isArray(maybeModules)) {
+      return maybeModules as ModuleConfig[];
+    }
+  }
+  return [];
+};
+
+const extractComponentDataFromTemplate = (modules: ModuleConfig[]): Record<string, unknown> => {
+  const data: Record<string, unknown> = {};
+
+  const collectFromComponents = (components: ComponentConfig[]) => {
+    for (const comp of components) {
+      if (comp.type === 'tabs' && comp.config?.tabs) {
+        for (const tab of comp.config.tabs) {
+          collectFromComponents(tab.components || []);
+        }
+        continue;
+      }
+      const storageKey = comp.dataKey || comp.id;
+      if (comp.value !== undefined) {
+        data[storageKey] = comp.value;
+      }
+    }
+  };
+
+  for (const module of modules) {
+    collectFromComponents(module.components || []);
+  }
+
+  return data;
+};
+
+const writeComponentDataToTemplate = (
+  modules: ModuleConfig[],
+  data: Record<string, unknown>
+): ModuleConfig[] => {
+  const applyDataToComponents = (components: ComponentConfig[]): ComponentConfig[] => {
+    return components.map(comp => {
+      if (comp.type === 'tabs' && comp.config?.tabs) {
+        return {
+          ...comp,
+          config: {
+            ...comp.config,
+            tabs: comp.config.tabs.map(tab => ({
+              ...tab,
+              components: applyDataToComponents(tab.components || [])
+            }))
+          }
+        };
+      }
+      const storageKey = comp.dataKey || comp.id;
+      if (Object.prototype.hasOwnProperty.call(data, storageKey)) {
+        return { ...comp, value: data[storageKey] };
+      }
+      return comp;
+    });
+  };
+
+  return modules.map(module => ({
+    ...module,
+    components: applyDataToComponents(module.components || [])
+  }));
+};
+
+const cleanTemplateStructure = (modules: ModuleConfig[]): ModuleConfig[] => {
+  const cleanComponents = (components: ComponentConfig[]): ComponentConfig[] => {
+    return components.map(comp => {
+      if (comp.type === 'tabs' && comp.config?.tabs) {
+        return {
+          ...comp,
+          value: undefined,
+          config: {
+            ...comp.config,
+            tabs: comp.config.tabs.map(tab => ({
+              ...tab,
+              components: cleanComponents(tab.components || [])
+            }))
+          }
+        };
+      }
+      return { ...comp, value: undefined };
+    });
+  };
+
+  return modules.map(module => ({
+    ...module,
+    components: cleanComponents(module.components || [])
+  }));
+};
 
 // ============ 缓存管理 ============
 
@@ -401,7 +478,7 @@ const componentRegistry: ComponentDefinition[] = [
 // 如果需要回退模板，可以从数据库加载系统模板（is_system=true）
 
 // 从数据库加载默认模板的辅助函数
-const loadDefaultTemplate = async (userTemplates?: any[]): Promise<TemplateConfig | null> => {
+const loadDefaultTemplate = async (userTemplates?: WorkTemplate[]): Promise<TemplateConfig | null> => {
   try {
     // 先尝试从 userTemplates 中查找（如果已提供）
     let templates = userTemplates || [];
@@ -737,7 +814,7 @@ function DataDependenciesSelector({ value, onChange, template, currentComponentI
 
 interface WorkInfoManagerProps {
   workId?: string | null;
-  workData?: any; // 可选的 workData，如果提供则避免重复请求
+  workData?: WorkData; // 可选的 workData，如果提供则避免重复请求
 }
 
 // 时间线角色选择器组件
@@ -896,7 +973,8 @@ function TimelineCharacterSelector({
   );
 }
 
-export default function WorkInfoManager({ workId, workData }: WorkInfoManagerProps = {}) {
+export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
+  const { workId, workData } = props;
   // 初始化时尝试从缓存加载（基于 workId）
   const [template, setTemplate] = useState<TemplateConfig>(() => {
     // 初始状态：使用空模板，等待从数据库加载
@@ -920,7 +998,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
     category: '',
     is_public: false
   });
-  const [userTemplates, setUserTemplates] = useState<any[]>([]);
+  const [userTemplates, setUserTemplates] = useState<WorkTemplate[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [showAddModule, setShowAddModule] = useState(false);
   const [showAddComponent, setShowAddComponent] = useState(false);
@@ -928,12 +1006,12 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
   // 跟踪每个时间线组件中正在编辑的事件ID：key 是组件ID，value 是正在编辑的事件ID
   const [editingTimelineEvents, setEditingTimelineEvents] = useState<{ [componentId: string]: string | null }>({});
   // 跟踪每个时间线事件的编辑表单数据：key 是 "组件ID-事件ID"，value 是编辑表单数据
-  const [timelineEditForms, setTimelineEditForms] = useState<{ [key: string]: any }>({});
+  const [timelineEditForms, setTimelineEditForms] = useState<Record<string, TimelineEditForm>>({});
   const [newModuleForm, setNewModuleForm] = useState({ name: '', icon: 'LayoutGrid', color: '#64748b' });
   const [newComponentForm, setNewComponentForm] = useState<{
     type: ComponentType;
     label: string;
-    config: any;
+    config: Record<string, unknown>;
     generatePrompt: string;
     validatePrompt: string;
     analysisPrompt: string;
@@ -1003,16 +1081,16 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
     comp: ComponentConfig | null;
     moduleId: string;
     tabId?: string;
-    generatedData: any;
-    existingData: any;
+    generatedData: GeneratedDataType;
+    existingData: GeneratedDataType;
     editingIndex: number | null; // 正在编辑的角色索引
     isGeneratingMore: boolean; // 是否正在继续生成
   }>({
     isOpen: false,
     comp: null,
     moduleId: '',
-    generatedData: null,
-    existingData: null,
+    generatedData: [],
+    existingData: [],
     editingIndex: null,
     isGeneratingMore: false
   });
@@ -1240,12 +1318,14 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
           }
           
           // 使用 component_data 中的组件数据
-          const dataToWrite = { ...componentData };
+          const dataToWrite: Record<string, unknown> = { ...componentData };
+          const charactersValue = dataToWrite['characters'];
+          const charactersCount = Array.isArray(charactersValue) ? charactersValue.length : 0;
           
           console.log('📥 准备写入的组件数据:', {
             componentDataKeys: Object.keys(componentData),
             dataToWriteKeys: Object.keys(dataToWrite),
-            charactersCount: (dataToWrite['characters'] || []).length,
+            charactersCount,
             componentDataSample: Object.keys(componentData).slice(0, 3).reduce((acc, key) => {
               acc[key] = Array.isArray(componentData[key]) 
                 ? `数组(${componentData[key].length}项)` 
@@ -1253,7 +1333,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
                   ? `对象(${Object.keys(componentData[key] || {}).length}键)` 
                   : componentData[key];
               return acc;
-            }, {} as any)
+            }, {} as Record<string, unknown>)
           });
           
           // 将简化格式的组件数据写入模板格式
@@ -1272,7 +1352,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
           }
           
           // 确保 modules 中的 prompt 内容已加载（如果 baseTemplate 已经加载过，这里不会重复加载）
-          const modulesWithPrompts = await loadPromptsForComponents(modules);
+          await loadPromptsForComponents(modules);
           
           // 不再使用预设模板补充，所有配置都应该在数据库中
           // 如果数据库模板缺少配置，需要重新运行初始化脚本或更新数据库
@@ -1510,320 +1590,11 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
     };
 
     loadTemplate();
-  }, [workId, workData]);
+  }, [workId, workData, extractComponentDataFromTemplate, userTemplates, writeComponentDataToTemplate]);
 
-  // 从模板格式中提取所有组件数据（简化格式，按 dataKey 组织）
-  const extractComponentDataFromTemplate = useCallback((modules: ModuleConfig[]): { [dataKey: string]: any } => {
-    const componentData: { [dataKey: string]: any } = {};
-    
-    // 递归提取组件数据
-    const extractFromComponents = (components: ComponentConfig[]) => {
-      for (const comp of components) {
-        // 确定存储键：优先使用 dataKey，如果没有则使用组件 ID（但会记录警告）
-        const storageKey = comp.dataKey || comp.id;
-        
-        // 如果没有 dataKey，记录警告（但继续保存，使用 ID 作为 key）
-        if (!comp.dataKey && comp.type !== 'tabs') {
-          console.warn(`⚠️ 组件 "${comp.label || comp.id}" (${comp.id}) 没有设置 dataKey，将使用组件 ID 作为存储键。建议为组件添加 dataKey 以确保数据正确保存。`);
-        }
-        
-        // 提取组件数据（有 dataKey 或使用 ID 作为 key）
-        if (comp.dataKey || (comp.type !== 'tabs' && comp.value !== undefined)) {
-          // 根据组件类型提取数据
-          if (comp.type === 'character-card' && Array.isArray(comp.value)) {
-            componentData[storageKey] = comp.value;
-          } else if (comp.type === 'relation-graph' && typeof comp.value === 'object') {
-            // 关系图组件：直接保存 relations 数组，不保存为对象格式
-            const relationValue = comp.value as { characters?: any[]; relations?: any[] } || {};
-            
-            // 直接保存 relations 数组到 character_relations
-            componentData[storageKey] = Array.isArray(relationValue.relations) ? relationValue.relations : [];
-            
-            console.log(`💾 提取关系图谱数据 "${storageKey}": ${componentData[storageKey].length} 个关系（直接存储为数组）`);
-          } else if (comp.type === 'timeline') {
-            // 时间线组件：如果是新格式（包含 events），只提取 events；否则提取整个 value
-            if (comp.value && typeof comp.value === 'object' && 'events' in comp.value) {
-              componentData[storageKey] = comp.value.events;
-            } else if (Array.isArray(comp.value)) {
-              componentData[storageKey] = comp.value;
-            } else {
-              // 即使 value 为空，也保存 dataKey（值为空数组）
-              componentData[storageKey] = [];
-            }
-          } else {
-            // 其他类型：即使 value 为空，也保存 dataKey
-            if (comp.value !== undefined && comp.value !== null && comp.value !== '') {
-              componentData[storageKey] = comp.value;
-            } else {
-              // 根据组件类型设置默认值
-              if (comp.type === 'multiselect' || comp.type === 'list' || comp.type === 'keyvalue' || comp.type === 'table' || comp.type === 'card-list') {
-                componentData[storageKey] = [];
-              } else if (comp.type === 'text' || comp.type === 'textarea') {
-                componentData[storageKey] = '';
-              } else {
-                componentData[storageKey] = comp.value; // 保存原始值（可能是 null 或 undefined）
-              }
-            }
-          }
-        }
-        
-        // 递归处理 tabs 中的组件
-        if (comp.type === 'tabs' && comp.config?.tabs) {
-          for (const tab of comp.config.tabs) {
-            if (tab.components) {
-              extractFromComponents(tab.components);
-            }
-          }
-        }
-      }
-    };
-    
-    // 遍历所有模块
-    for (const module of modules) {
-      extractFromComponents(module.components);
-    }
-    
-    return componentData;
-  }, []);
 
-  // 将简化格式的组件数据写入模板格式（按 dataKey 匹配，并注入依赖数据）
-  // 清理模板结构，移除所有组件的 value，只保留结构（包括 dataKey 和 dataDependencies）
-  const cleanTemplateStructure = useCallback((modules: ModuleConfig[]): ModuleConfig[] => {
-    const cleanComponents = (components: ComponentConfig[]): ComponentConfig[] => {
-      return components.map(comp => {
-        if (comp.type === 'tabs' && comp.config?.tabs) {
-          return {
-            ...comp,
-            config: {
-              ...comp.config,
-              tabs: comp.config.tabs.map(tab => ({
-                ...tab,
-                components: tab.components ? cleanComponents(tab.components) : []
-              }))
-            },
-            value: undefined, // 清理 value
-            // 清理 prompt 内容，只保留 id（数据库中只存储 id）
-            generatePrompt: undefined,
-            validatePrompt: undefined,
-            analysisPrompt: undefined,
-          };
-        } else {
-          // 保留所有结构信息（id, type, label, config, dataKey, dataDependencies 等），但清理 value 和 prompt 内容
-          return {
-            ...comp,
-            value: undefined, // 清理 value，只保留结构
-            // 清理 prompt 内容，只保留 id（数据库中只存储 id）
-            generatePrompt: undefined,
-            validatePrompt: undefined,
-            analysisPrompt: undefined,
-          };
-        }
-      });
-    };
-    
-    return modules.map(module => ({
-      ...module,
-      components: cleanComponents(module.components)
-    }));
-  }, []);
 
-  const writeComponentDataToTemplate = useCallback((modules: ModuleConfig[], componentData: { [dataKey: string]: any }): ModuleConfig[] => {
-    if (!componentData || Object.keys(componentData).length === 0) return modules;
-    
-    // 递归写入组件数据
-    const writeToComponents = (components: ComponentConfig[]): ComponentConfig[] => {
-      return components.map(comp => {
-        if (comp.type === 'tabs' && comp.config?.tabs) {
-          return {
-            ...comp,  // 保留所有属性，包括 dataKey 和 dataDependencies（虽然 tabs 组件通常不需要）
-            config: {
-              ...comp.config,
-              tabs: comp.config.tabs.map(tab => {
-                if (tab.components) {
-                  return {
-                    ...tab,
-                    components: writeToComponents(tab.components)
-                  };
-                }
-                return tab;
-              })
-            }
-          };
-        } else {
-          // 如果组件有 dataKey，从 componentData 中获取数据
-          // 如果没有 dataKey，尝试使用组件 ID 作为 key（向后兼容）
-          const storageKey = comp.dataKey || comp.id;
-          let value = comp.value;
-          
-          // 调试日志：检查数据匹配
-          if (comp.dataKey) {
-            if (componentData[comp.dataKey] === undefined) {
-              console.warn(`⚠️ 组件 "${comp.label || comp.id}" 的 dataKey "${comp.dataKey}" 在 componentData 中不存在`);
-              console.log(`   可用的 componentData keys:`, Object.keys(componentData));
-            } else {
-              console.log(`✅ 找到数据 - 组件 "${comp.label || comp.id}" (dataKey: ${comp.dataKey})`);
-            }
-          }
-          
-          if (componentData[storageKey] !== undefined) {
-            console.log(`📝 写入数据到组件 "${comp.label || comp.id}" (storageKey: ${storageKey}, type: ${comp.type}):`, 
-              Array.isArray(componentData[storageKey]) 
-                ? `数组(${componentData[storageKey].length}项)` 
-                : typeof componentData[storageKey] === 'object' 
-                  ? `对象(${Object.keys(componentData[storageKey] || {}).length}键)` 
-                  : componentData[storageKey]
-            );
-            // 根据组件类型合并数据
-            if (comp.type === 'character-card' && Array.isArray(componentData[storageKey])) {
-              // 角色卡片：合并数组
-              const existing = comp.value && Array.isArray(comp.value) ? comp.value : [];
-              const newData = componentData[storageKey];
-              const charMap: { [key: string]: any } = {};
-              
-              existing.forEach((char: any) => {
-                const key = char.name || char.id;
-                if (key) charMap[key] = char;
-              });
-              
-              newData.forEach((char: any) => {
-                const key = char.name || char.id;
-                if (key) {
-                  if (charMap[key]) {
-                    charMap[key] = { ...charMap[key], ...char };
-                  } else {
-                    charMap[key] = char;
-                  }
-                }
-              });
-              
-              value = Object.values(charMap);
-            } else if (comp.type === 'relation-graph' && typeof componentData[storageKey] === 'object') {
-              // 关系图：合并对象，确保正确处理 characters 和 relations 两个字段
-              const existing = comp.value && typeof comp.value === 'object' ? comp.value : { characters: [], relations: [] };
-              const newData = componentData[storageKey];
-              
-              // 新格式：直接存储为 relations 数组
-              // 兼容旧格式：如果是对象格式，提取 relations 字段
-              let relationsArray: any[] = [];
-              
-              if (Array.isArray(newData)) {
-                // 新格式：直接是数组
-                relationsArray = newData;
-              } else if (newData && typeof newData === 'object' && Array.isArray(newData.relations)) {
-                // 旧格式：对象中包含 relations 字段
-                relationsArray = newData.relations;
-              } else if (Array.isArray(existing)) {
-                // 如果 existing 是数组（新格式），使用它
-                relationsArray = existing;
-              } else if (existing && typeof existing === 'object' && Array.isArray(existing.relations)) {
-                // 如果 existing 是对象（旧格式），提取 relations
-                relationsArray = existing.relations;
-              }
-              
-              // 转换为组件需要的格式：包含 characters 和 relations
-              value = {
-                characters: [], // 角色来自依赖的角色列表，不保存
-                relations: relationsArray
-              };
-              
-              console.log(`📥 恢复关系图谱数据 "${storageKey}": 0 个角色（来自角色列表）, ${relationsArray.length} 个关系`);
-            } else {
-              // 其他类型：直接使用新数据
-              value = componentData[storageKey];
-            }
-          }
-          
-          // 注入依赖数据（如果组件有 dataDependencies）
-          if (comp.dataDependencies && comp.dataDependencies.length > 0) {
-            const dependencies: { [key: string]: any } = {};
-            comp.dataDependencies.forEach(depKey => {
-              if (componentData[depKey] !== undefined) {
-                dependencies[depKey] = componentData[depKey];
-              }
-            });
-            
-            // 将依赖数据注入到组件的 value 中（根据组件类型决定注入方式）
-            if (comp.type === 'timeline' && Array.isArray(value)) {
-              // 时间线组件：将依赖的角色数据作为元数据注入，供组件使用
-              value = {
-                events: value,
-                _dependencies: dependencies // 将依赖数据作为元数据注入
-              };
-            } else if (comp.type === 'relation-graph' && typeof value === 'object') {
-              // 关系图组件：提取 relations 数组，直接存储到 character_relations
-              const currentValue = value && typeof value === 'object' ? value : { characters: [], relations: [] };
-              const relationsArray = Array.isArray(currentValue.relations) ? currentValue.relations : [];
-              
-              // 直接存储 relations 数组，不存储为对象格式
-              componentData[storageKey] = relationsArray;
-              
-              // value 保持对象格式供组件使用
-              value = {
-                characters: [], // 角色来自依赖的角色列表，不保存
-                relations: relationsArray
-              };
-              
-              console.log(`💾 写入关系图谱数据到模板 "${storageKey}": ${relationsArray.length} 个关系（直接存储为数组）`);
-            }
-          }
-          
-          // 重要：使用展开运算符保留所有原始属性（包括 dataKey 和 dataDependencies），只更新 value
-          return { 
-            ...comp,  // 保留所有原始属性：id, type, label, config, dataKey, dataDependencies, generatePrompt, validatePrompt 等
-            value     // 只更新 value
-          };
-        }
-      });
-    };
-    
-    // 遍历所有模块并写入数据
-    return modules.map(module => ({
-      ...module,
-      components: writeToComponents(module.components)
-    }));
-  }, []);
 
-  // 从模板中提取角色信息（用于保存到 characters 字段）
-  const extractCharactersFromTemplate = useCallback((template: TemplateConfig): any[] => {
-    const characters: any[] = [];
-    
-    // 查找角色模块
-    const characterModule = template.modules.find(m => m.id === 'characters');
-    if (!characterModule) return characters;
-
-    // 查找角色卡片组件
-    const findCharacterCards = (components: ComponentConfig[]): any[] => {
-      const chars: any[] = [];
-      for (const comp of components) {
-        if (comp.type === 'character-card' && comp.value && Array.isArray(comp.value)) {
-          chars.push(...comp.value);
-        } else if (comp.type === 'tabs') {
-          // tabs 组件的结构：config.tabs 包含标签页配置，每个 tab 的 components 包含实际组件
-          if (comp.config && comp.config.tabs && Array.isArray(comp.config.tabs)) {
-            for (const tab of comp.config.tabs) {
-              if (tab.components && Array.isArray(tab.components)) {
-                chars.push(...findCharacterCards(tab.components));
-              }
-            }
-          }
-          // 也检查 value 中是否有 tabs（向后兼容）
-          if (comp.value && typeof comp.value === 'object' && 'tabs' in comp.value) {
-            const tabsValue = comp.value as any;
-            if (tabsValue.tabs && Array.isArray(tabsValue.tabs)) {
-              for (const tab of tabsValue.tabs) {
-                if (tab.components && Array.isArray(tab.components)) {
-                  chars.push(...findCharacterCards(tab.components));
-                }
-              }
-            }
-          }
-        }
-      }
-      return chars;
-    };
-
-    return findCharacterCards(characterModule.components);
-  }, []);
 
   // 保存作品信息到 metadata（包括模板配置和所有组件数据）
   const saveWorkInfoToMetadata = useCallback(async (template: TemplateConfig, originalSnapshot: string | null) => {
@@ -1837,7 +1608,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
       console.log('📥 从模板中提取到组件数据:', Object.keys(componentDataFromTemplate).length, '个组件');
       
       // 使用模板中的组件数据（不再合并数据库数据，直接保存当前模板中的数据）
-      const mergedComponentData: { [componentId: string]: any } = { ...componentDataFromTemplate };
+      const mergedComponentData: Record<string, unknown> = { ...componentDataFromTemplate };
       
       console.log('✅ 共有', Object.keys(mergedComponentData).length, '个组件的数据');
       
@@ -1875,7 +1646,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
       // 这样可以避免重复保存模板结构
       
       // 构建要更新的 metadata
-      const metadataUpdate: any = {
+      const metadataUpdate: Record<string, unknown> = {
         // 保存模板配置（包括 templateId 和完整的 modules 结构，确保 dataKey 和 dataDependencies 被保存）
         template_config: {
           templateId: template.id, // 指向 work_template 的 ID（如 db-1 表示 work_template 表中 id=1）
@@ -1895,17 +1666,18 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
         console.log('🔍 比较数据变化:');
         console.log('   原始快照长度:', originalSnapshot.length);
         console.log('   当前数据长度:', currentDataStr.length);
-        console.log('   原始 component_data keys:', JSON.parse(originalSnapshot).component_data ? Object.keys(JSON.parse(originalSnapshot).component_data) : []);
-        console.log('   当前 component_data keys:', Object.keys(mergedComponentData));
         
-        if (currentDataStr === originalSnapshot) {
-          console.log('ℹ️ 作品数据未修改，跳过保存');
-          return false; // 没有修改，不需要保存
-        } else {
-          console.log('✅ 检测到数据变化，需要保存');
-          // 显示变化的详细信息
-          try {
-            const originalData = JSON.parse(originalSnapshot);
+        try {
+          const originalData = JSON.parse(originalSnapshot) as { component_data?: Record<string, unknown> };
+          console.log('   原始 component_data keys:', originalData.component_data ? Object.keys(originalData.component_data) : []);
+          console.log('   当前 component_data keys:', Object.keys(mergedComponentData));
+          
+          if (currentDataStr === originalSnapshot) {
+            console.log('ℹ️ 作品数据未修改，跳过保存');
+            return false; // 没有修改，不需要保存
+          } else {
+            console.log('✅ 检测到数据变化，需要保存');
+            // 显示变化的详细信息
             const originalKeys = Object.keys(originalData.component_data || {});
             const currentKeys = Object.keys(mergedComponentData);
             const addedKeys = currentKeys.filter(k => !originalKeys.includes(k));
@@ -1914,7 +1686,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
             if (removedKeys.length > 0) console.log('   删除的键:', removedKeys);
             // 比较每个键的值
             currentKeys.forEach(key => {
-              if (originalKeys.includes(key)) {
+              if (originalKeys.includes(key) && originalData.component_data) {
                 const originalValue = JSON.stringify(originalData.component_data[key]);
                 const currentValue = JSON.stringify(mergedComponentData[key]);
                 if (originalValue !== currentValue) {
@@ -1922,9 +1694,10 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
                 }
               }
             });
-          } catch (e) {
-            console.warn('比较数据时出错:', e);
           }
+        } catch (e) {
+          console.warn('比较数据时出错:', e);
+          // 如果解析出错，假设数据已变化
         }
       }
 
@@ -2119,7 +1892,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
       console.error('❌ 保存模板结构失败:', error);
       throw error;
     }
-  }, [template, cleanTemplateStructure, saveComponentPrompts, workId]);
+  }, [template, cleanTemplateStructure, saveComponentPrompts]);
 
   // 不再自动保存，改为手动保存
   // 当模板变化时，只标记为未保存状态
@@ -2135,7 +1908,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
 
 
   // 更新组件值
-  const updateComponentValue = (moduleId: string, componentId: string, value: any, parentTabId?: string) => {
+  const updateComponentValue = (moduleId: string, componentId: string, value: unknown, parentTabId?: string) => {
     setTemplate(prev => {
       const updated = {
         ...prev,
@@ -2148,8 +1921,8 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
         })
       };
       // 如果是关系图谱组件，添加调试信息
-      if (value && typeof value === 'object' && Array.isArray(value.relations)) {
-        console.log(`✅ updateComponentValue: 更新关系图谱组件 ${componentId}，${value.relations.length} 个关系`, value);
+      if (value && typeof value === 'object' && Array.isArray((value as { relations?: unknown[] }).relations)) {
+        console.log(`✅ updateComponentValue: 更新关系图谱组件 ${componentId}，${(value as { relations: unknown[] }).relations.length} 个关系`, value);
       }
       
       // 不再自动保存，只标记为未保存状态
@@ -2159,7 +1932,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
     });
   };
 
-  const updateComponentInList = (components: ComponentConfig[], targetId: string, value: any, parentTabId?: string): ComponentConfig[] => {
+  const updateComponentInList = (components: ComponentConfig[], targetId: string, value: unknown, parentTabId?: string): ComponentConfig[] => {
     return components.map(comp => {
       if (comp.id === targetId) {
         return { ...comp, value };
@@ -2211,7 +1984,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
       );
 
       // 解析生成的数据
-      let newGeneratedValue: any = result.generated_data;
+      let newGeneratedValue: GeneratedDataType = result.generated_data as GeneratedDataType;
       
       // 根据组件类型处理生成的数据
       if (comp.type === 'text' || comp.type === 'textarea') {
@@ -2219,35 +1992,36 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
         const existingText = typeof generatePreviewModal.generatedData === 'string' 
           ? generatePreviewModal.generatedData 
           : '';
-        newGeneratedValue = existingText + '\n\n' + newGeneratedValue.trim();
+        newGeneratedValue = existingText + '\n\n' + (newGeneratedValue as string).trim();
       } else if (comp.type === 'list') {
         // 列表类型：尝试解析为数组，如果失败则按行分割
         try {
-          const parsed = JSON.parse(newGeneratedValue);
+          const parsed = JSON.parse(String(newGeneratedValue || ''));
           if (Array.isArray(parsed)) {
             newGeneratedValue = parsed;
           } else {
-            newGeneratedValue = newGeneratedValue.split('\n').filter((line: string) => line.trim());
+            newGeneratedValue = (newGeneratedValue as string).split('\n').filter((line: string) => line.trim());
           }
         } catch {
-          newGeneratedValue = newGeneratedValue.split('\n').filter((line: string) => line.trim());
+          newGeneratedValue = (newGeneratedValue as string).split('\n').filter((line: string) => line.trim());
         }
         // 追加到现有生成数据
         const existingList = Array.isArray(generatePreviewModal.generatedData) 
           ? generatePreviewModal.generatedData 
           : [];
-        newGeneratedValue = [...existingList, ...newGeneratedValue];
+        const appended = Array.isArray(newGeneratedValue) ? newGeneratedValue : [];
+        newGeneratedValue = [...existingList, ...appended];
       } else if (comp.type === 'character-card') {
         // 角色卡片类型：尝试解析为对象数组
         try {
-          const parsed = JSON.parse(newGeneratedValue);
+          const parsed = JSON.parse(newGeneratedValue as string);
           if (Array.isArray(parsed)) {
             newGeneratedValue = parsed;
           } else {
             newGeneratedValue = [parsed];
           }
         } catch {
-          alert('生成的数据格式不正确，无法解析为角色列表。生成的内容：\n' + newGeneratedValue.substring(0, 200));
+          alert('生成的数据格式不正确，无法解析为角色列表。生成的内容：\n' + (newGeneratedValue as string).substring(0, 200));
           setGeneratePreviewModal(prev => ({ ...prev, isGeneratingMore: false }));
           return;
         }
@@ -2255,26 +2029,28 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
         const existingChars = Array.isArray(generatePreviewModal.generatedData) 
           ? generatePreviewModal.generatedData 
           : [];
-        newGeneratedValue = [...existingChars, ...newGeneratedValue];
+        const appended = Array.isArray(newGeneratedValue) ? newGeneratedValue : [];
+        newGeneratedValue = [...existingChars, ...appended];
       } else if (comp.type === 'rank-system') {
         // 等级体系类型：尝试解析为对象数组
         try {
-          const parsed = JSON.parse(newGeneratedValue);
+          const parsed = JSON.parse(newGeneratedValue as string);
           if (Array.isArray(parsed)) {
             newGeneratedValue = parsed;
           } else {
             newGeneratedValue = [parsed];
           }
         } catch {
-          alert('生成的数据格式不正确，无法解析为等级体系。生成的内容：\n' + newGeneratedValue.substring(0, 200));
+          alert('生成的数据格式不正确，无法解析为等级体系。生成的内容：\n' + String(newGeneratedValue || '').substring(0, 200));
           setGeneratePreviewModal(prev => ({ ...prev, isGeneratingMore: false }));
           return;
         }
         // 追加到现有生成数据
-        const existingRanks = Array.isArray(generatePreviewModal.generatedData) 
+        const existingRanks: unknown[] = Array.isArray(generatePreviewModal.generatedData) 
           ? generatePreviewModal.generatedData 
           : [];
-        newGeneratedValue = [...existingRanks, ...newGeneratedValue];
+        const appended = Array.isArray(newGeneratedValue) ? newGeneratedValue : [];
+        newGeneratedValue = [...existingRanks, ...appended];
       }
 
       // 更新生成数据，保持弹窗打开
@@ -2335,30 +2111,30 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
       );
 
       // 解析生成的数据
-      let generatedValue: any = result.generated_data;
+      let generatedValue: GeneratedDataType = result.generated_data as GeneratedDataType;
       
       // 根据组件类型处理生成的数据
       if (comp.type === 'text' || comp.type === 'textarea') {
         // 文本类型直接使用生成的字符串
-        generatedValue = generatedValue.trim();
+        generatedValue = typeof generatedValue === 'string' ? generatedValue.trim() : String(generatedValue || '').trim();
       } else if (comp.type === 'list') {
         // 列表类型：尝试解析为数组，如果失败则按行分割
         try {
-          const parsed = JSON.parse(generatedValue);
+          const parsed = JSON.parse(String(generatedValue || ''));
           if (Array.isArray(parsed)) {
             generatedValue = parsed;
           } else {
             // 如果不是数组，尝试按行分割
-            generatedValue = generatedValue.split('\n').filter((line: string) => line.trim());
+            generatedValue = (generatedValue as string).split('\n').filter((line: string) => line.trim());
           }
         } catch {
           // 解析失败，按行分割
-          generatedValue = generatedValue.split('\n').filter((line: string) => line.trim());
+          generatedValue = String(generatedValue || '').split('\n').filter((line: string) => line.trim());
         }
       } else if (comp.type === 'character-card') {
         // 角色卡片类型：尝试解析为对象数组
         try {
-          const parsed = JSON.parse(generatedValue);
+          const parsed = JSON.parse(String(generatedValue || ''));
           if (Array.isArray(parsed)) {
             generatedValue = parsed;
           } else {
@@ -2367,26 +2143,28 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
           }
         } catch {
           // 解析失败，提示用户
-          alert('生成的数据格式不正确，无法解析为角色列表。生成的内容：\n' + generatedValue.substring(0, 200));
+          alert('生成的数据格式不正确，无法解析为角色列表。生成的内容：\n' + String(generatedValue || '').substring(0, 200));
           return;
         }
       } else if (comp.type === 'rank-system') {
         // 等级体系类型：尝试解析为对象数组
         try {
-          const parsed = JSON.parse(generatedValue);
+          const parsed = JSON.parse(String(generatedValue || ''));
           if (Array.isArray(parsed)) {
             generatedValue = parsed;
           } else {
             generatedValue = [parsed];
           }
         } catch {
-          alert('生成的数据格式不正确，无法解析为等级体系。生成的内容：\n' + generatedValue.substring(0, 200));
+          alert('生成的数据格式不正确，无法解析为等级体系。生成的内容：\n' + String(generatedValue || '').substring(0, 200));
           return;
         }
       }
 
       // 获取现有数据
-      const existingValue = comp.value || (comp.type === 'list' || comp.type === 'character-card' || comp.type === 'rank-system' ? [] : '');
+      const existingValue: GeneratedDataType = comp.type === 'list' || comp.type === 'character-card' || comp.type === 'rank-system'
+        ? (Array.isArray(comp.value) ? comp.value : [])
+        : (typeof comp.value === 'string' ? comp.value : '');
 
       // 显示预览弹窗，让用户确认后再更新
       setGeneratePreviewModal({
@@ -2452,14 +2230,15 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
             return;
           }
           const templateConfig = workData.metadata?.template_config;
+          const templateId = typeof templateConfig === 'object' && templateConfig !== null && !Array.isArray(templateConfig)
+            ? (templateConfig as { templateId?: string }).templateId
+            : undefined;
+          const modulesFromMetadata = getModulesFromTemplateConfig(templateConfig);
           
-          if (templateConfig && 
-              templateConfig.templateId && 
-              templateConfig.modules &&
-              Array.isArray(templateConfig.modules)) {
+          if (templateId && modulesFromMetadata.length > 0) {
             // 检查是否是数据库模板
-            if (templateConfig.templateId.startsWith('db-')) {
-              const dbTemplateId = parseInt(templateConfig.templateId.replace('db-', ''));
+            if (templateId.startsWith('db-')) {
+              const dbTemplateId = parseInt(templateId.replace('db-', ''));
               const dbTemplate = userTemplates.find(t => t.id === dbTemplateId);
               if (dbTemplate) {
                 
@@ -2467,7 +2246,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
                   id: `db-${dbTemplate.id}`,
                   name: dbTemplate.name,
                   description: dbTemplate.description || '',
-                  modules: templateConfig.modules
+                  modules: modulesFromMetadata
                 });
               }
             }
@@ -2478,84 +2257,12 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
       };
       reloadTemplate();
     }
-  }, [workId, workData, userTemplates.length]);
+  }, [workId, workData, userTemplates, userTemplates.length]);
 
-  // 应用模板
-  const applyTemplate = async (t: TemplateConfig) => {
-    
-    
-    // 如果有 workId，先保存当前编辑的内容
-    if (workId && template && template.modules) {
-      try {
-        // 直接保存到作品的 metadata 字段（切换模板前保存，不比较）
-        await saveWorkInfoToMetadata(template, null);
-        
-      } catch (error) {
-        console.error('切换模板前保存失败:', error);
-        // 即使保存失败，也继续切换模板
-      }
-    }
-    
-    const newTemplate = JSON.parse(JSON.stringify(t));
-    
-    
-    // 确保 modules 是数组
-    if (!Array.isArray(newTemplate.modules)) {
-      console.warn('模板 modules 不是数组，设置为空数组');
-      newTemplate.modules = [];
-    }
-    
-    // 如果有 workId，尝试加载该作品保存的模板配置
-    if (workId && workData) {
-      try {
-        // 从作品的 metadata 字段加载模板配置
-        // 必须提供 workData prop，不再调用 API
-        const templateConfig = workData.metadata?.template_config;
-        
-          // 只有当模板ID匹配时，才加载保存的内容
-          if (templateConfig && templateConfig.templateId === newTemplate.id) {
-            const componentData = workData.metadata?.component_data || {};
-            
-            // 从 work_template 获取结构（modules 应该只包含结构，不包含数据）
-            // 如果 newTemplate.id 是 db-1 格式，从 work_template 表获取
-            let modules = newTemplate.modules; // 从 work_template 获取结构
-            
-            // 向后兼容：如果 template_config 中有 modules，使用它（但应该从 work_template 获取）
-            if (templateConfig.modules && Array.isArray(templateConfig.modules) && templateConfig.modules.length > 0) {
-              // 向后兼容：使用保存的 modules（但未来应该从 work_template 获取）
-              modules = templateConfig.modules;
-            }
-            
-            // 使用 component_data 中的组件数据
-            const dataToWrite = { ...componentData };
-          
-          // 从 work_template 获取结构（modules 应该只包含结构，不包含数据）
-          // 从 work 的 component_data 获取数据，然后合并到结构中
-          if (Object.keys(dataToWrite).length > 0) {
-            modules = writeComponentDataToTemplate(modules, dataToWrite);
-            console.log('✅ 从 work 的 component_data 将', Object.keys(dataToWrite).length, '个组件的数据写入模板结构');
-          }
-          
-          newTemplate.modules = modules;
-        } else {
-          // 模板ID不匹配，使用新模板的默认内容
-          console.log('🔄 切换到新模板，使用模板默认内容');
-        }
-      } catch (error) {
-        console.error('加载保存的模板内容失败:', error);
-        // 加载失败，使用模板默认内容
-      }
-    }
-    
-    setTemplate(newTemplate);
-    setActiveModuleIndex(0);
-    setShowTemplateSelector(false);
-    
-    
-  };
+  // 应用模板 - 已移除未使用函数
 
   // 应用数据库模板
-  const applyDatabaseTemplate = async (dbTemplate: any) => {
+  const applyDatabaseTemplate = async (dbTemplate: { id: number; name: string; description?: string; template_config?: unknown }) => {
     try {
       
       
@@ -2570,20 +2277,8 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
       }
       
       // 从数据库模板的 template_config 中提取配置
-      const templateConfig = dbTemplate.template_config || {};
-      
-      
-      // 确保 modules 存在且是数组
-      let modules = [];
-      if (templateConfig.modules && Array.isArray(templateConfig.modules)) {
-        modules = templateConfig.modules;
-      } else if (Array.isArray(templateConfig)) {
-        // 如果 template_config 本身就是 modules 数组
-        modules = templateConfig;
-      } else {
-        console.warn('模板配置中没有找到有效的 modules，使用空数组');
-        modules = [];
-      }
+      const templateConfig = dbTemplate.template_config;
+      const modules = getModulesFromTemplateConfig(templateConfig);
       
       
       
@@ -2806,7 +2501,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
     const compDef = componentRegistry.find(c => c.type === newComponentForm.type);
     
     // 构建配置
-    let finalConfig = { ...compDef?.defaultConfig, ...newComponentForm.config };
+    const finalConfig = { ...compDef?.defaultConfig, ...newComponentForm.config };
     
     // 如果是 tabs 类型，转换 tabsConfig 为实际的 tabs 配置
     if (newComponentForm.type === 'tabs') {
@@ -2922,12 +2617,15 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
     
     // 如果是 tabs 类型，提取 tabsConfig
     const tabsConfig = comp.type === 'tabs' && comp.config.tabs
-      ? comp.config.tabs.map((t: any) => ({ id: t.id, label: t.label }))
+      ? comp.config.tabs.map((t: { id: string; label: string }) => ({ id: t.id, label: t.label }))
       : [];
     
     // 如果是 card-list 类型，提取 cardFields
-    const cardFields = comp.type === 'card-list' && comp.config.cardFields
-      ? comp.config.cardFields.map((f: any) => ({ key: f.key, label: f.label, type: f.type }))
+    const cardFields: Array<{ key: string; label: string; type: 'text' | 'textarea' | 'image' }> = comp.type === 'card-list' && comp.config.cardFields
+      ? comp.config.cardFields.map((f: { key: string; label: string; type: string }) => {
+          const type: 'text' | 'textarea' | 'image' = f.type === 'text' || f.type === 'textarea' || f.type === 'image' ? f.type : 'text';
+          return { key: f.key, label: f.label, type };
+        })
       : [];
     
     // 按需加载 prompt 内容（如果有 promptId 但没有 prompt 内容）
@@ -3028,7 +2726,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
                 components: m.components.map(c => {
                   // 找到 tabs 组件
                   if (c.id === editingComponentContext.tabsComponentId && c.type === 'tabs') {
-                    const updatedTabs = (c.config.tabs || []).map((tab: any) => {
+                    const updatedTabs = (c.config.tabs || []).map((tab: { id: string; label: string; components: ComponentConfig[] }) => {
                       if (tab.id === editingComponentContext.tabId) {
                         // 更新该 tab 中的组件
                         return {
@@ -3116,13 +2814,13 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
                 components: m.components.map(c => {
                   if (c.id !== editingComponentId) return c;
                   
-                  let newConfig = { ...newComponentForm.config };
+                  const newConfig = { ...newComponentForm.config };
                   
                   // 如果是 tabs 类型，更新 tabs 配置（保留已有的 components）
                   if (newComponentForm.type === 'tabs') {
                     const existingTabs = c.config.tabs || [];
                     newConfig.tabs = newComponentForm.tabsConfig.map(t => {
-                      const existingTab = existingTabs.find((et: any) => et.id === t.id);
+                      const existingTab = existingTabs.find((et: { id: string }) => et.id === t.id);
                       return {
                         id: t.id,
                         label: t.label,
@@ -3210,7 +2908,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
   };
 
   // 获取默认值
-  const getDefaultValue = (type: ComponentType): any => {
+  const getDefaultValue = (type: ComponentType): unknown => {
     switch (type) {
       case 'multiselect':
       case 'list':
@@ -3246,41 +2944,46 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
   // ============ 组件渲染器 ============
   
   const renderComponent = (comp: ComponentConfig, moduleId: string, tabsComponentId?: string, tabId?: string) => {
-    const updateValue = (value: any) => updateComponentValue(moduleId, comp.id, value);
+    const updateValue = (value: unknown) => updateComponentValue(moduleId, comp.id, value);
 
     switch (comp.type) {
-      case 'text':
+      case 'text': {
+        const inputValue = typeof comp.value === 'string' ? comp.value : '';
         return (
           <div className="comp-input-wrapper">
           <input
             type="text"
             className="comp-input"
-            value={comp.value || ''}
+            value={inputValue}
             onChange={(e) => updateValue(e.target.value)}
             placeholder={comp.config.placeholder}
           />
           </div>
         );
+      }
 
-      case 'textarea':
+      case 'textarea': {
+        const textareaValue = typeof comp.value === 'string' ? comp.value : '';
         return (
           <div className="comp-textarea-wrapper">
           <textarea
             className="comp-textarea"
-            value={comp.value || ''}
+            value={textareaValue}
             onChange={(e) => updateValue(e.target.value)}
             placeholder={comp.config.placeholder}
             rows={4}
           />
           </div>
         );
+      }
 
-      case 'image':
+      case 'image': {
+        const imageSrc = typeof comp.value === 'string' ? comp.value : '';
         return (
           <div className="comp-image">
-            {comp.value ? (
+            {imageSrc ? (
               <div className="image-preview">
-                <img src={comp.value} alt={comp.label} />
+                <img src={imageSrc} alt={comp.label} />
                 <div className="image-overlay">
                   <button onClick={() => { setCurrentImageId(comp.id); fileInputRef.current?.click(); }}>更换</button>
                   <button onClick={() => updateValue('')}>删除</button>
@@ -3294,8 +2997,9 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
             )}
           </div>
         );
+      }
 
-      case 'select':
+      case 'select': {
         const selectOptions: SelectOption[] = comp.config.options?.map(opt => ({
           value: opt.value,
           label: opt.label,
@@ -3303,7 +3007,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
         })) || [];
         return (
           <CustomSelect
-            value={comp.value || ''}
+            value={(comp.value as string) || ''}
             onChange={updateValue}
             options={selectOptions}
             placeholder="请选择..."
@@ -3311,8 +3015,9 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
             fullWidth
           />
         );
+      }
 
-      case 'multiselect':
+      case 'multiselect': {
         const selected = (comp.value as string[]) || [];
         const maxCount = comp.config.maxCount || 5;
         return (
@@ -3345,8 +3050,9 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
             )}
           </div>
         );
+      }
 
-      case 'list':
+      case 'list': {
         const listItems = (comp.value as string[]) || [];
         return (
           <div className="comp-list">
@@ -3373,8 +3079,9 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
             </button>
           </div>
         );
+      }
 
-      case 'keyvalue':
+      case 'keyvalue': {
         const kvItems = (comp.value as { key: string; value: string }[]) || [];
         return (
           <div className="comp-keyvalue">
@@ -3413,8 +3120,9 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
             </button>
           </div>
         );
+      }
 
-      case 'table':
+      case 'table': {
         const tableData = (comp.value as Record<string, string>[]) || [];
         const columns = comp.config.columns || [];
         return (
@@ -3462,8 +3170,9 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
             </button>
           </div>
         );
+      }
 
-      case 'tabs':
+      case 'tabs': {
         const tabs = comp.config.tabs || [];
         const handleUpdateTabs = (newTabs: { id: string; label: string; components: ComponentConfig[] }[]) => {
           const updatedConfig = {
@@ -3510,23 +3219,32 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
             isEditMode={isEditMode}
           />
         );
+      }
 
-      case 'relation-graph':
+      case 'relation-graph': {
         // 转换数据格式
         // 兼容新格式（直接是数组）和旧格式（对象包含 relations）
-        let relationData: { characters?: any[]; relations?: any[] } = { characters: [], relations: [] };
+        interface CharacterData {
+          id: string;
+          name: string;
+          gender: string;
+          [key: string]: unknown;
+        }
+
+        let relationData: { characters?: CharacterData[]; relations?: unknown[] } = { characters: [], relations: [] };
         
         if (Array.isArray(comp.value)) {
           // 新格式：直接是 relations 数组
           relationData = {
             characters: [],
-            relations: comp.value
+            relations: comp.value as unknown[]
           };
         } else if (comp.value && typeof comp.value === 'object') {
           // 旧格式：对象包含 characters 和 relations
+          const val = comp.value as { characters?: CharacterData[]; relations?: unknown[] };
           relationData = {
-            characters: Array.isArray(comp.value.characters) ? comp.value.characters : [],
-            relations: Array.isArray(comp.value.relations) ? comp.value.relations : []
+            characters: Array.isArray(val.characters) ? val.characters : [],
+            relations: Array.isArray(val.relations) ? val.relations : []
           };
         }
         
@@ -3537,19 +3255,19 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
           // 所以这里应该忽略 comp.value.characters，只从依赖中获取角色数据
           
           // 从模板中查找依赖的组件数据
-          const findDependencyData = (depKey: string): any[] => {
+          const findDependencyData = (depKey: string): unknown[] => {
             for (const module of template.modules) {
-              const findInComponents = (components: ComponentConfig[], path: string = ''): any[] | null => {
+              const findInComponents = (components: ComponentConfig[], path: string = ''): unknown[] | null => {
                 for (const compItem of components) {
                   // 检查当前组件是否匹配
                   if (compItem.dataKey === depKey) {
                     // 即使 value 是空数组，也应该返回（这样关系图谱至少能显示，只是没有角色）
                     if (compItem.value !== undefined && compItem.value !== null) {
                       if (Array.isArray(compItem.value)) {
-                        return compItem.value; // 即使为空数组也返回
+                        return compItem.value as unknown[]; // 即使为空数组也返回
                       } else if (typeof compItem.value === 'object' && compItem.value !== null) {
                         // 如果是对象，尝试提取数组字段
-                        const obj = compItem.value as any;
+                        const obj = compItem.value as { characters?: unknown[] };
                         if (Array.isArray(obj.characters)) {
                           return obj.characters;
                         }
@@ -3581,30 +3299,31 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
           
           // 重要：如果关系图谱组件有依赖，角色数据应该完全来自依赖
           // 初始值应该为空数组，而不是 relationData.characters（因为保存时被设置为空）
-          let mergedCharacters: any[] = [];
+          let mergedCharacters: CharacterData[] = [];
           
           // 收集所有依赖的角色数据并去重
-          const allDependencyCharacters: any[] = [];
+          const allDependencyCharacters: CharacterData[] = [];
           for (const depKey of comp.dataDependencies) {
             const depData = findDependencyData(depKey);
             if (depData && Array.isArray(depData) && depData.length > 0) {
               // 转换角色数据格式
               // 注意：保持角色ID稳定，如果角色没有ID，使用 name 作为稳定的标识
-              const convertedCharacters = depData.map((char: any, index: number) => {
-                if (char.id && char.name && (char.gender === '男' || char.gender === '女')) {
+              const convertedCharacters = depData.map((char: unknown, index: number) => {
+                const c = char as { id?: string; name?: string; gender?: string; display_name?: string };
+                if (c.id && c.name && (c.gender === '男' || c.gender === '女')) {
                   return {
-                    id: char.id,
-                    name: char.name,
-                    gender: char.gender
-                  };
+                    id: c.id,
+                    name: c.name,
+                    gender: c.gender
+                  } as CharacterData;
                 }
                 // 如果没有ID，使用 name 作为ID（更稳定，不包含时间戳）
-                const stableId = char.id || char.name || `char-${index}`;
+                const stableId = c.id || c.name || `char-${index}`;
                 return {
                   id: stableId,
-                  name: char.name || char.display_name || '',
-                  gender: (char.gender === '男' || char.gender === '女') ? char.gender : '男'
-                };
+                  name: c.name || c.display_name || '',
+                  gender: (c.gender === '男' || c.gender === '女') ? c.gender : '男'
+                } as CharacterData;
               });
               
               allDependencyCharacters.push(...convertedCharacters);
@@ -3612,8 +3331,8 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
           }
           
           // 去重：使用 id 或 name 作为唯一标识
-          const charMap: { [key: string]: any } = {};
-          allDependencyCharacters.forEach((char: any) => {
+          const charMap: Record<string, CharacterData> = {};
+          allDependencyCharacters.forEach((char) => {
             const key = char.id || char.name;
             if (key && !charMap[key]) {
               charMap[key] = char;
@@ -3636,8 +3355,8 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
         }
         
         const graphData: CharacterRelationsData = {
-          characters: relationData.characters || [],
-          relations: relationData.relations || []
+          characters: (relationData.characters || []) as CharacterRelationsData['characters'],
+          relations: (relationData.relations || []) as CharacterRelationsData['relations']
         };
         
         // 调试信息：检查关系数据
@@ -3662,36 +3381,38 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
             />
           </div>
         );
+      }
 
-      case 'timeline':
+      case 'timeline': {
         // 支持两种格式：数组格式（旧格式）和对象格式（新格式，包含依赖数据）
-        let timelineData: any[] = [];
-        let dependencies: { [key: string]: any } = {};
+        let timelineData: Record<string, unknown>[] = [];
+        let dependencies: Record<string, unknown> = {};
         
         if (Array.isArray(comp.value)) {
           // 旧格式：直接是数组
-          timelineData = comp.value;
+          timelineData = comp.value as Record<string, unknown>[];
         } else if (comp.value && typeof comp.value === 'object' && 'events' in comp.value) {
           // 新格式：包含 events 和 _dependencies
-          timelineData = comp.value.events || [];
-          dependencies = comp.value._dependencies || {};
+          const val = comp.value as { events: Record<string, unknown>[]; _dependencies: Record<string, unknown> };
+          timelineData = val.events || [];
+          dependencies = val._dependencies || {};
         } else {
           timelineData = [];
         }
         
         // 从依赖中获取角色列表
-        let availableCharacters: any[] = [];
+        let availableCharacters: { id: string; name: string; gender: string }[] = [];
         if (comp.dataDependencies && comp.dataDependencies.length > 0) {
-          const findDependencyData = (depKey: string): any[] => {
+          const findDependencyData = (depKey: string): unknown[] => {
             for (const module of template.modules) {
-              const findInComponents = (components: ComponentConfig[]): any[] | null => {
+              const findInComponents = (components: ComponentConfig[]): unknown[] | null => {
                 for (const compItem of components) {
                   if (compItem.dataKey === depKey) {
                     if (compItem.value !== undefined && compItem.value !== null) {
                       if (Array.isArray(compItem.value)) {
                         return compItem.value;
                       } else if (typeof compItem.value === 'object' && compItem.value !== null) {
-                        const obj = compItem.value as any;
+                        const obj = compItem.value as { characters?: unknown[] };
                         if (Array.isArray(obj.characters)) {
                           return obj.characters;
                         }
@@ -3717,23 +3438,23 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
           };
           
           // 收集所有依赖的角色数据并去重
-          const allDependencyCharacters: any[] = [];
+          const allDependencyCharacters: Record<string, unknown>[] = [];
           for (const depKey of comp.dataDependencies) {
             const depData = findDependencyData(depKey);
             if (depData && Array.isArray(depData) && depData.length > 0) {
-              allDependencyCharacters.push(...depData);
+              allDependencyCharacters.push(...(depData as Record<string, unknown>[]));
             }
           }
           
           // 去重
-          const charMap: { [key: string]: any } = {};
-          allDependencyCharacters.forEach((char: any) => {
-            const key = char.id || char.name;
+          const charMap: Record<string, { id: string; name: string; gender: string }> = {};
+          allDependencyCharacters.forEach((char) => {
+            const key = (char.id as string) || (char.name as string);
             if (key && !charMap[key]) {
               charMap[key] = {
-                id: char.id || key,
-                name: char.name || char.display_name || '',
-                gender: char.gender || '男'
+                id: (char.id as string) || key,
+                name: (char.name as string) || (char.display_name as string) || '',
+                gender: (char.gender as string) || '男'
               };
             }
           });
@@ -3741,35 +3462,35 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
         }
         
         // 确保时间线数据格式正确（支持多个角色，向后兼容单个角色）
-        const ensureEventFormat = (item: any) => {
+        const ensureEventFormat = (item: Record<string, unknown>) => {
           // 兼容旧格式：如果存在 characterId/character，转换为数组格式
           let characterIds: string[] = [];
           let characters: string[] = [];
           
           if (item.characterIds && Array.isArray(item.characterIds)) {
-            characterIds = item.characterIds;
+            characterIds = item.characterIds as string[];
           } else if (item.characterId) {
-            characterIds = [item.characterId];
+            characterIds = [item.characterId as string];
           }
           
           if (item.characters && Array.isArray(item.characters)) {
-            characters = item.characters;
+            characters = item.characters as string[];
           } else if (item.character) {
-            characters = [item.character];
+            characters = [item.character as string];
           }
           
           return {
-            id: item.id || `event-${Date.now()}-${Math.random()}`,
+            id: (item.id as string) || `event-${Date.now()}-${Math.random()}`,
             characterIds: characterIds,
             characters: characters,
-            time: item.time || '',
-            event: item.event || '',
-            description: item.description || '',
-            location: item.location || ''
+            time: (item.time as string) || '',
+            event: (item.event as string) || '',
+            description: (item.description as string) || '',
+            location: (item.location as string) || ''
           };
         };
         
-        const normalizedTimelineData = timelineData.map(ensureEventFormat);
+        const normalizedTimelineData = timelineData.map(item => ensureEventFormat(item));
         
         return (
           <div className="comp-timeline">
@@ -3999,8 +3720,9 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
             </button>
           </div>
         );
+      }
 
-      case 'character-card':
+      case 'character-card': {
         // 角色卡片 - 只读展示 + 弹窗编辑
         // 当前组件的数据（用于显示和编辑）
         const characterData = (comp.value as { name: string; gender: string; type: string; description: string }[]) || [];
@@ -4255,14 +3977,15 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
             )}
           </div>
         );
+      }
 
-      case 'card-list':
+      case 'card-list': {
         // 通用卡片列表
         const cardFields = comp.config.cardFields || [
           { key: 'name', label: '名称', type: 'text' },
           { key: 'description', label: '描述', type: 'textarea' },
         ];
-        const cardData = (comp.value as Record<string, any>[]) || [];
+        const cardData = (comp.value as Record<string, unknown>[]) || [];
         return (
           <div className="comp-card-list">
             <div className="card-grid">
@@ -4285,7 +4008,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
                           <div className="card-field-image">
                             {card[field.key] ? (
                               <div className="card-image-preview">
-                                <img src={card[field.key]} alt={field.label} />
+                                <img src={card[field.key] as string} alt={field.label} />
                                 <div className="card-image-overlay">
                                   <button onClick={() => {
                                     setCurrentImageId(`card-${cardIndex}-${field.key}`);
@@ -4314,7 +4037,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
                         ) : field.type === 'textarea' ? (
                           <textarea
                             className="card-field-textarea"
-                            value={card[field.key] || ''}
+                            value={(card[field.key] as string) || ''}
                             onChange={(e) => {
                               const newData = [...cardData];
                               newData[cardIndex] = { ...card, [field.key]: e.target.value };
@@ -4327,7 +4050,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
                           <input
                             type="text"
                             className="card-field-input"
-                            value={card[field.key] || ''}
+                            value={(card[field.key] as string) || ''}
                             onChange={(e) => {
                               const newData = [...cardData];
                               newData[cardIndex] = { ...card, [field.key]: e.target.value };
@@ -4345,7 +4068,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
             <button 
               className="card-add-btn"
               onClick={() => {
-                const newCard: Record<string, any> = {};
+                const newCard: Record<string, unknown> = {};
                 cardFields.forEach((f: { key: string }) => newCard[f.key] = '');
                 updateValue([...cardData, newCard]);
               }}
@@ -4355,8 +4078,9 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
             </button>
           </div>
         );
+      }
 
-      case 'rank-system':
+      case 'rank-system': {
         // 等级体系组件
         const rankData = (comp.value as { level: number; name: string; description: string }[]) || [];
         return (
@@ -4427,8 +4151,9 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
             </button>
           </div>
         );
+      }
 
-      case 'faction':
+      case 'faction': {
         // 势力组件
         const factionData = (comp.value as FactionData[]) || [];
         
@@ -4570,6 +4295,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
             </button>
           </div>
         );
+      }
 
       default:
         return <div className="comp-unsupported">不支持的组件类型: {comp.type}</div>;
@@ -5018,14 +4744,14 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
                       <div className="form-group">
                         <label>标签选项 <span className="required">*</span></label>
                         <div className="tag-options-config">
-                          {(newComponentForm.config.options || []).map((opt: { label: string; value: string; color: string }, index: number) => (
+                          {(Array.isArray(newComponentForm.config.options) ? newComponentForm.config.options : []).map((opt: { label: string; value: string; color: string }, index: number) => (
                             <div key={index} className="tag-option-item">
                               <span className="tag-preview" style={{ background: opt.color }}>{opt.label}</span>
                               <input
                                 type="text"
                                 value={opt.label}
                                 onChange={(e) => {
-                                  const newOptions = [...(newComponentForm.config.options || [])];
+                                  const newOptions = [...(Array.isArray(newComponentForm.config.options) ? newComponentForm.config.options : [])];
                                   newOptions[index] = { ...opt, label: e.target.value, value: e.target.value.toLowerCase() };
                                   setNewComponentForm({ ...newComponentForm, config: { ...newComponentForm.config, options: newOptions } });
                                 }}
@@ -5037,7 +4763,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
                                 className="tag-color-input"
                                 value={opt.color}
                                 onChange={(e) => {
-                                  const newOptions = [...(newComponentForm.config.options || [])];
+                                  const newOptions = [...(Array.isArray(newComponentForm.config.options) ? newComponentForm.config.options : [])];
                                   newOptions[index] = { ...opt, color: e.target.value };
                                   setNewComponentForm({ ...newComponentForm, config: { ...newComponentForm.config, options: newOptions } });
                                 }}
@@ -5046,7 +4772,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
                               <button
                                 className="tag-remove-btn"
                                 onClick={() => {
-                                  const newOptions = (newComponentForm.config.options || []).filter((_: any, i: number) => i !== index);
+                                  const newOptions = (Array.isArray(newComponentForm.config.options) ? newComponentForm.config.options : []).filter((_: unknown, i: number) => i !== index);
                                   setNewComponentForm({ ...newComponentForm, config: { ...newComponentForm.config, options: newOptions } });
                                 }}
                               >
@@ -5063,7 +4789,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
                               className="tag-label-input"
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter' && newTagOption.label.trim()) {
-                                  const newOptions = [...(newComponentForm.config.options || []), {
+                                  const newOptions = [...(Array.isArray(newComponentForm.config.options) ? newComponentForm.config.options : []), {
                                     label: newTagOption.label.trim(),
                                     value: newTagOption.label.trim().toLowerCase(),
                                     color: newTagOption.color
@@ -5084,7 +4810,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
                               className="tag-add-btn"
                               onClick={() => {
                                 if (newTagOption.label.trim()) {
-                                  const newOptions = [...(newComponentForm.config.options || []), {
+                                  const newOptions = [...(Array.isArray(newComponentForm.config.options) ? newComponentForm.config.options : []), {
                                     label: newTagOption.label.trim(),
                                     value: newTagOption.label.trim().toLowerCase(),
                                     color: newTagOption.color
@@ -5100,7 +4826,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
                             </button>
                           </div>
                         </div>
-                        {(!newComponentForm.config.options || newComponentForm.config.options.length === 0) && (
+                        {(Array.isArray(newComponentForm.config.options) ? newComponentForm.config.options.length === 0 : true) && (
                           <div className="tabs-hint">请至少添加一个标签选项</div>
                         )}
                       </div>
@@ -5112,7 +4838,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
                             min="1"
                             max="20"
                             className="max-count-input"
-                            value={newComponentForm.config.maxCount || 5}
+                            value={typeof newComponentForm.config.maxCount === 'number' ? newComponentForm.config.maxCount : 5}
                             onChange={(e) => {
                               const val = parseInt(e.target.value) || 5;
                               setNewComponentForm({ 
@@ -5121,7 +4847,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
                               });
                             }}
                           />
-                          <span className="max-count-hint">用户最多可选择 {newComponentForm.config.maxCount || 5} 个标签</span>
+                          <span className="max-count-hint">用户最多可选择 {typeof newComponentForm.config.maxCount === 'number' ? newComponentForm.config.maxCount : 5} 个标签</span>
                         </div>
                       </div>
                       </>
@@ -5133,11 +4859,9 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
                         <textarea
                           rows={4}
                           placeholder="每行一个列名&#10;例如：&#10;姓名&#10;身份&#10;简介"
-                          defaultValue={
-                            newComponentForm.config.columns
-                              ?.map((c: any) => c.label)
-                              .join('\n') || ''
-                          }
+                          defaultValue={(Array.isArray(newComponentForm.config.columns) ? newComponentForm.config.columns : [])
+                            .map((c: { label: string }) => c.label)
+                            .join('\n')}
                           onChange={(e) => {
                             const columns = e.target.value.split('\n').filter(Boolean).map(label => ({
                               key: label.trim().toLowerCase(),
@@ -5960,7 +5684,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
                 {comp.type === 'character-card' && Array.isArray(generatePreviewModal.generatedData) ? (
                   // 角色卡片类型：以卡片形式展示，支持编辑
                   <div className="comp-character-cards" style={{ marginTop: '12px' }}>
-                    {generatePreviewModal.generatedData.map((char: any, idx: number) => (
+                    {(generatePreviewModal.generatedData as PreviewItem[]).map((char: PreviewItem, idx: number) => (
                       <div key={idx} style={{ marginBottom: '12px' }}>
                         {generatePreviewModal.editingIndex === idx ? (
                           // 编辑模式
@@ -5971,7 +5695,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
                                 type="text"
                                 value={char.name || ''}
                                 onChange={(e) => {
-                                  const newData = [...generatePreviewModal.generatedData];
+                                  const newData = [...(generatePreviewModal.generatedData as PreviewItem[])];
                                   newData[idx] = { ...char, name: e.target.value };
                                   setGeneratePreviewModal({ ...generatePreviewModal, generatedData: newData });
                                 }}
@@ -5985,7 +5709,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
                                 <select
                                   value={char.gender || '男'}
                                   onChange={(e) => {
-                                    const newData = [...generatePreviewModal.generatedData];
+                                    const newData = [...(generatePreviewModal.generatedData as PreviewItem[])];
                                     newData[idx] = { ...char, gender: e.target.value };
                                     setGeneratePreviewModal({ ...generatePreviewModal, generatedData: newData });
                                   }}
@@ -6001,7 +5725,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
                                 <select
                                   value={char.type || '主要角色'}
                                   onChange={(e) => {
-                                    const newData = [...generatePreviewModal.generatedData];
+                                    const newData = [...(generatePreviewModal.generatedData as PreviewItem[])];
                                     newData[idx] = { ...char, type: e.target.value };
                                     setGeneratePreviewModal({ ...generatePreviewModal, generatedData: newData });
                                   }}
@@ -6019,7 +5743,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
                               <textarea
                                 value={char.description || ''}
                                 onChange={(e) => {
-                                  const newData = [...generatePreviewModal.generatedData];
+                                  const newData = [...(generatePreviewModal.generatedData as PreviewItem[])];
                                   newData[idx] = { ...char, description: e.target.value };
                                   setGeneratePreviewModal({ ...generatePreviewModal, generatedData: newData });
                                 }}
@@ -6031,7 +5755,8 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
                               <button
                                 onClick={() => {
                                   // 删除角色
-                                  const newData = generatePreviewModal.generatedData.filter((_: any, i: number) => i !== idx);
+                                  const currentData = generatePreviewModal.generatedData as PreviewItem[];
+                                  const newData = currentData.filter((_: unknown, i: number) => i !== idx);
                                   setGeneratePreviewModal({ 
                                     ...generatePreviewModal, 
                                     generatedData: newData,
@@ -6095,7 +5820,8 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
                     <button
                       onClick={() => {
                         const newChar = { name: '', gender: '男', type: '主要角色', description: '' };
-                        const newData = [...generatePreviewModal.generatedData, newChar];
+                        const currentData = generatePreviewModal.generatedData as PreviewItem[];
+                        const newData = [...currentData, newChar];
                         setGeneratePreviewModal({ 
                           ...generatePreviewModal, 
                           generatedData: newData,
@@ -6188,7 +5914,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
                   {comp.type === 'character-card' && Array.isArray(generatePreviewModal.existingData) ? (
                     // 角色卡片类型：以卡片形式展示现有数据
                     <div className="comp-character-cards" style={{ marginTop: '12px' }}>
-                      {generatePreviewModal.existingData.slice(0, 5).map((char: any, idx: number) => (
+                      {(generatePreviewModal.existingData as PreviewItem[]).slice(0, 5).map((char: PreviewItem, idx: number) => (
                         <div 
                           key={idx} 
                           className="character-card-item"
@@ -6261,11 +5987,11 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
                   onClick={() => {
                     if (!comp) return;
                     // 追加模式：将生成的数据追加到现有数据
-                    let finalData: any;
+                    let finalData: GeneratedDataType;
                     if (Array.isArray(generatePreviewModal.existingData) && Array.isArray(generatePreviewModal.generatedData)) {
-                      finalData = [...generatePreviewModal.existingData, ...generatePreviewModal.generatedData];
+                      finalData = [...(generatePreviewModal.existingData as PreviewItem[]), ...(generatePreviewModal.generatedData as PreviewItem[])];
                     } else if (Array.isArray(generatePreviewModal.existingData)) {
-                      finalData = [...generatePreviewModal.existingData, generatePreviewModal.generatedData];
+                      finalData = [...(generatePreviewModal.existingData as PreviewItem[]), generatePreviewModal.generatedData as PreviewItem];
                     } else {
                       // 对于非数组类型，追加意味着拼接
                       finalData = String(generatePreviewModal.existingData) + '\n' + String(generatePreviewModal.generatedData);
