@@ -246,7 +246,7 @@ export default function UserWorksPage() {
                 {/* 移动端：在个人信息下方显示操作按钮 */}
                 <div className="mobile-actions">
                   <button 
-                    className="action-btn primary mobile-action-btn"
+                    className="action-btn mobile-action-btn"
                     onClick={handleCreateWork}
                   >
                     <Plus size={16} />
@@ -300,7 +300,7 @@ export default function UserWorksPage() {
 
               <div className="edit-profile-actions">
                 <button
-                  className="action-btn primary"
+                  className="action-btn"
                   onClick={handleSaveProfile}
                   disabled={saving}
                 >
@@ -324,7 +324,7 @@ export default function UserWorksPage() {
             {isCurrentUser && (
               <div className="works-header-actions">
                 <button 
-                  className="action-btn primary"
+                  className="action-btn"
                   onClick={handleCreateWork}
                 >
                   <Plus size={16} />

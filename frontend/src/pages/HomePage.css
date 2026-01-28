@@ -101,7 +101,7 @@
 
 .landing-page .btn-primary {
   color: #ffffff !important;
-  background: rgba(153, 153, 153, 0.9) !important;
+  background: #000000 !important;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(147, 197, 253, 0.3) !important;

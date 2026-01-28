@@ -45,13 +45,13 @@
 }
 
 .action-btn.primary:hover {
-  background: linear-gradient(135deg, #444444 0%, #1d4ed8 100%) !important;
+  background: linear-gradient(135deg, #999999 0%, #444444 100%) !important;
   transform: translateY(-2px);
   box-shadow: var(--shadow-lg);
 }
 
 .action-btn.primary:active {
-  background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%) !important;
+  background: linear-gradient(135deg, #999999 0%, #444444 100%) !important;
 }
 
 /* 左右分栏容器 */
@@ -178,7 +178,7 @@
 }
 
 .mobile-action-btn.action-btn.primary:hover {
-  background: linear-gradient(135deg, #444444 0%, #1d4ed8 100%) !important;
+  background: linear-gradient(135deg, #999999 0%, #444444 100%) !important;
 }
 
 /* 编辑资料表单 */

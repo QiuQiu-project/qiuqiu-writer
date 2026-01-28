@@ -293,7 +293,7 @@ export default function WorksPage() {
         <h1 className="works-title">我的作品</h1>
           <div className="works-actions">
           <button 
-            className="action-btn primary"
+            className="action-btn"
             onClick={handleCreateWork}
           >
             <Plus size={16} />
@@ -332,7 +332,7 @@ export default function WorksPage() {
           {works.length === 0 ? (
             <div className="works-empty">
               <p>暂无作品</p>
-              <button className="action-btn primary" onClick={handleCreateWork}>
+              <button className="action-btn" onClick={handleCreateWork}>
                 <Plus size={16} />
                 <span>创建第一个作品</span>
               </button>
