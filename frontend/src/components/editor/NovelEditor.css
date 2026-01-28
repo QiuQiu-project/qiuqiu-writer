@@ -266,7 +266,7 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--bg-secondary);
+  background: #ffffff;
   box-sizing: border-box;
 }
 
