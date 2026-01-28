@@ -42,7 +42,6 @@ export default function NovelEditorPage(){
   const [activeNav, setActiveNav] = useState<'work-info' | 'tags' | 'outline' | 'characters' | 'settings' | 'map' | 'factions'>('work-info');
   const [selectedChapter, setSelectedChapter] = useState<string | null>(null);
   // 同步状态（保留用于内部逻辑，不显示在UI上）
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [syncStatus, setSyncStatus] = useState(syncManager.getStatus());
   
   // 作品数据
@@ -198,7 +197,7 @@ export default function NovelEditorPage(){
         setWork(workData);
         
         // 检查是否来自缓存
-        if ((workData as any)._fromCache) {
+        if ((workData as { _fromCache?: boolean })._fromCache) {
           setError('使用缓存数据（数据库不可用）');
           console.warn('⚠️ [NovelEditorPage] 使用缓存数据，数据库可能不可用');
         } else {
@@ -682,7 +681,7 @@ export default function NovelEditorPage(){
             message += `，${errorCount} 章失败`;
           }
           if (data.errors && data.errors.length > 0) {
-            const errorMessages = data.errors.map((e: any) => e.message || e.error || '未知错误').join('；');
+            const errorMessages = data.errors.map((e: { message?: string; error?: string }) => e.message || e.error || '未知错误').join('；');
             console.warn('分析错误详情:', errorMessages);
           }
           
@@ -705,7 +704,7 @@ export default function NovelEditorPage(){
             success: true,
             message,
             analyzedCount: successCount,
-            errors: data.errors?.map((e: any) => e.message || e.error).filter(Boolean),
+            errors: data.errors?.map((e: { message?: string; error?: string }) => e.message || e.error).filter(Boolean),
           };
         } else {
           const message = `分析失败: ${data.message || '未知错误'}`;
@@ -1433,7 +1432,7 @@ export default function NovelEditorPage(){
         const chapterId = parseInt(data.id);
         
         // 准备更新数据
-        const updateData: any = {
+        const updateData: ChapterUpdate = {
           title: data.title,
         };
 
@@ -1553,7 +1552,7 @@ export default function NovelEditorPage(){
       } else {
         // 创建新章节
         // 统一处理：使用 volume_number = 0（未分卷）或根据卷ID计算
-        let volNum = data.volumeId === 'draft' ? 0 : parseInt(data.volumeId.replace('vol', '')) || 0;
+        const volNum = data.volumeId === 'draft' ? 0 : parseInt(data.volumeId.replace('vol', '')) || 0;
         
         // 计算章节号
         let maxChapterNumber = 0;
@@ -1647,11 +1646,11 @@ export default function NovelEditorPage(){
   };
 
   // 将 outline 对象转换为可读文本
-  const formatOutlineText = (outline: any): string => {
+  const formatOutlineText = (outline: unknown): string => {
     if (!outline) return '';
     if (typeof outline === 'string') return outline;
     if (typeof outline === 'object') {
-      const outlineObj = outline as any;
+      const outlineObj = outline as Record<string, unknown>;
       const parts: string[] = [];
       if (outlineObj.core_function) {
         parts.push(`核心功能：${outlineObj.core_function}`);
@@ -1671,7 +1670,7 @@ export default function NovelEditorPage(){
         );
       }
       if (outlineObj.atmosphere && Array.isArray(outlineObj.atmosphere)) {
-        parts.push(`氛围：${outlineObj.atmosphere.join('、')}`);
+        parts.push(`氛围：${(outlineObj.atmosphere as string[]).join('、')}`);
       }
       if (outlineObj.hook) {
         parts.push(`结尾钩子：${outlineObj.hook}`);
@@ -1682,14 +1681,14 @@ export default function NovelEditorPage(){
   };
 
   // 将 detailed_outline 对象转换为可读文本
-  const formatDetailedOutlineText = (detailed: any): string => {
+  const formatDetailedOutlineText = (detailed: unknown): string => {
     if (!detailed) return '';
     if (typeof detailed === 'string') return detailed;
     if (typeof detailed === 'object') {
-      const detailedObj = detailed as any;
+      const detailedObj = detailed as Record<string, unknown>;
       if (detailedObj.sections && Array.isArray(detailedObj.sections)) {
         return detailedObj.sections
-          .map((section: any) => {
+          .map((section: { section_number?: string; title?: string; content?: string }) => {
             const sectionNum = section.section_number || '';
             const sectionTitle = section.title || '';
             const sectionContent = section.content || '';
@@ -1883,7 +1882,7 @@ export default function NovelEditorPage(){
             // 解析 outline（可能是对象格式）
             let outline = data.outline || '';
             if (needsOutline && docResult.chapter_info.metadata.outline) {
-              const outlineObj = docResult.chapter_info.metadata.outline as any;
+              const outlineObj = docResult.chapter_info.metadata.outline as unknown as Record<string, unknown>;
               if (typeof outlineObj === 'object' && outlineObj !== null) {
                 // 格式化大纲对象为可读字符串
                 const parts: string[] = [];
@@ -1897,7 +1896,7 @@ export default function NovelEditorPage(){
                   parts.push(`画面感：\n${outlineObj.visual_scenes.map((s: string, i: number) => `${i + 1}. ${s}`).join('\n')}`);
                 }
                 if (outlineObj.atmosphere && Array.isArray(outlineObj.atmosphere)) {
-                  parts.push(`氛围：${outlineObj.atmosphere.join('、')}`);
+                  parts.push(`氛围：${(outlineObj.atmosphere as string[]).join('、')}`);
                 }
                 if (outlineObj.hook) {
                   parts.push(`结尾钩子：${outlineObj.hook}`);
@@ -1911,11 +1910,11 @@ export default function NovelEditorPage(){
             // 解析 detailed_outline（可能是对象格式）
             let detailedOutline = data.detailOutline || '';
             if (needsDetailOutline && docResult.chapter_info.metadata.detailed_outline) {
-              const detailedObj = docResult.chapter_info.metadata.detailed_outline as any;
+              const detailedObj = docResult.chapter_info.metadata.detailed_outline as unknown as Record<string, unknown>;
               if (typeof detailedObj === 'object' && detailedObj !== null) {
                 // 格式化细纲对象为可读字符串
                 if (detailedObj.sections && Array.isArray(detailedObj.sections)) {
-                  detailedOutline = detailedObj.sections.map((section: any) => {
+                  detailedOutline = detailedObj.sections.map((section: { section_number?: string; title?: string; content?: string }) => {
                     const sectionNum = section.section_number || '';
                     const sectionTitle = section.title || '';
                     const sectionContent = section.content || '';

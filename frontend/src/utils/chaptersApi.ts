@@ -6,11 +6,11 @@
 
 import { BaseApiClient } from './baseApiClient';
 import { localCacheManager } from './localCacheManager';
-import type { Work } from './worksApi';
+
 
 export interface Chapter {
-  outline: any;
-  detailed_outline: any;
+  outline: Record<string, unknown>;
+  detailed_outline: Record<string, unknown>;
   id: number;
   work_id: number;
   title: string;
@@ -22,7 +22,7 @@ export interface Chapter {
   metadata?: {
     outline?: string;
     detailed_outline?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
   created_at: string;
   updated_at: string;
@@ -41,10 +41,12 @@ export interface ChapterUpdate {
   content?: string;
   status?: string;
   word_count?: number;
+  chapter_number?: number;
+  volume_number?: number;
   chapter_metadata?: {
     outline?: string;
     detailed_outline?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
@@ -65,6 +67,13 @@ export interface ChapterVersion {
   content: string;
   change_description?: string;
   created_at: string;
+}
+
+export interface ChapterDocumentResponse {
+  document_id: string;
+  content: unknown;
+  chapter_info: Chapter;
+  document_exists?: boolean;
 }
 
 class ChaptersApiClient extends BaseApiClient {
@@ -288,11 +297,7 @@ class ChaptersApiClient extends BaseApiClient {
   /**
    * 获取章节ShareDB文档内容
    */
-  async getChapterDocument(chapterId: number): Promise<{
-    document_id: string;
-    content: any;
-    chapter_info: Chapter;
-  }> {
+  async getChapterDocument(chapterId: number): Promise<ChapterDocumentResponse> {
     return this.get(`/api/v1/chapters/${chapterId}/document`);
   }
 }

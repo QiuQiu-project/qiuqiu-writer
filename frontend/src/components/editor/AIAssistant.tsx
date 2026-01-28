@@ -64,7 +64,7 @@ interface CharacterFromMetadata {
   name: string;
   display_name?: string;
   description?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export default function AIAssistant({ workId }: AIAssistantProps) {

@@ -29,7 +29,7 @@ export interface SyncResponse {
   operations: Array<{
     doc_id: string;
     version: number;
-    operation: any;
+    operation: unknown;
     user_id: number;
     timestamp: string;
   }>;
@@ -37,12 +37,12 @@ export interface SyncResponse {
   work?: {
     id: number;
     word_count: number;
-    [key: string]: any;
+    [key: string]: unknown;
   };
   chapter?: {
     id: number;
     word_count: number;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 // 章节完整数据类型
@@ -74,9 +74,9 @@ export interface CachedWorkDoc {
     category?: string;
     genre?: string;
     is_public?: boolean;
-    [key: string]: any;
+    [key: string]: unknown;
   };
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 // 缓存的章节文档类型
@@ -87,8 +87,8 @@ export interface CachedChapterDoc {
     chapter_number?: number;
     title?: string;
     volume_number?: number;
-    [key: string]: any;
+    [key: string]: unknown;
   };
-  [key: string]: any;
+  [key: string]: unknown;
 }
 

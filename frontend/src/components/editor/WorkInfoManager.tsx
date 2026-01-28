@@ -39,7 +39,7 @@ const collectPromptIds = (components: ComponentConfig[]): number[] => {
 };
 
 // 递归填充组件的 prompt 内容
-const fillPromptsForComponents = (components: ComponentConfig[], promptMap: Map<number, any>): ComponentConfig[] => {
+const fillPromptsForComponents = (components: ComponentConfig[], promptMap: Map<number, PromptTemplate>): ComponentConfig[] => {
   return components.map(comp => {
     const updatedComp: ComponentConfig = { ...comp };
     
@@ -119,7 +119,7 @@ type ComponentType =
   | 'faction';       // 势力组件
 
 // 组件配置接口
-interface ComponentConfig {
+export interface ComponentConfig {
   id: string;
   type: ComponentType;
   label: string;

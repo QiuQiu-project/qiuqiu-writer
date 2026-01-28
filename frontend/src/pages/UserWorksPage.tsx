@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Grid, List, BookOpen, User, Calendar, FileText, Plus, Upload } from 'lucide-react';
 import { worksApi, type Work } from '../utils/worksApi';
 import { authApi, type UserInfo } from '../utils/authApi';
@@ -28,14 +28,7 @@ export default function UserWorksPage() {
   const isCurrentUser = authApi.isAuthenticated() && 
     authApi.getUserInfo()?.id === Number(userId);
 
-  useEffect(() => {
-    if (userId) {
-      loadUserWorks();
-      loadUserInfo();
-    }
-  }, [userId, currentPage]);
-
-  const loadUserWorks = async () => {
+  const loadUserWorks = useCallback(async () => {
     if (!userId) return;
     
     setLoading(true);
@@ -69,9 +62,9 @@ export default function UserWorksPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId, currentPage, isCurrentUser, itemsPerPage]);
 
-  const loadUserInfo = async () => {
+  const loadUserInfo = useCallback(async () => {
     if (!userId) return;
     
     try {
@@ -108,7 +101,14 @@ export default function UserWorksPage() {
     } catch (err) {
       console.error('Error loading user info:', err);
     }
-  };
+  }, [userId, isCurrentUser]);
+
+  useEffect(() => {
+    if (userId) {
+      loadUserWorks();
+      loadUserInfo();
+    }
+  }, [userId, currentPage, loadUserWorks, loadUserInfo]);
 
 
   const formatDate = (dateString: string) => {
@@ -164,7 +164,7 @@ export default function UserWorksPage() {
     if (userInfo) {
       setEditFormData({
         display_name: userInfo.display_name || '',
-        bio: (userInfo as any).bio || '',
+        bio: userInfo.bio || '',
       });
     }
     setShowEditProfile(true);
@@ -462,4 +462,3 @@ export default function UserWorksPage() {
     </div>
   );
 }
-

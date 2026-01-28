@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Grid, List, Plus, Upload, ChevronDown, Download, Link2, Trash2, RefreshCw } from 'lucide-react';
 import { worksApi, type Work } from '../utils/worksApi';
@@ -26,12 +26,7 @@ export default function WorksPage() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
 
-  // 加载作品列表
-  useEffect(() => {
-    loadWorks();
-  }, [currentPage, itemsPerPage]);
-
-  const loadWorks = async () => {
+  const loadWorks = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -47,7 +42,12 @@ export default function WorksPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, itemsPerPage]);
+
+  // 加载作品列表
+  useEffect(() => {
+    loadWorks();
+  }, [loadWorks]);
 
   // 点击外部关闭菜单
   useEffect(() => {
@@ -140,10 +140,6 @@ export default function WorksPage() {
           
           
           try {
-            // 显示开始提示
-            const formatName = format === 'text' ? 'Text' : format === 'word' ? 'Word' : 'PDF';
-            
-            
             // 获取作品信息
             
             const work = await worksApi.getWork(Number(workId));
@@ -184,51 +180,53 @@ export default function WorksPage() {
           }
           break;
         case 'copy-link':
-          // 生成作品链接
-          const workLink = `${window.location.origin}/novel/editor?workId=${workId}`;
-          
-          try {
-            // 使用 Clipboard API 复制链接
-            await navigator.clipboard.writeText(workLink);
-            // 显示成功提示
-            alert('链接已复制到剪贴板');
-          } catch (clipboardErr) {
-            // 如果 Clipboard API 不可用，使用备用方法
-            console.warn('Clipboard API 不可用，使用备用方法:', clipboardErr);
-            
-            // 创建临时文本区域
-            const textArea = document.createElement('textarea');
-            textArea.value = workLink;
-            textArea.style.position = 'fixed';
-            textArea.style.left = '-999999px';
-            textArea.style.top = '-999999px';
-            document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
+          {
+            // 生成作品链接
+            const workLink = `${window.location.origin}/novel/editor?workId=${workId}`;
             
             try {
-              const successful = document.execCommand('copy');
-              document.body.removeChild(textArea);
+              // 使用 Clipboard API 复制链接
+              await navigator.clipboard.writeText(workLink);
+              // 显示成功提示
+              alert('链接已复制到剪贴板');
+            } catch (clipboardErr) {
+              // 如果 Clipboard API 不可用，使用备用方法
+              console.warn('Clipboard API 不可用，使用备用方法:', clipboardErr);
               
-              if (successful) {
-                alert('链接已复制到剪贴板');
-              } else {
-                // 如果复制失败，显示链接让用户手动复制
+              // 创建临时文本区域
+              const textArea = document.createElement('textarea');
+              textArea.value = workLink;
+              textArea.style.position = 'fixed';
+              textArea.style.left = '-999999px';
+              textArea.style.top = '-999999px';
+              document.body.appendChild(textArea);
+              textArea.focus();
+              textArea.select();
+              
+              try {
+                const successful = document.execCommand('copy');
+                document.body.removeChild(textArea);
+                
+                if (successful) {
+                  alert('链接已复制到剪贴板');
+                } else {
+                  // 如果复制失败，显示链接让用户手动复制
+                  const userConfirmed = window.confirm(
+                    `无法自动复制链接，请手动复制：\n\n${workLink}\n\n点击"确定"打开链接`
+                  );
+                  if (userConfirmed) {
+                    window.open(workLink, '_blank');
+                  }
+                }
+              } catch {
+                document.body.removeChild(textArea);
+                // 最后的后备方案：显示链接并询问是否打开
                 const userConfirmed = window.confirm(
-                  `无法自动复制链接，请手动复制：\n\n${workLink}\n\n点击"确定"打开链接`
+                  `无法复制链接，请手动复制：\n\n${workLink}\n\n点击"确定"打开链接`
                 );
                 if (userConfirmed) {
                   window.open(workLink, '_blank');
                 }
-              }
-            } catch (fallbackErr) {
-              document.body.removeChild(textArea);
-              // 最后的后备方案：显示链接并询问是否打开
-              const userConfirmed = window.confirm(
-                `无法复制链接，请手动复制：\n\n${workLink}\n\n点击"确定"打开链接`
-              );
-              if (userConfirmed) {
-                window.open(workLink, '_blank');
               }
             }
           }
@@ -283,8 +281,9 @@ export default function WorksPage() {
   const handleImportSuccess = (_workId: number, _workTitle: string) => {
     // 重新加载作品列表
     loadWorks();
+    alert(`导入成功：${_workTitle}`);
     // 可选：跳转到作品页面
-    // navigate(`/novel/editor?workId=${workId}`);
+    navigate(`/novel/editor?workId=${_workId}`);
   };
 
   return (
@@ -568,10 +567,9 @@ export default function WorksPage() {
           // 恢复成功后，重新加载作品列表
           loadWorks();
           // 可选：跳转到恢复的作品
-          // navigate(`/novel/editor?workId=${workId}`);
+          navigate(`/novel/editor?workId=${workId}`);
         }}
       />
     </div>
   );
 }
-

@@ -6,10 +6,15 @@
 import { Editor } from '@tiptap/react';
 import { documentCache } from './documentCache';
 import { localCacheManager } from './localCacheManager';
-import { chaptersApi } from './chaptersApi';
+import { chaptersApi, type ChapterDocumentResponse } from './chaptersApi';
 import { countCharacters } from './textUtils';
 import type { ShareDBDocument, ChapterFullData } from '../types/document';
 import type { Chapter } from './chaptersApi';
+
+interface CustomWindow extends Window {
+  __chapterSaveTimeout?: React.MutableRefObject<NodeJS.Timeout | null>;
+  __chapterPullTimer?: NodeJS.Timeout;
+}
 
 /**
  * 加载章节内容的参数接口
@@ -40,6 +45,27 @@ export interface LoadChapterContentParams {
   
   // 函数
   stopSync: () => void;
+}
+
+interface ChapterOutline {
+  core_function?: string;
+  key_points?: string[];
+  visual_scenes?: string[];
+  atmosphere?: string[];
+  hook?: string;
+  [key: string]: unknown;
+}
+
+interface ChapterSection {
+  section_number?: string;
+  title?: string;
+  content?: string;
+  [key: string]: unknown;
+}
+
+interface ChapterDetailedOutline {
+  sections?: ChapterSection[];
+  [key: string]: unknown;
 }
 
 /**
@@ -93,16 +119,16 @@ export async function loadChapterContent(params: LoadChapterContentParams): Prom
       try {
         // 关键修复：立即清除所有待保存的定时器，避免保存到错误的章节
         // 这样可以防止自动保存在新章节加载后保存到前一个章节
-        const saveTimeoutRef = (window as any).__chapterSaveTimeout;
+        const saveTimeoutRef = (window as unknown as CustomWindow).__chapterSaveTimeout;
         if (saveTimeoutRef?.current) {
           clearTimeout(saveTimeoutRef.current);
         }
         
         // 关键修复：清除自动拉取定时器，避免拉取其他章节的内容
-        const pullTimer = (window as any).__chapterPullTimer;
+        const pullTimer = (window as unknown as CustomWindow).__chapterPullTimer;
         if (pullTimer) {
           clearTimeout(pullTimer);
-          delete (window as any).__chapterPullTimer;
+          delete (window as unknown as CustomWindow).__chapterPullTimer;
         }
         
         // 等待一小段时间，确保所有异步保存操作完成
@@ -202,7 +228,7 @@ export async function loadChapterContent(params: LoadChapterContentParams): Prom
     if (isChapterSwitch) {
       // 关键修复：在更新 currentChapterIdRef 之前，先清除所有待保存的定时器
       // 这可以防止已经排队的自动保存定时器在章节切换后仍然执行
-      const saveTimeoutRef = (window as any).__chapterSaveTimeout;
+      const saveTimeoutRef = (window as unknown as CustomWindow).__chapterSaveTimeout;
       if (saveTimeoutRef?.current) {
         console.log('🔍 [切换章节-调试] 清除待保存的定时器');
         clearTimeout(saveTimeoutRef.current);
@@ -397,7 +423,7 @@ export async function loadChapterContent(params: LoadChapterContentParams): Prom
       
       // 2. 只有当 chaptersData 中没有大纲和细纲时，才从服务器获取章节信息
       // 避免频繁请求，优先使用已缓存的数据
-      let docResult: any = null;
+      const docResult: ChapterDocumentResponse | null = null;
       const chapterIdStr = String(chapterId);
       const hasOutlineInCache = chaptersData[chapterIdStr]?.outline && chaptersData[chapterIdStr].outline.trim().length > 0;
       const hasDetailOutlineInCache = chaptersData[chapterIdStr]?.detailOutline && chaptersData[chapterIdStr].detailOutline.trim().length > 0;
@@ -406,33 +432,34 @@ export async function loadChapterContent(params: LoadChapterContentParams): Prom
       // 避免频繁请求，优先使用已缓存的数据
       if (!hasOutlineInCache || !hasDetailOutlineInCache) {
         // 关键优化：不再自动从服务器获取，避免不必要的请求
-        // 如果用户需要最新的大纲/细纲，可以通过手动刷新或编辑章节设置来获取
-        console.log('ℹ️ [loadChapterContent] 缓存中没有大纲/细纲，跳过自动获取（本地优先策略）');
+      // 如果用户需要最新的大纲/细纲，可以通过手动刷新或编辑章节设置来获取
+      console.log('ℹ️ [loadChapterContent] 缓存中没有大纲/细纲，跳过自动获取（本地优先策略）');
 
-        try {
-          // 更新章节的 outline 和 detailed_outline 到设置中
-          if (docResult.chapter_info?.metadata) {
-            const chapterIdStr = String(docResult.chapter_info.id);
-            
-            // 将对象格式的 outline 转换为字符串
-            let outline = '';
-            if (docResult.chapter_info.metadata.outline) {
-              const outlineObj = docResult.chapter_info.metadata.outline as any;
-              if (typeof outlineObj === 'object' && outlineObj !== null) {
-                // 格式化大纲对象为可读字符串
-                const parts: string[] = [];
-                if (outlineObj.core_function) {
-                  parts.push(`核心功能：${outlineObj.core_function}`);
-                }
-                if (outlineObj.key_points && Array.isArray(outlineObj.key_points)) {
-                  parts.push(`关键情节点：\n${outlineObj.key_points.map((p: string, i: number) => `${i + 1}. ${p}`).join('\n')}`);
-                }
-                if (outlineObj.visual_scenes && Array.isArray(outlineObj.visual_scenes)) {
-                  parts.push(`画面感：\n${outlineObj.visual_scenes.map((s: string, i: number) => `${i + 1}. ${s}`).join('\n')}`);
-                }
-                if (outlineObj.atmosphere && Array.isArray(outlineObj.atmosphere)) {
-                  parts.push(`氛围：${outlineObj.atmosphere.join('、')}`);
-                }
+      try {
+        // 更新章节的 outline 和 detailed_outline 到设置中
+        // 关键修复：添加 docResult 检查，防止访问 null 属性
+        if (docResult && docResult.chapter_info?.metadata) {
+          const chapterIdStr = String(docResult.chapter_info.id);
+          
+          // 将对象格式的 outline 转换为字符串
+          let outline = '';
+          if (docResult.chapter_info.metadata.outline) {
+            const outlineObj = docResult.chapter_info.metadata.outline as ChapterOutline;
+            if (typeof outlineObj === 'object' && outlineObj !== null) {
+              // 格式化大纲对象为可读字符串
+              const parts: string[] = [];
+              if (outlineObj.core_function) {
+                parts.push(`核心功能：${outlineObj.core_function}`);
+              }
+              if (outlineObj.key_points && Array.isArray(outlineObj.key_points)) {
+                parts.push(`关键情节点：\n${outlineObj.key_points.map((p: string, i: number) => `${i + 1}. ${p}`).join('\n')}`);
+              }
+              if (outlineObj.visual_scenes && Array.isArray(outlineObj.visual_scenes)) {
+                parts.push(`画面感：\n${outlineObj.visual_scenes.map((s: string, i: number) => `${i + 1}. ${s}`).join('\n')}`);
+              }
+              if (outlineObj.atmosphere && Array.isArray(outlineObj.atmosphere)) {
+                parts.push(`氛围：${outlineObj.atmosphere.join('、')}`);
+              }
                 if (outlineObj.hook) {
                   parts.push(`结尾钩子：${outlineObj.hook}`);
                 }
@@ -445,11 +472,11 @@ export async function loadChapterContent(params: LoadChapterContentParams): Prom
             // 将对象格式的 detailed_outline 转换为字符串
             let detailedOutline = '';
             if (docResult.chapter_info.metadata.detailed_outline) {
-              const detailedObj = docResult.chapter_info.metadata.detailed_outline as any;
+              const detailedObj = docResult.chapter_info.metadata.detailed_outline as ChapterDetailedOutline;
               if (typeof detailedObj === 'object' && detailedObj !== null) {
                 // 格式化细纲对象为可读字符串
                 if (detailedObj.sections && Array.isArray(detailedObj.sections)) {
-                  detailedOutline = detailedObj.sections.map((section: any) => {
+                  detailedOutline = detailedObj.sections.map((section: ChapterSection) => {
                     const sectionNum = section.section_number || '';
                     const sectionTitle = section.title || '';
                     const sectionContent = section.content || '';
@@ -510,10 +537,10 @@ export async function loadChapterContent(params: LoadChapterContentParams): Prom
           // 修复判断逻辑：明确检查 document_exists 字段
           if (docResult) {
             // 关键修复：只有当 document_exists 明确为 true 时才认为 MongoDB 有数据
-            // 如果 document_exists 为 false、undefined 或 null，都认为 MongoDB 没有数据
-            const documentExists = (docResult as any).document_exists === true;
-            
-            // 统一格式：检查内容是否有效（content 必须是字符串）
+          // 如果 document_exists 为 false、undefined 或 null，都认为 MongoDB 没有数据
+          const documentExists = docResult.document_exists === true;
+          
+          // 统一格式：检查内容是否有效（content 必须是字符串）
             let hasContent = false;
             if (docResult.content && typeof docResult.content === 'string') {
               const trimmed = docResult.content.trim();
@@ -533,7 +560,7 @@ export async function loadChapterContent(params: LoadChapterContentParams): Prom
               docResultContentPreview: typeof docResult.content === 'string' 
                 ? docResult.content.substring(0, 100) 
                 : 'object',
-              docResultDocumentExists: (docResult as any).document_exists,
+              docResultDocumentExists: docResult.document_exists,
             });
             
             if (shouldUseLocalCache) {
@@ -624,7 +651,7 @@ export async function loadChapterContent(params: LoadChapterContentParams): Prom
           // 关键修复：只有在 content 为 null 或空时才从 docResult 中提取内容
           // 如果已经从缓存获取到内容，不应该被 docResult 覆盖（除非 docResult 有有效内容）
           // 如果仍然没有内容，从 docResult 中提取内容（仅在 document_exists 为 true 时）
-          if (!content && docResult && (docResult as any).document_exists === true && docResult.content) {
+          if (!content && docResult && docResult.document_exists === true && docResult.content) {
             console.log('🔍 [loadChapterContent-调试] 尝试从 docResult 获取内容（content 为空）:', {
               chapterId,
               hasDocResultContent: !!docResult.content,
@@ -669,7 +696,7 @@ export async function loadChapterContent(params: LoadChapterContentParams): Prom
               if (docResult.chapter_info?.metadata) {
                 // 将对象格式的 outline 转换为字符串
                 if (docResult.chapter_info.metadata.outline) {
-                  const outlineObj = docResult.chapter_info.metadata.outline as any;
+                  const outlineObj = docResult.chapter_info.metadata.outline as ChapterOutline;
                   if (typeof outlineObj === 'object' && outlineObj !== null) {
                     const parts: string[] = [];
                     if (outlineObj.core_function) {
@@ -695,10 +722,10 @@ export async function loadChapterContent(params: LoadChapterContentParams): Prom
                 
                 // 将对象格式的 detailed_outline 转换为字符串
                 if (docResult.chapter_info.metadata.detailed_outline) {
-                  const detailedObj = docResult.chapter_info.metadata.detailed_outline as any;
+                  const detailedObj = docResult.chapter_info.metadata.detailed_outline as ChapterDetailedOutline;
                   if (typeof detailedObj === 'object' && detailedObj !== null) {
                     if (detailedObj.sections && Array.isArray(detailedObj.sections)) {
-                      detailedOutline = detailedObj.sections.map((section: any) => {
+                      detailedOutline = detailedObj.sections.map((section: ChapterSection) => {
                         const sectionNum = section.section_number || '';
                         const sectionTitle = section.title || '';
                         const sectionContent = section.content || '';
@@ -761,7 +788,7 @@ export async function loadChapterContent(params: LoadChapterContentParams): Prom
               hasContent: !!content,
               contentLength: content ? content.length : 0,
               hasDocResult: !!docResult,
-              docResultDocumentExists: docResult ? (docResult as any).document_exists : undefined,
+              docResultDocumentExists: docResult ? (docResult as Record<string, unknown>).document_exists : undefined,
               hasDocResultContent: docResult ? !!docResult.content : false,
               docResultContentType: docResult && docResult.content ? typeof docResult.content : undefined,
               timestamp: new Date().toISOString(),
@@ -779,6 +806,7 @@ export async function loadChapterContent(params: LoadChapterContentParams): Prom
         } catch (docErr) {
           // 如果 ShareDB 失败，尝试从普通章节 API 获取（作为后备）
           // 注意：这个 API 不包含大纲和细纲，只用于获取内容
+          console.error('ShareDB 获取失败，尝试后备方案:', docErr);
           if (!content) {
             try {
               const chapter = await chaptersApi.getChapter(chapterId);

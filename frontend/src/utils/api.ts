@@ -2,6 +2,8 @@
  * API client for 星球写作 backend (MemOS)
  */
 
+import type { ShareDBDocument, SyncResponse } from '../types/sharedb';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 
 export interface Document {
@@ -151,22 +153,22 @@ class ApiClient {
     create_version?: boolean;
     base_version?: number;
     base_content?: string;
-    metadata?: Record<string, any>;
-  }): Promise<any> {
-    const response = await this.request<any>('/v1/sharedb/documents/sync', {
+    metadata?: Record<string, unknown>;
+  }): Promise<SyncResponse> {
+    const response = await this.request<SyncResponse>('/v1/sharedb/documents/sync', {
       method: 'POST',
       body: JSON.stringify(data),
     });
-    return response;
+    return response.data;
   }
 
   /**
    * 获取 ShareDB 文档
    */
-  async getShareDBDocument(docId: string): Promise<any> {
-    return this.request<any>(`/v1/sharedb/documents/${docId}`);
+  async getShareDBDocument(docId: string): Promise<ShareDBDocument> {
+    const response = await this.request<ShareDBDocument>(`/v1/sharedb/documents/${docId}`);
+    return response.data;
   }
 }
 
 export const apiClient = new ApiClient();
-

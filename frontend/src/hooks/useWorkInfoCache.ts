@@ -55,20 +55,20 @@ export function useWorkInfoCache(
           const modules = data.modules || [];
           
           // 查找角色设定模块
-          const characterModule = modules.find((m: any) => m.id === 'characters');
+          const characterModule = modules.find((m: ModuleConfig) => m.id === 'characters');
           if (characterModule) {
             setHasCharacterModule(true);
             
             // 查找角色数据（可能在char-table或character-card组件中）
             // 只从character-card组件收集角色数据
-            const findAllCharacterData = (components: any[]): Character[] => {
+            const findAllCharacterData = (components: ComponentConfig[]): Character[] => {
               const allCharacters: Character[] = [];
               
               for (const comp of components) {
                 // 只检查character-card组件（不再检查table组件）
                 if (comp.type === 'character-card' && comp.value) {
                   // 角色卡片数据格式：数组，每个对象有name字段
-                  const cardChars = (comp.value as any[]).map((char) => ({
+                  const cardChars = (Array.isArray(comp.value) ? comp.value : []).map((char: any) => ({
                     id: char.name || String(Date.now() + Math.random()),
                     name: char.name || '',
                     avatar: char.avatar || undefined,
@@ -76,7 +76,7 @@ export function useWorkInfoCache(
                     description: char.description || '',
                     type: char.type || undefined,
                     source: 'character-card',
-                  })).filter(c => c.name);
+                  })).filter((c: Character) => c.name);
                   allCharacters.push(...cardChars);
                 }
                 

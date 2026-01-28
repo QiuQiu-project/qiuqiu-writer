@@ -8,7 +8,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 export interface LoginRequest {
   username_or_email: string;
   password: string;
-  device_info?: Record<string, any>;
+  device_info?: Record<string, unknown>;
 }
 
 export interface RegisterRequest {
@@ -33,6 +33,7 @@ export interface UserInfo {
   email: string;
   display_name?: string;
   avatar_url?: string;
+  bio?: string;
   status: string;
   created_at?: string;
   updated_at?: string;
@@ -91,9 +92,14 @@ class AuthApiClient {
         const errors = Array.isArray(errorData.detail) 
           ? errorData.detail 
           : [errorData.detail];
-        const errorMessages = errors.map((err: any) => {
+        const errorMessages = (errors as unknown[]).map((err) => {
           if (typeof err === 'string') return err;
-          if (err.msg) return `${err.loc?.join('.') || ''}: ${err.msg}`;
+          if (typeof err === 'object' && err !== null && 'msg' in err) {
+            const e = err as { msg?: string; loc?: unknown };
+            const loc = Array.isArray(e.loc) ? e.loc.join('.') : '';
+            const msg = e.msg ?? '';
+            return `${loc}: ${msg}`.trim();
+          }
           return JSON.stringify(err);
         });
         throw new Error(errorMessages.join('; ') || '数据验证失败');
@@ -268,4 +274,3 @@ class AuthApiClient {
 }
 
 export const authApi = new AuthApiClient();
-

@@ -24,8 +24,8 @@ export interface AnalysisProgress {
   text?: string;
   error?: string;
   message?: string;
-  structuredData?: any;
-  characters?: any[];
+  structuredData?: Record<string, unknown>;
+  characters?: Record<string, unknown>[];
   charactersSaved?: boolean;
   charactersCount?: number;
   metadata?: {
@@ -162,7 +162,7 @@ export async function analyzeChapterContent(
 
     const decoder = new TextDecoder();
     let buffer = '';
-    let parsed_data: any = null;
+    let parsed_data: Record<string, unknown> | null = null;
     let characters_saved = false;
     let characters_count = 0;
 
@@ -229,16 +229,16 @@ export async function analyzeChapterContent(
               case 'structured_data':
                 parsed_data = data.data;
                 onProgress?.({ 
-                  structuredData: parsed_data,
-                  characters: parsed_data?.characters || []
+                  structuredData: parsed_data || undefined,
+                  characters: (parsed_data?.characters as Record<string, unknown>[]) || [],
                 });
                 break;
               
               case 'done':
                 onProgress?.({ 
                   message: data.message || '分析完成',
-                  structuredData: parsed_data,
-                  characters: parsed_data?.characters || [],
+                  structuredData: parsed_data || undefined,
+                  characters: (parsed_data?.characters as Record<string, unknown>[]) || [],
                   charactersSaved: data.characters_saved || characters_saved,
                   charactersCount: data.characters_count || characters_count
                 });
@@ -419,13 +419,14 @@ export async function analyzeBookEnhanced(
                 }
                 break;
               
-              case 'chunk':
+              case 'chunk': {
                 const chunkContent = parsed.content || '';
                 if (chunkContent) {
                   result += chunkContent;
                   onProgress?.({ text: chunkContent });
                 }
                 break;
+              }
               
               case 'done':
                 
@@ -582,12 +583,13 @@ export async function analyzeChaptersIncremental(
                 });
                 break;
               
-              case 'chunk':
+              case 'chunk': {
                 const chunkContent = parsed.content || '';
                 if (chunkContent) {
                   onProgress?.({ text: chunkContent });
                 }
                 break;
+              }
               
               case 'done':
                 
@@ -678,8 +680,8 @@ export async function analyzeChapterByFile(
   chapter_number: number;
   volume_number: number;
   title: string;
-  outline?: any;
-  detailed_outline?: any;
+  outline?: Record<string, unknown>;
+  detailed_outline?: Record<string, unknown>;
   work_created: boolean;
 }> {
   try {
@@ -717,9 +719,8 @@ export async function analyzeChapterByFile(
     }
 
     const decoder = new TextDecoder();
-    let result = '';
     let buffer = '';
-    let workResult: {
+    const workResult: {
       work_id?: number;
       work_title?: string;
       chapter_id?: number;
@@ -758,13 +759,13 @@ export async function analyzeChapterByFile(
                 }
                 break;
               
-              case 'chunk':
+              case 'chunk': {
                 const chunkContent = parsed.content || '';
                 if (chunkContent) {
-                  result += chunkContent;
                   onProgress?.({ text: chunkContent });
                 }
                 break;
+              }
               
               case 'done':
                 
@@ -963,7 +964,7 @@ export async function createWorkFromFile(
  * @param chapterId 章节ID
  * @param onProgress 进度回调函数（可选）
  * @param settings 分析设置（可选）
- * @returns Promise<{ outline: any; detailed_outline: any }>
+ * @returns Promise<{ outline: Record<string, unknown>; detailed_outline: Record<string, unknown> }>
  */
 export async function analyzeChapter(
   workId: number,
@@ -971,8 +972,8 @@ export async function analyzeChapter(
   onProgress?: (progress: { message?: string; status?: string }) => void,
   settings?: AnalysisSettings
 ): Promise<{
-  outline: any;
-  detailed_outline: any;
+  outline: Record<string, unknown>;
+  detailed_outline: Record<string, unknown>;
 }> {
   try {
     onProgress?.({ message: '开始分析章节...', status: 'start' });
@@ -1009,7 +1010,7 @@ export async function analyzeChapter(
     }
 
     // 从结果中获取第一个成功的结果
-    const successResult = data.results?.find((r: any) => r.success);
+    const successResult = data.results?.find((r: { success: boolean; outline?: unknown; detailed_outline?: unknown }) => r.success);
     if (!successResult) {
       throw new Error('未能获取章节大纲和细纲');
     }
@@ -1017,8 +1018,8 @@ export async function analyzeChapter(
     onProgress?.({ message: data.message || '分析完成', status: 'complete' });
 
     return {
-      outline: successResult.outline || {},
-      detailed_outline: successResult.detailed_outline || {},
+      outline: (successResult.outline as Record<string, unknown>) || {},
+      detailed_outline: (successResult.detailed_outline as Record<string, unknown>) || {},
     };
   } catch (error) {
     console.error('分析章节失败:', error);
@@ -1114,7 +1115,7 @@ export async function generateComponentData(
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const body: any = {
+    const body: Record<string, unknown> = {
       work_id: workId,
       component_id: componentId,
       data_key: dataKey,

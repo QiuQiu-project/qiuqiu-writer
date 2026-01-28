@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Info, Coins, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Info, ChevronDown } from 'lucide-react';
 import ScriptSideNav, { type ScriptNavItem } from '../components/editor/ScriptSideNav';
 import AIAssistant from '../components/editor/AIAssistant';
 import TagsManager from '../components/editor/TagsManager';
@@ -84,4 +84,3 @@ export default function ScriptEditorPage() {
     </div>
   );
 }
-

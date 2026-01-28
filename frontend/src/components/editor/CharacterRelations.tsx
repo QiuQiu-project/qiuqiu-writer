@@ -34,8 +34,15 @@ interface CharacterRelationsProps {
   onChange?: (data: CharacterRelationsData) => void;
 }
 
+interface NodeData {
+  data?: {
+    name?: string;
+  };
+  id?: string;
+}
+
 // 自定义 React 节点组件
-const CharacterNode = ({ data }: { data: any }) => {
+const CharacterNode = ({ data }: { data: NodeData }) => {
   const { name } = data.data || {};
   
   return (

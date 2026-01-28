@@ -90,7 +90,7 @@ export function useChapterAutoSave({
       }
       
       // 更新全局引用，方便在切换章节时清除
-      (window as any).__chapterSaveTimeout = { current: null };
+      (window as unknown as CustomWindow).__chapterSaveTimeout = { current: null };
 
       saveTimeoutRef.current = setTimeout(async () => {
         // 再次检查，确保章节没有切换（双重验证）

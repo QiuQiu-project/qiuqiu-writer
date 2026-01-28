@@ -149,7 +149,7 @@ export function ExampleLexicalEditor({ documentId }: { documentId: string }) {
       if (root) {
         root.clear();
         const lines = newContent.split('\n');
-        lines.forEach((_line) => {
+        lines.forEach(() => {
           // 创建段落节点并添加文本
           // 这里需要根据实际的 Lexical API 来实现
         });

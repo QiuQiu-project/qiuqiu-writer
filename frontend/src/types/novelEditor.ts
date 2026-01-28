@@ -3,7 +3,7 @@
 // ShareDB 文档类型
 export interface ShareDBDocument {
   document_id: string;
-  content: any;
+  content: string;
   version?: number;
   document_exists?: boolean;
   metadata?: {
@@ -27,7 +27,7 @@ export interface SyncResponse {
   operations: Array<{
     doc_id: string;
     version: number;
-    operation: any;
+    operation: unknown;
     user_id: number;
     timestamp: string;
   }>;
@@ -35,12 +35,12 @@ export interface SyncResponse {
   work?: {
     id: number;
     word_count: number;
-    [key: string]: any;
+    [key: string]: unknown;
   };
   chapter?: {
     id: number;
     word_count: number;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 

@@ -4,7 +4,7 @@
  * 支持 LRU 淘汰策略、版本控制、离线优先
  */
 
-export interface CacheItem<T = any> {
+export interface CacheItem<T = unknown> {
   key: string;
   data: T;
   version: number;
@@ -362,7 +362,7 @@ class LocalCacheManager {
     return size;
   }
 
-  private calculateSize(data: any): number {
+  private calculateSize(data: unknown): number {
     try {
       return new Blob([JSON.stringify(data)]).size;
     } catch {

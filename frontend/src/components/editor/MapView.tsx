@@ -52,8 +52,15 @@ const initialConnections: MapConnection[] = [
   { id: 'c4', from: '3', to: '4', type: '传送门', description: '魔法传送' },
 ];
 
+interface LocationNodeData {
+  data?: {
+    name?: string;
+  };
+  id?: string;
+}
+
 // 自定义 React 地点节点组件
-const LocationNode = ({ data }: { data: any }) => {
+const LocationNode = ({ data }: { data: LocationNodeData }) => {
   const { name } = data.data || {};
   
   return (

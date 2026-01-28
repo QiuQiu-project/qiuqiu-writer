@@ -10,8 +10,8 @@ export function useAutoSave(
   currentChapterIdRef: React.MutableRefObject<number | null>,
   isChapterLoadingRef: React.MutableRefObject<boolean>,
   onWordCountUpdate: (count: number) => void,
-  onWorkUpdate?: (work: any) => void,
-  onChapterUpdate?: (chapter: any) => void
+  onWorkUpdate?: (work: Work) => void,
+  onChapterUpdate?: (chapter: Chapter) => void
 ) {
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 

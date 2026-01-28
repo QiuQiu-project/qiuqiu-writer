@@ -191,7 +191,7 @@ export function useIntelligentSync(
     } finally {
       syncInProgress.current = false;
     }
-  }, [documentId, getCurrentContent, updateContent, onSyncSuccess, onSyncError, onCollaborativeUpdate, onContentChange]);
+  }, [documentId, getCurrentContent, updateContent, onSyncSuccess, onSyncError, onContentChange, cleanupOldVersions, userInputWindow]);
 
   /**
    * 轮询检查更新
@@ -273,7 +273,7 @@ export function useIntelligentSync(
 
       // 关键修复：验证服务器文档是否属于当前章节
       if (expectedChapterId !== null) {
-        const serverChapterId = serverDoc.metadata?.chapter_id;
+        const serverChapterId = serverDoc.metadata?.chapter_id as number | undefined;
         if (serverChapterId && serverChapterId !== expectedChapterId) {
           console.error('❌ [IntelligentSync] 严重错误：服务器文档属于其他章节！', {
             serverChapterId,
@@ -341,7 +341,7 @@ export function useIntelligentSync(
       console.error('[IntelligentSync] 轮询失败:', error);
       onContentChange?.(false);
     }
-  }, [documentId, updateContent, userInputWindow, onCollaborativeUpdate, onContentChange]);
+  }, [updateContent, userInputWindow, onCollaborativeUpdate, onContentChange]);
 
   /**
    * 更新用户输入时间
@@ -524,6 +524,7 @@ export function useIntelligentSync(
       }
     }, pollInterval); // 使用正常的轮询间隔
 
+
     return () => {
       console.log('🧹 [IntelligentSync] 清理轮询定时器:', {
         documentId: documentIdRef.current,
@@ -538,20 +539,6 @@ export function useIntelligentSync(
       }
     };
   }, [enablePolling, pollInterval, documentId]); // 当 documentId 变化时重新启动轮询
-  
-  // 关键修复：添加调试日志，检查定时器状态（每5秒检查一次）
-  useEffect(() => {
-    const checkInterval = setInterval(() => {
-      console.log('🔍 [IntelligentSync-调试] 定时器状态检查:', {
-        hasPollTimer: !!pollTimer.current,
-        documentId: documentIdRef.current,
-        pollInterval,
-        timestamp: new Date().toISOString(),
-      });
-    }, 5000); // 每5秒检查一次
-    
-    return () => clearInterval(checkInterval);
-  }, [pollInterval]);
 
   // 关键修复：禁用自动同步检查，避免与 useChapterAutoSave 重复同步
   // useChapterAutoSave 已经负责了自动保存，useIntelligentSync 只负责轮询更新

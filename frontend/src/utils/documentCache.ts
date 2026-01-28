@@ -4,8 +4,20 @@
  */
 
 import { localCacheManager } from './localCacheManager';
-import { chaptersApi } from './chaptersApi';
+import { chaptersApi, type ChapterDocumentResponse } from './chaptersApi';
 import type { ShareDBDocument, SyncResponse } from '../types/document';
+
+interface SyncRequestBody {
+  doc_id: string;
+  version: number;
+  content: string;
+  content_json?: unknown;
+  base_version?: number;
+  base_content?: string;
+  base_content_json?: unknown;
+  create_version: boolean;
+  metadata?: ShareDBDocument['metadata'];
+}
 
 /**
  * 文档缓存管理器
@@ -19,7 +31,7 @@ export const documentCache = {
   lastSyncedVersion: new Map<string, number>(),
   lastSyncedContent: new Map<string, string>(),
   // 请求去重：记录正在进行的请求，避免重复请求
-  pendingRequests: new Map<string, Promise<any>>(),
+  pendingRequests: new Map<string, Promise<ChapterDocumentResponse>>(),
   // 关键修复：防止重复同步的锁
   syncLocks: new Map<string, Promise<SyncResponse>>(),
   
@@ -401,8 +413,8 @@ export const documentCache = {
   async syncDocumentState(
     documentId: string, 
     content: string, 
-    contentJson?: any, 
-    metadata?: any,
+    contentJson?: unknown, 
+    metadata?: ShareDBDocument['metadata'],
     verifyCurrentChapter?: (documentId: string) => boolean
   ): Promise<SyncResponse> {
     // 🔍 [调试] 检查内容是否为空
@@ -490,7 +502,7 @@ export const documentCache = {
           
           // 关键修复：同时提供 HTML 和 JSON 格式，后端可以使用 JSON 格式进行更精确的段落级合并
           // 关键修复：如果提供了 metadata，也传递给后端
-          const requestBody: any = {
+          const requestBody: SyncRequestBody = {
             doc_id: documentId,
             version: localVersion,
             content: contentToSave, // HTML 格式（用于兼容）
@@ -748,21 +760,13 @@ export const documentCache = {
       documentCache.pendingRequests.set(requestKey, requestPromise);
       
       const result = await requestPromise;
-      console.log('✅ [fetchFromServer] document 请求完成:', {
-        documentId,
-        chapterId,
-        hasContent: !!result?.content,
-        contentLength: result?.content?.length || 0,
-        timestamp: new Date().toISOString(),
-      });
-      
       // 请求完成后移除
       documentCache.pendingRequests.delete(requestKey);
       
       // 关键修复：如果 MongoDB 没有数据（document_exists 为 false 或 content 为空），使用本地缓存
       // 修复判断逻辑：明确检查 document_exists 字段
-      const documentExists = (result as any).document_exists === true; // 只有当明确为 true 时才认为存在
-      let content: any = result.content;
+      const documentExists = result.document_exists === true; // 只有当明确为 true 时才认为存在
+      let content: unknown = result.content;
       
       // 关键修复：检查内容是否有效
       // 如果 document_exists 为 false，或者 content 为空字符串，都认为 MongoDB 没有有效数据
@@ -825,10 +829,10 @@ export const documentCache = {
       };
       
       // 确保内容是字符串，并转换为 HTML 格式
-      const htmlContent = convertTextToHtml(typeof content === 'string' ? content : (content || ''));
+      const htmlContent = convertTextToHtml(typeof content === 'string' ? content : '');
       
       // 关键修复：传递 document_exists 信息
-      const serverDocumentExists = (result as any).document_exists === true;
+      const serverDocumentExists = result.document_exists === true;
       
       const serverDoc: ShareDBDocument = {
         document_id: documentId,

@@ -5,17 +5,21 @@
 
 import * as Automerge from '@automerge/automerge'
 
+export interface AutomergeTextDoc {
+  content: string
+}
+
 export interface AutomergeClientOptions {
   wsUrl?: string
   documentId: string
   userId?: number
   onConnect?: () => void
   onDisconnect?: () => void
-  onUpdate?: (doc: Automerge.Doc<any>) => void
+  onUpdate?: (doc: Automerge.Doc<AutomergeTextDoc>) => void
 }
 
 export class AutomergeClient {
-  private doc: Automerge.Doc<any>
+  private doc: Automerge.Doc<AutomergeTextDoc>
   private ws: WebSocket | null = null
   private options: AutomergeClientOptions
   private connected: boolean = false
@@ -26,8 +30,8 @@ export class AutomergeClient {
   constructor(options: AutomergeClientOptions) {
     this.options = options
     // 初始化文档
-    this.doc = Automerge.init()
-    this.doc = Automerge.change(this.doc, (d: any) => {
+    this.doc = Automerge.init<AutomergeTextDoc>()
+    this.doc = Automerge.change(this.doc, (d: AutomergeTextDoc) => {
       d.content = ''
     })
   }
@@ -61,12 +65,14 @@ export class AutomergeClient {
         // 二进制消息（更改）
         const buffer = await event.data.arrayBuffer()
         const changesData = new TextDecoder().decode(buffer)
-        const changesList = JSON.parse(changesData)
+        const changesList: string[] = JSON.parse(changesData)
         
         // 应用更改
         for (const changeHex of changesList) {
+          const hexPairs = changeHex.match(/.{1,2}/g) as string[] | null
+          if (!hexPairs) continue
           const changeBytes = Uint8Array.from(
-            changeHex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16))
+            hexPairs.map((b) => parseInt(b, 16))
           )
           this.doc = Automerge.applyChanges(this.doc, [changeBytes])
         }
@@ -79,7 +85,7 @@ export class AutomergeClient {
         try {
           const message = JSON.parse(event.data)
           if (message.type === 'automerge_connected') {
-            
+            this.connected = true
           } else if (message.type === 'pong') {
             // 心跳响应
           }
@@ -129,7 +135,7 @@ export class AutomergeClient {
   /**
    * 获取文档
    */
-  getDoc(): Automerge.Doc<any> {
+  getDoc(): Automerge.Doc<AutomergeTextDoc> {
     return this.doc
   }
 
@@ -144,7 +150,7 @@ export class AutomergeClient {
    * 设置文档内容
    */
   setContent(content: string): void {
-    this.doc = Automerge.change(this.doc, (d: any) => {
+    this.doc = Automerge.change(this.doc, (d: AutomergeTextDoc) => {
       d.content = content
     })
     
@@ -155,7 +161,7 @@ export class AutomergeClient {
   /**
    * 应用本地更改
    */
-  applyLocalChange(changeFn: (doc: any) => void): void {
+  applyLocalChange(changeFn: (doc: AutomergeTextDoc) => void): void {
     const oldDoc = this.doc
     this.doc = Automerge.change(this.doc, changeFn)
     
@@ -210,8 +216,6 @@ export class AutomergeClient {
     this.disconnect()
   }
 }
-
-
 
 
 

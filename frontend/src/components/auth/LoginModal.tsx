@@ -6,7 +6,7 @@ import './LoginModal.css';
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onLoginSuccess: (userInfo: any) => void;
+  onLoginSuccess: (userInfo: UserInfo) => void;
 }
 
 export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginModalProps) {

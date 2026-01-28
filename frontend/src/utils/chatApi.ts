@@ -13,7 +13,7 @@ interface ChatCompleteResponse {
 
 export interface ChatStreamEvent {
   type: 'status' | 'reference' | 'text' | 'time' | 'suggestion' | 'end' | 'error';
-  data?: any;
+  data?: unknown;
 }
 
 /**
