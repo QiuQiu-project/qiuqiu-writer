@@ -5341,7 +5341,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
                           value={newComponentForm.dataKey}
                           onChange={(e) => setNewComponentForm({ ...newComponentForm, dataKey: e.target.value.trim() })}
                           placeholder="例如：characters、character_timeline、world_locations（必填）"
-                          style={{ fontFamily: 'monospace', borderColor: !newComponentForm.dataKey ? '#ef4444' : undefined }}
+                          style={{ fontFamily: 'monospace', borderColor: !newComponentForm.dataKey ? 'var(--error, #666666)' : undefined }}
                           required
                         />
                         {!newComponentForm.dataKey && (
@@ -5494,7 +5494,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
                 <div className="form-group">
                   <label>选择颜色</label>
                   <div className="color-grid">
-                    {['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4', '#6366f1'].map(c => (
+                    {['#000000', '#333333', '#666666', '#999999', '#cccccc', '#444444', '#222222', '#111111'].map(c => (
                       <button 
                         key={c} 
                         className={`color-btn ${newModuleForm.color === c ? 'active' : ''}`} 
@@ -5964,7 +5964,7 @@ export default function WorkInfoManager({ workId, workData }: WorkInfoManagerPro
                       <div key={idx} style={{ marginBottom: '12px' }}>
                         {generatePreviewModal.editingIndex === idx ? (
                           // 编辑模式
-                          <div style={{ padding: '12px', border: '2px solid #3b82f6', borderRadius: '8px', backgroundColor: '#f8fafc' }}>
+                          <div style={{ padding: '12px', border: '2px solid var(--info, #999999)', borderRadius: '8px', backgroundColor: 'var(--bg-secondary, #f8f8f8)' }}>
                             <div style={{ marginBottom: '12px' }}>
                               <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', fontWeight: 500 }}>角色名称</label>
                               <input
