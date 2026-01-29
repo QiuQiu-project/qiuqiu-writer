@@ -74,7 +74,7 @@ export class AutomergeClient {
           const changeBytes = Uint8Array.from(
             hexPairs.map((b) => parseInt(b, 16))
           )
-          this.doc = Automerge.applyChanges(this.doc, [changeBytes])
+          this.doc = Automerge.applyChanges(this.doc, [changeBytes]) as unknown as Automerge.Doc<AutomergeTextDoc>
         }
         
         if (this.options.onUpdate) {
@@ -216,7 +216,6 @@ export class AutomergeClient {
     this.disconnect()
   }
 }
-
 
 
 

@@ -13,7 +13,7 @@ export default defineConfig({
           // 编辑器相关
           'editor-vendor': ['@tiptap/react', '@tiptap/starter-kit', '@tiptap/extension-placeholder', '@tiptap/extension-underline'],
           // 协作编辑
-          'collab-vendor': ['yjs', 'y-websocket', '@automerge/automerge', '@tiptap/extension-collaboration', '@tiptap/extension-collaboration-cursor'],
+          'collab-vendor': ['yjs', 'y-websocket'],
           // 图形库
           'graph-vendor': ['@antv/g6', '@antv/g6-extension-react', 'reactflow'],
           // 工具库

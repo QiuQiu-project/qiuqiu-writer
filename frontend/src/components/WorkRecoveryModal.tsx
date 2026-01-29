@@ -3,7 +3,7 @@
  * 从本地缓存恢复作品和章节
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { X, RefreshCw, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { 
   getRecoverableWorks, 
@@ -219,7 +219,6 @@ export default function WorkRecoveryModal({
     </div>
   );
 }
-
 
 
 

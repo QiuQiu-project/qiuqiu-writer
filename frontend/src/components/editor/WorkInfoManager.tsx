@@ -814,7 +814,7 @@ function DataDependenciesSelector({ value, onChange, template, currentComponentI
 
 interface WorkInfoManagerProps {
   workId?: string | null;
-  workData?: WorkData; // 可选的 workData，如果提供则避免重复请求
+  workData?: WorkData;
 }
 
 // 时间线角色选择器组件
@@ -882,7 +882,7 @@ function TimelineCharacterSelector({
   
   const handleRemoveCharacter = (charId: string) => {
     const newCharacterIds = selectedCharacterIds.filter(id => id !== charId);
-    const newCharacters = selectedCharacters.filter((name, idx) => 
+    const newCharacters = selectedCharacters.filter((_, idx) => 
       selectedCharacterIds[idx] !== charId
     );
     onSelectionChange(newCharacterIds, newCharacters);

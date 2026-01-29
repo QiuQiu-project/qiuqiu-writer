@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
-import { authApi, type LoginRequest, type RegisterRequest } from '../../utils/authApi';
+import { authApi, type LoginRequest, type RegisterRequest, type UserInfo } from '../../utils/authApi';
 import './LoginModal.css';
 
 interface LoginModalProps {
@@ -231,7 +231,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     </div>
   );
 }
-
 
 
 

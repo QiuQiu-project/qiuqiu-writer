@@ -2261,7 +2261,12 @@ export default function NovelEditorPage(){
         <div className="novel-editor-main">
 
           {/* 根据导航项显示不同内容 */}
-          {activeNav === 'work-info' && selectedChapter === null && <WorkInfoManager workId={workId} workData={work} />}
+          {activeNav === 'work-info' && selectedChapter === null && (
+            <WorkInfoManager 
+              workId={workId} 
+              workData={work ? ({ metadata: { ...(work.metadata || {}) } } as any) : undefined} 
+            />
+          )}
           {activeNav === 'tags' && <TagsManager />}
           {activeNav === 'outline' && <ChapterOutline />}
           {activeNav === 'map' && <MapView />}
@@ -2479,7 +2484,6 @@ export default function NovelEditorPage(){
         availableCharacters={hasCharacterModule ? availableCharacters : []}
         availableLocations={hasLocationModule ? availableLocations : []}
         availableVolumes={volumes.map(vol => ({ id: vol.id, title: vol.title }))}
-        workType="long"
         onClose={() => setIsChapterModalOpen(false)}
         onSave={handleSaveChapter}
         onGenerateContent={async (content: string, isFinal?: boolean) => {
