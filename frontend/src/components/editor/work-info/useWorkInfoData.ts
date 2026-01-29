@@ -259,20 +259,20 @@ export const useWorkInfoData = (
       };
 
       const newModules = updateModules(prev.modules);
-      const newTemplate = { ...prev, modules: newModules, lastModified: Date.now() };
-      
-      // 异步保存到缓存
-      if (workId) {
-        saveToCache({
-          templateId: newTemplate.id,
-          modules: newModules,
-          lastModified: Date.now()
-        }, workId, newTemplate.id);
-      }
-      
-      return newTemplate;
+      return { ...prev, modules: newModules, lastModified: Date.now() };
     });
   }, [workId]);
+
+  // 监听模板变化并自动保存到缓存
+  useEffect(() => {
+    if (workId && template) {
+      saveToCache({
+        templateId: template.id,
+        modules: template.modules,
+        lastModified: Date.now()
+      }, workId, template.id);
+    }
+  }, [template, workId]);
 
   return {
     template,

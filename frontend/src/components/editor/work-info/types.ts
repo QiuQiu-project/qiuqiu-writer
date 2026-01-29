@@ -5,6 +5,7 @@ export type ComponentType =
   | 'image'          // 图片上传
   | 'select'         // 单选下拉
   | 'multiselect'    // 多选标签
+  | 'tags'           // 标签组件
   | 'list'           // 简单列表
   | 'keyvalue'       // 键值对列表
   | 'table'          // 表格
@@ -61,6 +62,7 @@ export interface TemplateConfig {
   modules: ModuleConfig[];
   lastModified?: number;
   templateId?: string; // 用于 metadata 存储
+  [key: string]: unknown;
 }
 
 export interface WorkMetadata {

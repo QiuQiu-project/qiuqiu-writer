@@ -1,5 +1,5 @@
 
-import type { ComponentConfig, ModuleConfig } from './types';
+import type { ComponentConfig, ModuleConfig, CharacterData } from './types';
 
 // 获取组件的默认数据键
 const getDefaultDataKey = (comp: ComponentConfig): string | null => {
@@ -7,6 +7,75 @@ const getDefaultDataKey = (comp: ComponentConfig): string | null => {
   if (comp.type === 'timeline') return 'character_timeline';
   if (comp.type === 'character-card') return 'characters';
   return null;
+};
+
+// 获取依赖的角色数据
+export const getDependencyCharacters = (modules: ModuleConfig[], dataDependencies?: string[]): CharacterData[] => {
+  if (!dataDependencies || dataDependencies.length === 0) return [];
+
+  const findDependencyData = (depKey: string): unknown[] => {
+    for (const module of modules) {
+      const findInComponents = (components: ComponentConfig[], path: string = ''): unknown[] | null => {
+        for (const compItem of components) {
+          if (compItem.dataKey === depKey) {
+            if (compItem.value !== undefined && compItem.value !== null) {
+              if (Array.isArray(compItem.value)) {
+                return compItem.value as unknown[];
+              } else if (typeof compItem.value === 'object' && compItem.value !== null) {
+                const obj = compItem.value as { characters?: unknown[] };
+                if (Array.isArray(obj.characters)) {
+                  return obj.characters;
+                }
+              }
+            } else {
+              return [];
+            }
+          }
+          if (compItem.type === 'tabs' && compItem.config?.tabs) {
+            for (const tab of compItem.config.tabs) {
+              if (tab.components) {
+                const found = findInComponents(tab.components, `${path} > ${tab.label || tab.id}`);
+                if (found) return found;
+              }
+            }
+          }
+        }
+        return null;
+      };
+      const found = findInComponents(module.components, module.name);
+      if (found) {
+        return found;
+      }
+    }
+    return [];
+  };
+
+  const allDependencyCharacters: CharacterData[] = [];
+  for (const depKey of dataDependencies) {
+    const depData = findDependencyData(depKey);
+    if (depData && Array.isArray(depData) && depData.length > 0) {
+      const convertedCharacters = depData.map((char: unknown, index: number) => {
+        const c = char as { id?: string; name?: string; gender?: string; display_name?: string };
+        const stableId = c.id || c.name || `char-${index}`;
+        return {
+          id: stableId,
+          name: c.name || c.display_name || '',
+          gender: (c.gender === '男' || c.gender === '女') ? c.gender : '男'
+        } as CharacterData;
+      });
+      allDependencyCharacters.push(...convertedCharacters);
+    }
+  }
+
+  const charMap: Record<string, CharacterData> = {};
+  allDependencyCharacters.forEach((char) => {
+    const key = char.id || char.name;
+    if (key && !charMap[key]) {
+      charMap[key] = char;
+    }
+  });
+  
+  return Object.values(charMap);
 };
 
 // 从模板配置中提取模块
@@ -36,7 +105,16 @@ export const extractComponentDataFromTemplate = (modules: ModuleConfig[]): Recor
       }
       const storageKey = comp.dataKey || getDefaultDataKey(comp) || comp.id;
       if (comp.value !== undefined) {
-        data[storageKey] = comp.value;
+        if (Object.prototype.hasOwnProperty.call(data, storageKey)) {
+          const existing = data[storageKey];
+          if (Array.isArray(existing)) {
+            (existing as unknown[]).push(comp.value);
+          } else {
+            data[storageKey] = [existing, comp.value];
+          }
+        } else {
+          data[storageKey] = comp.value;
+        }
       }
     }
   };

@@ -6,8 +6,9 @@
 import { BaseApiClient } from './baseApiClient';
 
 export interface TemplateConfig {
-  templateId: string;
+  templateId?: string;
   modules: unknown[];
+  [key: string]: unknown;
 }
 
 export interface WorkTemplate {
