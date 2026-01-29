@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Settings } from 'lucide-react';
 import type { ComponentConfig } from './types';
 
 export interface TabsComponentProps {
@@ -100,7 +101,7 @@ export function TabsComponent({
                           onClick={() => onEditComponentInTab(subComp, activeTabData.id)}
                           title="编辑组件"
                         >
-                          ⚙️
+                          <Settings size={14} />
                         </button>
                       )}
                     </div>

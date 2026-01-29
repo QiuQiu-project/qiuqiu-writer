@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, X, Search, ChevronDown, Calendar, MapPin, User } from 'lucide-react';
+import { Plus, X, Search, ChevronDown, Calendar, MapPin, User, Settings } from 'lucide-react';
 import type { ComponentConfig, TimelineEditForm, CharacterData } from './types';
 
 interface TimelineCharacterSelectorProps {
@@ -256,8 +256,8 @@ export default function TimelineEditor({
           </div>
           
           <div className="form-actions">
-            <button className="btn-save" onClick={handleSaveEvent}>保存</button>
-            <button className="btn-cancel" onClick={() => setEditingEventId(null)}>取消</button>
+            <button className="btn-primary" onClick={handleSaveEvent}>保存</button>
+            <button className="btn-secondary" onClick={() => setEditingEventId(null)}>取消</button>
           </div>
         </div>
       ) : (
@@ -268,12 +268,14 @@ export default function TimelineEditor({
               <div className="timeline-content">
                 <div className="timeline-header">
                   <span className="timeline-title">{event.event}</span>
-                  {isEditMode && (
-                    <div className="timeline-actions">
-                      <button onClick={() => handleEditEvent(event, index)}>编辑</button>
-                      <button onClick={() => handleDeleteEvent(index)} className="text-red-500">删除</button>
-                    </div>
-                  )}
+                  <div className="timeline-actions">
+                    <button className="icon-btn" onClick={() => handleEditEvent(event, index)} title="编辑">
+                       <Settings size={14} />
+                    </button>
+                    <button className="icon-btn text-red" onClick={() => handleDeleteEvent(index)} title="删除">
+                       <X size={14} />
+                    </button>
+                  </div>
                 </div>
                 {event.location && (
                   <div className="timeline-meta">
@@ -291,11 +293,10 @@ export default function TimelineEditor({
               </div>
             </div>
           ))}
-          {isEditMode && (
-            <button className="timeline-add-btn" onClick={handleAddEvent}>
-              <Plus size={16} /> 添加事件
-            </button>
-          )}
+          {/* Always allow adding events */}
+          <button className="timeline-add-btn btn-secondary" onClick={handleAddEvent} style={{ width: '100%', marginTop: '12px', justifyContent: 'center' }}>
+            <Plus size={16} /> 添加事件
+          </button>
         </div>
       )}
     </div>

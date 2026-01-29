@@ -640,7 +640,11 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
                {isEditMode ? '完成编辑' : '编辑模板'}
              </button>
              {isEditMode && (
-               <button onClick={() => setShowAddModule(true)}>
+               <button 
+                 className="btn-secondary"
+                 onClick={() => setShowAddModule(true)}
+                 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+               >
                  <Plus size={16} /> 添加模块
                </button>
              )}
@@ -670,11 +674,16 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
                         </button>
                     )}
                     {isEditMode && (
-                      <button onClick={() => {
+                      <button 
+                        className="comp-edit-btn"
+                        title="编辑组件"
+                        onClick={() => {
                         setEditingComponentId(comp.id);
                         setEditingComponentData(comp);
                         setShowAddComponent(true);
-                      }}>编辑</button>
+                      }}>
+                        <Settings size={14} />
+                      </button>
                     )}
                  </div>
                </div>
@@ -727,8 +736,8 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
                </div>
             </div>
             <div className="modal-footer">
-              <button onClick={() => setShowAddModule(false)}>取消</button>
-              <button className="primary" onClick={handleAddModule}>确认添加</button>
+              <button className="btn-secondary" onClick={() => setShowAddModule(false)}>取消</button>
+              <button className="btn-primary" onClick={handleAddModule}>确认添加</button>
             </div>
           </div>
         </div>

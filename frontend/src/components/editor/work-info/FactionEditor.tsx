@@ -15,14 +15,12 @@ const FactionNode = ({
   onUpdate, 
   onDelete, 
   onAddChild,
-  isEditMode,
   level = 0
 }: { 
   node: FactionData; 
   onUpdate: (id: string, data: Partial<FactionData>) => void;
   onDelete: (id: string) => void;
   onAddChild: (parentId: string) => void;
-  isEditMode: boolean;
   level?: number;
 }) => {
   const [expanded, setExpanded] = useState(true);
@@ -39,24 +37,16 @@ const FactionNode = ({
         </button>
         
         <div className="faction-info">
-          {isEditMode ? (
-            <input 
-              value={node.name} 
-              onChange={e => onUpdate(node.id, { name: e.target.value })}
-              className="faction-name-input"
-              placeholder="势力名称"
-            />
-          ) : (
-            <span className="faction-name">{node.name}</span>
-          )}
+          <input 
+            value={node.name} 
+            onChange={e => onUpdate(node.id, { name: e.target.value })}
+            className="faction-name-input"
+            placeholder="势力名称"
+          />
           
           <div className="faction-actions">
-            {isEditMode && (
-              <>
-                <button onClick={() => onAddChild(node.id)} title="添加下级"><Plus size={14} /></button>
-                <button onClick={() => onDelete(node.id)} title="删除"><Trash2 size={14} /></button>
-              </>
-            )}
+            <button onClick={() => onAddChild(node.id)} title="添加下级"><Plus size={14} /></button>
+            <button onClick={() => onDelete(node.id)} title="删除"><Trash2 size={14} /></button>
           </div>
         </div>
       </div>
@@ -70,7 +60,6 @@ const FactionNode = ({
               onUpdate={onUpdate} 
               onDelete={onDelete}
               onAddChild={onAddChild}
-              isEditMode={isEditMode}
               level={level + 1}
             />
           ))}
@@ -83,7 +72,8 @@ const FactionNode = ({
 export default function FactionEditor({
   component,
   onChange,
-  isEditMode
+  // isEditMode is no longer used for restricting editing, 
+  // but we keep it in props to avoid breaking the interface if passed
 }: FactionEditorProps) {
   const factions = (Array.isArray(component.value) ? component.value : []) as FactionData[];
 
@@ -152,15 +142,12 @@ export default function FactionEditor({
             onUpdate={handleUpdate}
             onDelete={handleDelete}
             onAddChild={handleAddChild}
-            isEditMode={isEditMode}
           />
         ))}
       </div>
-      {isEditMode && (
-        <button className="faction-add-root-btn" onClick={() => handleAddChild(null)}>
-          <Plus size={14} /> 添加顶级势力
-        </button>
-      )}
+      <button className="faction-add-root-btn btn-secondary" onClick={() => handleAddChild(null)}>
+        <Plus size={14} /> 添加顶级势力
+      </button>
     </div>
   );
 }
