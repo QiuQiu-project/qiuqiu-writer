@@ -237,18 +237,107 @@ export default function ComponentEditorModal({
               
               {(formData.type === 'select' || formData.type === 'multiselect') && (
                 <div className="form-group">
-                  <label>选项配置 (每行一个)</label>
-                  <textarea
-                    value={((formData.config.options as any[])?.map(o => o.label).join('\n')) || ''}
-                    onChange={e => {
-                      const options = e.target.value.split('\n').filter(Boolean).map(s => ({ label: s, value: s }));
-                      setFormData({
-                        ...formData,
-                        config: { ...formData.config, options }
-                      });
-                    }}
-                    placeholder="选项1&#10;选项2&#10;选项3"
-                  />
+                  <label>选项配置 (每行一个，支持设置颜色)</label>
+                  <div className="options-config-container" style={{ border: '1px solid #e2e8f0', borderRadius: '6px', overflow: 'hidden' }}>
+                    {((formData.config.options as any[]) || []).map((option, index) => (
+                      <div key={index} style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', padding: '8px', gap: '8px', alignItems: 'center' }}>
+                        <input
+                          type="text"
+                          value={option.label}
+                          onChange={e => {
+                            const newOptions = [...((formData.config.options as any[]) || [])];
+                            newOptions[index] = { ...newOptions[index], label: e.target.value, value: e.target.value };
+                            setFormData({
+                              ...formData,
+                              config: { ...formData.config, options: newOptions }
+                            });
+                          }}
+                          placeholder="选项名称"
+                          className="comp-input"
+                          style={{ flex: 1 }}
+                        />
+                        <input
+                          type="color"
+                          value={option.color || '#e2e8f0'}
+                          onChange={e => {
+                            const newOptions = [...((formData.config.options as any[]) || [])];
+                            newOptions[index] = { ...newOptions[index], color: e.target.value };
+                            setFormData({
+                              ...formData,
+                              config: { ...formData.config, options: newOptions }
+                            });
+                          }}
+                          style={{ width: '30px', height: '30px', padding: 0, border: 'none', background: 'none', cursor: 'pointer' }}
+                          title="选择颜色"
+                        />
+                        <button
+                          onClick={() => {
+                            const newOptions = [...((formData.config.options as any[]) || [])];
+                            newOptions.splice(index, 1);
+                            setFormData({
+                              ...formData,
+                              config: { ...formData.config, options: newOptions }
+                            });
+                          }}
+                          className="icon-btn"
+                          style={{ color: '#ef4444' }}
+                          title="删除选项"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ))}
+                    <div style={{ padding: '8px', background: '#f8fafc' }}>
+                      <button
+                        onClick={() => {
+                          const newOptions = [...((formData.config.options as any[]) || [])];
+                          newOptions.push({ label: '', value: '', color: '#e2e8f0' });
+                          setFormData({
+                            ...formData,
+                            config: { ...formData.config, options: newOptions }
+                          });
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '8px',
+                          border: '1px dashed #cbd5e1',
+                          background: 'white',
+                          borderRadius: '4px',
+                          color: '#64748b',
+                          cursor: 'pointer',
+                          fontSize: '13px'
+                        }}
+                      >
+                        + 添加选项
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {/* Fallback for bulk add via text (optional, or keep both) */}
+                  <div style={{ marginTop: '8px' }}>
+                    <small style={{ color: '#64748b' }}>也可以通过下方文本框快速添加（每行一个）:</small>
+                    <textarea
+                        style={{ marginTop: '4px', height: '80px' }}
+                        value=""
+                        onChange={e => {
+                          const lines = e.target.value.split('\n').filter(Boolean);
+                          const newOptions = [...((formData.config.options as any[]) || [])];
+                          
+                          lines.forEach(line => {
+                             // Check if already exists to avoid dupes if possible, or just add
+                             if (!newOptions.find(o => o.label === line)) {
+                               newOptions.push({ label: line, value: line, color: '#e2e8f0' });
+                             }
+                          });
+                          
+                          setFormData({
+                            ...formData,
+                            config: { ...formData.config, options: newOptions }
+                          });
+                        }}
+                        placeholder="输入选项后回车添加..."
+                    />
+                  </div>
                 </div>
               )}
 
