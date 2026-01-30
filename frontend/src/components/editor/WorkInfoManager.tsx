@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { 
-  Plus, X, Settings, LayoutGrid, Sparkles, Save
+  Plus, X, Settings, LayoutGrid, Sparkles, Save, Trash2
 } from 'lucide-react';
 import CharacterRelations from './CharacterRelations';
 import type { CharacterRelationsData } from './CharacterRelations';
@@ -581,6 +581,23 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
     }
   };
 
+  const handleDeleteModule = () => {
+    if (!activeModule) return;
+    
+    if (window.confirm(`确定要删除模块 "${activeModule.name}" 吗？此操作将删除该模块下的所有数据且不可恢复。`)) {
+      setTemplate(prev => {
+        if (!prev) return null;
+        const newModules = prev.modules.filter(m => m.id !== activeModule.id);
+        return {
+          ...prev,
+          modules: newModules
+        };
+      });
+      // Reset index to 0
+      setActiveModuleIndex(0);
+    }
+  };
+
   const handleSelectTemplate = (tpl: WorkTemplate) => {
     if (tpl.template_config && typeof tpl.template_config === 'object') {
        // 这里需要做一些类型适配，因为后端返回的结构可能需要转换
@@ -650,13 +667,23 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
                {isEditMode ? '完成编辑' : '编辑模板'}
              </button>
              {isEditMode && (
-               <button 
-                 className="btn-secondary"
-                 onClick={() => setShowAddModule(true)}
-                 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-               >
-                 <Plus size={16} /> 添加模块
-               </button>
+               <>
+                 <button 
+                   className="btn-secondary"
+                   onClick={() => setShowAddModule(true)}
+                   style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                 >
+                   <Plus size={16} /> 添加模块
+                 </button>
+                 <button 
+                   className="btn-secondary"
+                   onClick={handleDeleteModule}
+                   style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ef4444', borderColor: '#fecaca', background: '#fef2f2' }}
+                   title="删除当前模块"
+                 >
+                   <Trash2 size={16} /> 删除模块
+                 </button>
+               </>
              )}
            </div>
         </div>
@@ -719,35 +746,42 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
       {/* 模块添加模态框 */}
       {showAddModule && (
         <div className="modal-overlay">
-          <div className="modal-content">
-            <h3>添加新模块</h3>
-            <div className="form-group">
-              <label>模块名称</label>
-              <input
-                type="text"
-                value={newModuleForm.name}
-                onChange={(e) => setNewModuleForm({ ...newModuleForm, name: e.target.value })}
-                placeholder="例如：世界观、人物设定"
-              />
+          <div className="modal-content" style={{ maxWidth: '480px', maxHeight: '80vh' }}>
+            <div className="modal-header">
+              <h3>添加新模块</h3>
+              <button className="close-btn" onClick={() => setShowAddModule(false)}><X size={18} /></button>
             </div>
-             <div className="form-group">
-              <label>图标</label>
-               <div className="icon-selector">
-                 {Object.keys(IconMap).map(iconName => (
-                   <button
-                     key={iconName}
-                     className={`icon-btn ${newModuleForm.icon === iconName ? 'active' : ''}`}
-                     onClick={() => setNewModuleForm({ ...newModuleForm, icon: iconName })}
-                     title={iconName}
-                   >
-                     {IconMap[iconName]}
-                   </button>
-                 ))}
-               </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label>模块名称</label>
+                <input
+                  type="text"
+                  value={newModuleForm.name}
+                  onChange={(e) => setNewModuleForm({ ...newModuleForm, name: e.target.value })}
+                  placeholder="例如：世界观、人物设定"
+                  autoFocus
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddModule()}
+                />
+              </div>
+              <div className="form-group">
+                <label>图标</label>
+                <div className="icon-selector">
+                  {Object.keys(IconMap).map(iconName => (
+                    <button
+                      key={iconName}
+                      className={`icon-btn ${newModuleForm.icon === iconName ? 'active' : ''}`}
+                      onClick={() => setNewModuleForm({ ...newModuleForm, icon: iconName })}
+                      title={iconName}
+                    >
+                      {IconMap[iconName]}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
             <div className="modal-footer">
-              <button className="btn-secondary" onClick={() => setShowAddModule(false)}>取消</button>
-              <button className="btn-primary" onClick={handleAddModule}>确认添加</button>
+              <button onClick={() => setShowAddModule(false)}>取消</button>
+              <button className="primary" onClick={handleAddModule}>确认添加</button>
             </div>
           </div>
         </div>

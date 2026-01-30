@@ -642,32 +642,41 @@
   gap: 16px;
 }
 
-.icon-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+.icon-selector {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+  gap: 12px;
+  padding: 4px;
+  margin-top: 8px;
 }
 
 .icon-selector .icon-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 100%;
+  aspect-ratio: 1;
   background: var(--bg-secondary);
-  border: 2px solid var(--border-light);
+  border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all var(--transition-base);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  color: var(--text-secondary);
 }
 
 .icon-selector .icon-btn:hover {
-  border-color: var(--text-tertiary);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  background: var(--bg-primary);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
 }
 
 .icon-selector .icon-btn.active {
-  border-color: currentColor;
+  border-color: var(--accent-primary);
   background: var(--accent-light);
+  color: var(--accent-primary);
+  box-shadow: 0 0 0 2px var(--accent-light);
 }
 
 .color-grid {
