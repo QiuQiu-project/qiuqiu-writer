@@ -583,6 +583,58 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
     setEditingComponentContext(null);
   };
 
+  const handleDeleteComponent = () => {
+    if (!activeModule || !editingComponentId) return;
+    
+    setTemplate(prev => {
+      if (!prev) return null;
+      
+      const newModules = prev.modules.map(m => {
+         if (m.id === activeModule.id) {
+            // Case 1: Component inside a Tab
+            if (editingComponentContext) {
+               const { tabsComponentId, tabId } = editingComponentContext;
+               
+               return {
+                 ...m,
+                 components: m.components.map(c => {
+                   if (c.id === tabsComponentId) {
+                      const newTabs = c.config.tabs?.map((tab: any) => {
+                        if (tab.id === tabId) {
+                          return {
+                            ...tab,
+                            components: (tab.components || []).filter((subC: any) => subC.id !== editingComponentId)
+                          };
+                        }
+                        return tab;
+                      });
+                      return { ...c, config: { ...c.config, tabs: newTabs } };
+                   }
+                   return c;
+                 })
+               };
+            }
+            
+            // Case 2: Top-level Component in Module
+            return {
+              ...m,
+              components: m.components.filter(c => c.id !== editingComponentId)
+            };
+         }
+         return m;
+      });
+      
+      return { ...prev, modules: newModules };
+    });
+
+    // Close modal and reset state
+    setShowAddComponent(false);
+    setEditingComponentId(null);
+    setEditingComponentData(undefined);
+    setAddingToTab(null);
+    setEditingComponentContext(null);
+  };
+
   const handleAddModule = () => {
     if (newModuleForm.name) {
       setTemplate(prev => {
@@ -823,6 +875,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
             setEditingComponentContext(null);
         }}
         onSave={handleSaveComponent}
+        onDelete={handleDeleteComponent}
         initialData={editingComponentData}
         template={template}
         isEditing={!!editingComponentId}

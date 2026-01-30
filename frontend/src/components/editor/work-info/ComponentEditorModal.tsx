@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, ChevronLeft, ChevronRight, Loader2, Maximize2 } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Loader2, Maximize2, Trash2 } from 'lucide-react';
 import type { ComponentType, ComponentConfig, TemplateConfig } from './types';
 import { DataDependenciesSelector } from './DataDependenciesSelector';
 import { promptTemplateApi } from '../../../utils/promptTemplateApi';
@@ -8,6 +8,7 @@ interface ComponentEditorModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (componentData: any) => void;
+  onDelete?: () => void;
   initialData?: ComponentConfig;
   template: TemplateConfig;
   isEditing?: boolean;
@@ -17,6 +18,7 @@ export default function ComponentEditorModal({
   isOpen,
   onClose,
   onSave,
+  onDelete,
   initialData,
   template,
   isEditing = false
@@ -356,6 +358,27 @@ export default function ComponentEditorModal({
                 {!isEditing && (
                   <button onClick={() => setStep('type')}><ChevronLeft size={14} /> 上一步</button>
                 )}
+                
+                {isEditing && onDelete && (
+                  <button 
+                    onClick={() => {
+                      if (window.confirm('确定要删除这个组件吗？此操作不可恢复。')) {
+                        onDelete();
+                      }
+                    }}
+                    style={{ 
+                      background: '#fff1f2', 
+                      color: '#e11d48', 
+                      border: '1px solid #fecdd3',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <Trash2 size={14} /> 删除
+                  </button>
+                )}
+
                 <div style={{ flex: 1 }}></div>
                 <button onClick={onClose}>取消</button>
                 <button className="primary" onClick={handleSave}>保存</button>
