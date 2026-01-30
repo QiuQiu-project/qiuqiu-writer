@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { X, Code, Eye, User, MapPin, Calendar, List, Box, Layers, Tag } from 'lucide-react';
+import './GeneratedDataPreviewModal.css';
 
 interface GeneratedDataPreviewModalProps {
   isOpen: boolean;
@@ -17,6 +18,7 @@ export function GeneratedDataPreviewModal({
   dataKey
 }: GeneratedDataPreviewModalProps) {
   const [content, setContent] = useState('');
+  const [activeTab, setActiveTab] = useState<'preview' | 'json'>('preview');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -28,7 +30,15 @@ export function GeneratedDataPreviewModal({
         cleaned = match[1];
       }
       setContent(cleaned);
-      validateJSON(cleaned);
+      
+      // Auto-switch to json if parsing fails initially
+      try {
+        JSON.parse(cleaned);
+        setActiveTab('preview');
+      } catch (e) {
+        setActiveTab('json');
+        setError((e as Error).message);
+      }
     }
   }, [isOpen, rawData]);
 
@@ -43,59 +53,208 @@ export function GeneratedDataPreviewModal({
     }
   };
 
-  const handleSave = () => {
-    if (!validateJSON(content)) return;
-    
+  const parsedData = useMemo(() => {
     try {
       const parsed = JSON.parse(content);
-      // Smart extraction logic
+      // Smart extraction logic similar to handleSave
       let finalData = parsed;
       if (dataKey && !Array.isArray(parsed) && typeof parsed === 'object' && parsed !== null) {
         if (Object.prototype.hasOwnProperty.call(parsed, dataKey)) {
              finalData = parsed[dataKey];
         }
       }
-      
-      onSave(finalData);
-      onClose();
+      return finalData;
     } catch (e) {
-      setError('Save failed: ' + (e as Error).message);
+      return null;
     }
+  }, [content, dataKey]);
+
+  const handleSave = () => {
+    if (!validateJSON(content)) return;
+    
+    if (parsedData) {
+      onSave(parsedData);
+      onClose();
+    }
+  };
+
+  const renderPreview = () => {
+    if (!parsedData) {
+      return (
+        <div className="empty-preview">
+          <p>无法解析 JSON 数据，请切换到 JSON 编辑模式修正。</p>
+        </div>
+      );
+    }
+
+    // Determine type
+    const isArray = Array.isArray(parsedData);
+    
+    // 1. Character List / Faction List / Location List
+    if (isArray) {
+      const firstItem = parsedData[0];
+      if (typeof firstItem === 'object' && firstItem !== null) {
+        // Check for common fields
+        const hasName = 'name' in firstItem;
+        
+        if (hasName) {
+           return (
+             <div className="preview-cards-grid">
+               {parsedData.map((item: any, index: number) => (
+                 <div key={index} className="preview-card">
+                   <div className="preview-card-header">
+                     <div className="preview-card-icon">
+                        {dataKey?.includes('character') ? <User size={18} /> :
+                         dataKey?.includes('location') ? <MapPin size={18} /> :
+                         dataKey?.includes('faction') ? <Layers size={18} /> :
+                         <Box size={18} />}
+                     </div>
+                     <div className="preview-card-title">{item.name || '未命名'}</div>
+                   </div>
+                   {Object.entries(item).map(([key, value]) => {
+                     if (key === 'name' || key === 'id') return null;
+                     if (typeof value === 'object') return null; // Skip nested objects for simple card view
+                     return (
+                       <div key={key} className="preview-card-field">
+                         <span className="preview-card-label">{key}:</span>
+                         <span className="preview-card-value">{String(value)}</span>
+                       </div>
+                     );
+                   })}
+                 </div>
+               ))}
+             </div>
+           );
+        }
+      }
+      
+      // Timeline items (often has 'time' or 'date')
+      const isTimeline = parsedData.some((item: any) => item.time || item.date || item.year);
+      if (isTimeline) {
+         return (
+           <div className="preview-timeline">
+             {parsedData.map((item: any, index: number) => (
+               <div key={index} className="preview-timeline-item">
+                 <div className="preview-timeline-dot"></div>
+                 <div className="preview-timeline-time">{item.time || item.date || item.year || '未知时间'}</div>
+                 <div className="preview-timeline-content">
+                   <div className="preview-card-title">{item.event || item.title || item.name || '未命名事件'}</div>
+                   {item.description && <div className="preview-card-field">{item.description}</div>}
+                   {Object.entries(item).map(([key, value]) => {
+                     if (['time', 'date', 'year', 'event', 'title', 'name', 'description'].includes(key)) return null;
+                     if (typeof value === 'object') return null;
+                     return (
+                       <div key={key} className="preview-card-field">
+                         <span className="preview-card-label">{key}:</span>
+                         <span className="preview-card-value">{String(value)}</span>
+                       </div>
+                     );
+                   })}
+                 </div>
+               </div>
+             ))}
+           </div>
+         );
+      }
+      
+      // Generic List
+      return (
+        <div className="preview-list">
+          {parsedData.map((item: any, index: number) => (
+             <div key={index} className="preview-list-item">
+               {typeof item === 'object' ? (
+                 <div style={{ width: '100%' }}>
+                   {Object.entries(item).map(([key, value]) => (
+                     <div key={key} className="preview-key-value-row">
+                       <span className="preview-kv-key">{key}:</span>
+                       <span className="preview-kv-value">{JSON.stringify(value)}</span>
+                     </div>
+                   ))}
+                 </div>
+               ) : (
+                 <span>{String(item)}</span>
+               )}
+             </div>
+          ))}
+        </div>
+      );
+    }
+    
+    // 2. Object (Key-Value)
+    if (typeof parsedData === 'object' && parsedData !== null) {
+      return (
+        <div className="preview-key-value">
+          {Object.entries(parsedData).map(([key, value]) => (
+            <div key={key} className="preview-list-item">
+               <div className="preview-key-value-row" style={{ width: '100%', border: 'none' }}>
+                 <span className="preview-kv-key" style={{ width: '180px' }}>{key}</span>
+                 <span className="preview-kv-value">
+                   {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                 </span>
+               </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    return <div>{String(parsedData)}</div>;
   };
 
   if (!isOpen) return null;
 
   return (
     <div className="modal-overlay">
-      <div className="modal-content" style={{ width: '600px', maxWidth: '90vw' }}>
+      <div className="generated-data-preview-modal modal-content">
         <div className="modal-header">
           <h3>AI 生成结果预览</h3>
           <button className="close-btn" onClick={onClose}><X size={18} /></button>
         </div>
         
-        <div className="modal-body">
-           <div className="form-group">
-             <label>生成的数据 (JSON)</label>
-             <textarea 
-               value={content}
-               onChange={(e) => {
-                 setContent(e.target.value);
-                 validateJSON(e.target.value);
-               }}
-               rows={15}
-               style={{ fontFamily: 'monospace', fontSize: '12px', width: '100%' }}
-             />
-             {error && <div className="error-message" style={{ color: 'red', fontSize: '12px', marginTop: '5px' }}>JSON 格式错误: {error}</div>}
-           </div>
-           
-           {dataKey && !error && (
-             <div className="info-message" style={{ fontSize: '12px', color: '#666', marginTop: '10px' }}>
-               将保存到数据键: <strong>{dataKey}</strong>
-             </div>
-           )}
+        <div className="preview-tabs">
+          <div 
+            className={`preview-tab ${activeTab === 'preview' ? 'active' : ''}`}
+            onClick={() => setActiveTab('preview')}
+          >
+            <Eye size={16} />
+            <span>预览模式</span>
+          </div>
+          <div 
+            className={`preview-tab ${activeTab === 'json' ? 'active' : ''}`}
+            onClick={() => setActiveTab('json')}
+          >
+            <Code size={16} />
+            <span>JSON 代码</span>
+          </div>
         </div>
         
-        <div className="modal-footer">
+        <div className="modal-body">
+          {activeTab === 'preview' ? (
+            <div className="preview-content">
+              {renderPreview()}
+            </div>
+          ) : (
+            <div className="form-group" style={{ height: '100%', display: 'flex', flexDirection: 'column', margin: 0, padding: '16px' }}>
+              <textarea 
+                className="raw-json-editor"
+                value={content}
+                onChange={(e) => {
+                  setContent(e.target.value);
+                  validateJSON(e.target.value);
+                }}
+                spellCheck={false}
+              />
+              {error && <div className="error-message" style={{ color: '#ef4444', fontSize: '12px', marginTop: '8px' }}>JSON 格式错误: {error}</div>}
+            </div>
+          )}
+        </div>
+        
+        <div className="modal-footer" style={{ borderTop: '1px solid #e2e8f0', padding: '16px' }}>
+          {dataKey && !error && (
+             <div className="info-message" style={{ fontSize: '12px', color: '#666', marginRight: 'auto' }}>
+               将保存到数据键: <strong>{dataKey}</strong>
+             </div>
+          )}
           <button onClick={onClose}>取消</button>
           <button className="primary" onClick={handleSave} disabled={!!error}>确认并保存</button>
         </div>
