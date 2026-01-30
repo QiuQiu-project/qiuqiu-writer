@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { X, Plus, Check } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { X, Check } from 'lucide-react';
 
 interface MultiSelectOption {
   label: string;

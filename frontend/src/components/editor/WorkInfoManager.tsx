@@ -23,22 +23,17 @@ import ListEditor from './work-info/ListEditor';
 import KeyValueEditor from './work-info/KeyValueEditor';
 import MultiSelectEditor from './work-info/MultiSelectEditor';
 import TemplateMarketModal from './work-info/TemplateMarketModal';
-import { IconMap, componentRegistry } from './work-info/config';
+import { IconMap } from './work-info/config';
 import { getDependencyCharacters } from './work-info/utils';
 import type { 
   ComponentConfig, 
-  ModuleConfig, 
-  TemplateConfig, 
   WorkData, 
-  ComponentType,
   PreviewItem,
-  FactionData,
-  TimelineEditForm,
   CharacterData
 } from './work-info/types';
 
 // 生成数据类型
-type GeneratedDataType = string | unknown[] | Record<string, unknown>;
+// type GeneratedDataType = string | unknown[] | Record<string, unknown>;
 
 // ============ 主组件 ============
 
@@ -85,7 +80,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
   } | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [currentImageId, setCurrentImageId] = useState<string | null>(null);
+  const [, setCurrentImageId] = useState<string | null>(null);
   const [generatingComponents, setGeneratingComponents] = useState<Record<string, boolean>>({});
 
   // 生成数据预览状态

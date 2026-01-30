@@ -1,5 +1,4 @@
-import React from 'react';
-import { Plus, X, GripVertical } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 
 interface ListEditorProps {
   value: string[];

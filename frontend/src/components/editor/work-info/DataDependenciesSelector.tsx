@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Plus, X } from 'lucide-react';
 import type { ComponentConfig, TemplateConfig } from './types';
 

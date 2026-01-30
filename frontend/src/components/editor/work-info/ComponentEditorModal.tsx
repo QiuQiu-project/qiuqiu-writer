@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { X, ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { ComponentType, ComponentConfig, TemplateConfig } from './types';
 import { DataDependenciesSelector } from './DataDependenciesSelector';
-import CustomSelect from '../../CustomSelect';
 
 interface ComponentEditorModalProps {
   isOpen: boolean;

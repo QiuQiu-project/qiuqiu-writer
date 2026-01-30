@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, Search, LayoutTemplate, Save, Download, Globe, User, Edit2, Trash2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Search, Save, Download, Globe, User, Edit2, Trash2 } from 'lucide-react';
 import { templatesApi } from '../../../utils/templatesApi';
 import type { WorkTemplate, TemplateConfig } from '../../../utils/templatesApi';
 import { authApi } from '../../../utils/authApi';

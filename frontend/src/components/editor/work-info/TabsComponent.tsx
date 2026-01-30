@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Settings } from 'lucide-react';
 import type { ComponentConfig } from './types';
 
@@ -21,7 +21,7 @@ export function TabsComponent({
   moduleId, 
   tabsComponentId, 
   renderComponent, 
-  onUpdateTabs, 
+  // onUpdateTabs, 
   onEditComponentInTab, 
   onGenerateComponent, 
   generatingComponents = {}, 

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus, Trash2, User, ChevronDown, ChevronRight } from 'lucide-react';
 import type { ComponentConfig, CharacterData } from './types';
 
@@ -34,11 +34,11 @@ function SingleCharacterCard({
     onChange({ ...value, [key]: val });
   };
 
-  const deleteField = (key: string) => {
-    const newValue = { ...value };
-    delete newValue[key];
-    onChange(newValue);
-  };
+  // const deleteField = (key: string) => {
+  //   const newValue = { ...value };
+  //   delete newValue[key];
+  //   onChange(newValue);
+  // };
 
   const handleAddField = () => {
     if (newFieldName.trim()) {
@@ -64,7 +64,7 @@ function SingleCharacterCard({
   const [customJsonValue, setCustomJsonValue] = useState(getCustomDataJson());
   
   // Update local state when value changes (external update)
-  React.useEffect(() => {
+  useEffect(() => {
     setCustomJsonValue(getCustomDataJson());
   }, [value]);
 
@@ -101,16 +101,16 @@ function SingleCharacterCard({
   const nameField = fields.find(f => f.key === 'name') || fields[0];
   const nameValue = value[nameField.key] || '未命名角色';
 
-  const renderValue = (val: any) => {
-    if (typeof val === 'object' && val !== null) {
-      try {
-        return JSON.stringify(val);
-      } catch (e) {
-        return String(val);
-      }
-    }
-    return val || '';
-  };
+  // const renderValue = (val: any) => {
+  //   if (typeof val === 'object' && val !== null) {
+  //     try {
+  //       return JSON.stringify(val);
+  //     } catch (e) {
+  //       return String(val);
+  //     }
+  //   }
+  //   return val || '';
+  // };
 
   return (
     <div className="character-card-item" style={{ 

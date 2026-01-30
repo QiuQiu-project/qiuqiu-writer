@@ -2,7 +2,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { WorkData, TemplateConfig, ModuleConfig, ComponentConfig } from './types';
 import { 
-  getModulesFromTemplateConfig, 
   extractComponentDataFromTemplate, 
   writeComponentDataToTemplate, 
   loadFromCache, 
@@ -28,8 +27,8 @@ export const useWorkInfoData = (
   const [isSaving, setIsSaving] = useState(false);
   
   const initializedRef = useRef(false);
-  const lastLoadedTemplateTimeRef = useRef<number>(0);
-  const isInternalUpdateRef = useRef(false);
+  // const lastLoadedTemplateTimeRef = useRef<number>(0);
+  // const isInternalUpdateRef = useRef(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 加载默认模板

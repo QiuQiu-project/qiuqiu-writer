@@ -1,6 +1,6 @@
 
-import React, { useState, useRef, useEffect } from 'react';
-import { Plus, X, Search, ChevronDown, Calendar, MapPin, User, Settings } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Plus, X, Search, ChevronDown, MapPin, User, Settings } from 'lucide-react';
 import type { ComponentConfig, TimelineEditForm, CharacterData } from './types';
 
 interface TimelineCharacterSelectorProps {
@@ -142,7 +142,7 @@ export default function TimelineEditor({
   component,
   onChange,
   availableCharacters,
-  isEditMode
+  // isEditMode
 }: TimelineEditorProps) {
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<TimelineEditForm>({
