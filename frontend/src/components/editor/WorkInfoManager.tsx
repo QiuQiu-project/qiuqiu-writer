@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { 
-  Plus, X, Settings, LayoutGrid, Sparkles
+  Plus, X, Settings, LayoutGrid, Sparkles, Save
 } from 'lucide-react';
 import CharacterRelations from './CharacterRelations';
 import type { CharacterRelationsData } from './CharacterRelations';
@@ -61,7 +61,9 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
     template, 
     isLoading: loading, 
     setTemplate, 
-    updateComponentValue
+    updateComponentValue,
+    saveData,
+    isSaving
   } = useWorkInfoData(workId || null, workData || null, userTemplates);
 
   // UI 状态
@@ -625,6 +627,14 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
         <div className="module-header">
            <h2>{activeModule?.name}</h2>
            <div className="header-actions">
+             <button 
+               className="icon-btn"
+               onClick={saveData}
+               disabled={isSaving}
+               title="保存数据"
+             >
+               <Save size={16} /> {isSaving ? '保存中...' : '保存'}
+             </button>
              <button 
                className="icon-btn"
                onClick={() => setShowTemplateMarket(true)}

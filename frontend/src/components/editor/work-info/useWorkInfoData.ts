@@ -10,6 +10,7 @@ import {
 } from './utils';
 import { templatesApi } from '../../../utils/templatesApi';
 import type { WorkTemplate } from '../../../utils/templatesApi';
+import { worksApi } from '../../../utils/worksApi';
 
 // 简单的加载 prompt 模拟（原文件中该函数已不再请求 API）
 const loadPromptsForComponents = async (modules: ModuleConfig[]): Promise<ModuleConfig[]> => {
@@ -24,10 +25,12 @@ export const useWorkInfoData = (
   const [template, setTemplate] = useState<TemplateConfig | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   
   const initializedRef = useRef(false);
   const lastLoadedTemplateTimeRef = useRef<number>(0);
   const isInternalUpdateRef = useRef(false);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 加载默认模板
   const loadDefaultTemplate = useCallback(async (templates: WorkTemplate[] = []): Promise<TemplateConfig | null> => {
@@ -263,15 +266,94 @@ export const useWorkInfoData = (
     });
   }, [workId]);
 
-  // 监听模板变化并自动保存到缓存
-  useEffect(() => {
-    if (workId && template) {
+  // 手动保存数据
+  const saveData = useCallback(async () => {
+    if (!workId || !template) return;
+    
+    setIsSaving(true);
+    try {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+      }
+
       saveToCache({
         templateId: template.id,
         modules: template.modules,
         lastModified: Date.now()
       }, workId, template.id);
+
+      const componentData = extractComponentDataFromTemplate(template.modules);
+      
+      const metadataToSave = {
+        template_config: {
+          templateId: template.id,
+          modules: template.modules
+        },
+        component_data: componentData,
+        ...componentData
+      };
+
+      console.log('正在手动保存作品信息到后端:', workId);
+      await worksApi.updateWork(parseInt(workId), {
+        metadata: metadataToSave
+      });
+      console.log('手动保存成功');
+    } catch (err) {
+      console.error('保存作品信息失败:', err);
+      throw err;
+    } finally {
+      setIsSaving(false);
     }
+  }, [workId, template]);
+
+  // 监听模板变化并自动保存到缓存和后端
+  useEffect(() => {
+    if (workId && template) {
+      // 1. 保存到本地缓存 (立即执行)
+      saveToCache({
+        templateId: template.id,
+        modules: template.modules,
+        lastModified: Date.now()
+      }, workId, template.id);
+
+      // 2. 延迟保存到后端 (Debounce 2秒)
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+
+      saveTimeoutRef.current = setTimeout(async () => {
+        try {
+          // 提取组件数据
+          const componentData = extractComponentDataFromTemplate(template.modules);
+          
+          // 构建要保存的 metadata
+          const metadataToSave = {
+            template_config: {
+              templateId: template.id,
+              modules: template.modules // 这里保存完整的 modules 结构，包含 config 等
+            },
+            component_data: componentData,
+            // 也可以把一些关键字段提出来放在顶层，方便索引
+            ...componentData
+          };
+
+          console.log('正在保存作品信息到后端:', workId);
+          await worksApi.updateWork(parseInt(workId), {
+            metadata: metadataToSave
+          });
+          console.log('作品信息保存成功');
+        } catch (err) {
+          console.error('保存作品信息失败:', err);
+        }
+      }, 2000);
+    }
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
   }, [template, workId]);
 
   return {
@@ -280,6 +362,8 @@ export const useWorkInfoData = (
     isLoading,
     error,
     updateComponentValue,
-    loadDefaultTemplate
+    loadDefaultTemplate,
+    saveData,
+    isSaving
   };
 };

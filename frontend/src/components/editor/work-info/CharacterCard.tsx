@@ -141,7 +141,7 @@ function SingleCharacterCard({
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {isEditMode && onDelete && (
+          {onDelete && (
             <button 
               onClick={(e) => {
                 e.stopPropagation();
@@ -293,12 +293,19 @@ export default function CharacterCard({
   isEditMode,
   availableCharacters = []
 }: CharacterCardProps) {
-  const isArray = Array.isArray(component.value);
-  const value = isArray 
-    ? (component.value as any[]) 
-    : (typeof component.value === 'object' && component.value !== null 
-      ? component.value 
-      : {}) as Record<string, any>;
+  // Normalize value to array
+  const rawValue = component.value;
+  let listValue: any[] = [];
+  
+  if (Array.isArray(rawValue)) {
+    listValue = rawValue;
+  } else if (typeof rawValue === 'object' && rawValue !== null && Object.keys(rawValue).length > 0) {
+    // Legacy object with data -> convert to single item array
+    listValue = [rawValue];
+  } else {
+    // Empty or invalid -> empty array
+    listValue = [];
+  }
     
   const fields = component.config.cardFields || [
     { key: 'name', label: '姓名', type: 'text' },
@@ -319,146 +326,31 @@ export default function CharacterCard({
       role: char.type === 'main' ? '主角' : '配角',
     };
 
-    if (isArray) {
-      // Add to list
-      onChange([...(value as any[]), newCharData]);
-    } else {
-      // Fill single card
-      const newValue: Record<string, any> = {
-        ...(value as Record<string, any>),
-        ...newCharData
-      };
-      onChange(newValue);
-    }
+    onChange([...listValue, newCharData]);
   };
 
   const handleAddCharacter = () => {
-    if (isArray) {
-      onChange([...(value as any[]), {}]);
-    }
+    onChange([...listValue, {}]);
   };
 
   const handleDeleteCharacter = (index: number) => {
-    if (isArray) {
-      const newList = [...(value as any[])];
-      newList.splice(index, 1);
-      onChange(newList);
-    }
+    const newList = [...listValue];
+    newList.splice(index, 1);
+    onChange(newList);
   };
 
   const handleCharacterChange = (index: number, newData: any) => {
-    if (isArray) {
-      const newList = [...(value as any[])];
-      newList[index] = newData;
-      onChange(newList);
-    }
+    const newList = [...listValue];
+    newList[index] = newData;
+    onChange(newList);
   };
 
-  if (isArray) {
-    return (
-      <div className="character-card-list">
-        {/* Import Character Section */}
-        {availableCharacters.length > 0 && isEditMode && (
-           <div className="character-import-section" style={{ marginBottom: '16px', padding: '12px', background: '#f8fafc', borderRadius: '6px', border: '1px dashed #cbd5e1' }}>
-              <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '8px' }}>快速添加角色：</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                {availableCharacters.map(char => (
-                  <button 
-                    key={char.id}
-                    onClick={() => handleImportCharacter(char)}
-                    style={{ 
-                      padding: '4px 10px', 
-                      fontSize: '12px', 
-                      background: 'white', 
-                      border: '1px solid #e2e8f0', 
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    <Plus size={12} />
-                    {char.name}
-                  </button>
-                ))}
-                <button 
-                  onClick={handleAddCharacter}
-                  style={{ 
-                    padding: '4px 10px', 
-                    fontSize: '12px', 
-                    background: '#eff6ff', 
-                    border: '1px solid #bfdbfe', 
-                    color: '#2563eb',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                >
-                  <Plus size={12} />
-                  新建空白角色
-                </button>
-              </div>
-           </div>
-        )}
-
-        <div className="character-list-container" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {(value as any[]).map((charData, index) => (
-            <SingleCharacterCard
-              key={index}
-              value={charData || {}}
-              onChange={(newData) => handleCharacterChange(index, newData)}
-              fields={fields}
-              isEditMode={isEditMode}
-              onDelete={() => handleDeleteCharacter(index)}
-            />
-          ))}
-          
-          {(value as any[]).length === 0 && !isEditMode && (
-             <div className="empty-state" style={{ padding: '32px', textAlign: 'center', color: '#94a3b8', background: '#f8fafc', borderRadius: '8px' }}>
-                <User size={32} style={{ marginBottom: '8px', opacity: 0.5 }} />
-                <div>暂无角色数据</div>
-             </div>
-          )}
-        </div>
-        
-        {isEditMode && (
-          <button 
-            onClick={handleAddCharacter}
-            className="add-character-btn"
-            style={{
-              width: '100%',
-              padding: '12px',
-              marginTop: '16px',
-              background: '#f8fafc',
-              border: '1px dashed #cbd5e1',
-              borderRadius: '8px',
-              color: '#64748b',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              transition: 'all 0.2s'
-            }}
-          >
-            <Plus size={16} />
-            添加角色
-          </button>
-        )}
-      </div>
-    );
-  }
-
-  // Legacy Single Card Mode
   return (
-    <div className="character-card">
+    <div className="character-card-list">
       {/* Import Character Section */}
-      {availableCharacters.length > 0 && !(value as any).name && (
+      {availableCharacters.length > 0 && (
          <div className="character-import-section" style={{ marginBottom: '16px', padding: '12px', background: '#f8fafc', borderRadius: '6px', border: '1px dashed #cbd5e1' }}>
-            <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '8px' }}>从数据源导入角色：</div>
+            <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '8px' }}>快速添加角色：</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
               {availableCharacters.map(char => (
                 <button 
@@ -480,16 +372,70 @@ export default function CharacterCard({
                   {char.name}
                 </button>
               ))}
+              <button 
+                onClick={handleAddCharacter}
+                style={{ 
+                  padding: '4px 10px', 
+                  fontSize: '12px', 
+                  background: '#eff6ff', 
+                  border: '1px solid #bfdbfe', 
+                  color: '#2563eb',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                <Plus size={12} />
+                新建空白角色
+              </button>
             </div>
          </div>
       )}
 
-      <SingleCharacterCard
-        value={value as Record<string, any>}
-        onChange={onChange}
-        fields={fields}
-        isEditMode={isEditMode}
-      />
+      <div className="character-list-container" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {listValue.map((charData, index) => (
+          <SingleCharacterCard
+            key={index}
+            value={charData || {}}
+            onChange={(newData) => handleCharacterChange(index, newData)}
+            fields={fields}
+            isEditMode={isEditMode}
+            onDelete={() => handleDeleteCharacter(index)}
+          />
+        ))}
+        
+        {listValue.length === 0 && (
+           <div className="empty-state" style={{ padding: '32px', textAlign: 'center', color: '#94a3b8', background: '#f8fafc', borderRadius: '8px' }}>
+              <User size={32} style={{ marginBottom: '8px', opacity: 0.5 }} />
+              <div>暂无角色数据</div>
+           </div>
+        )}
+      </div>
+      
+      <button 
+        onClick={handleAddCharacter}
+        className="add-character-btn"
+        style={{
+          width: '100%',
+          padding: '12px',
+          marginTop: '16px',
+          background: '#f8fafc',
+          border: '1px dashed #cbd5e1',
+          borderRadius: '8px',
+          color: '#64748b',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '8px',
+          transition: 'all 0.2s'
+        }}
+      >
+        <Plus size={16} />
+        添加角色
+      </button>
     </div>
   );
 }
