@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Sparkles, Plus, MapPin, Users, FileText, BookOpen } from 'lucide-react';
+import { chaptersApi } from '../../utils/chaptersApi';
+import LoadingSpinner from '../common/LoadingSpinner';
 import './ChapterSettingsModal.css';
 
 interface Character {
@@ -70,6 +72,7 @@ export default function ChapterSettingsModal({
   const [isGeneratingOutline, setIsGeneratingOutline] = useState(false);
   const [isGeneratingDetail, setIsGeneratingDetail] = useState(false);
   const [isGeneratingContent, setIsGeneratingContent] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'basic' | 'outline'>('basic');
   
   // 是否显示卷号选择器（编辑章节时）
@@ -81,17 +84,110 @@ export default function ChapterSettingsModal({
   // 使用传入的地点数据，如果没有则使用空数组
   const locationsToShow: Location[] = availableLocations.length > 0 ? availableLocations : [];
 
+  const ensureString = (val: unknown): string => {
+    if (typeof val === 'string') return val;
+    if (val === null || val === undefined) return '';
+    if (typeof val === 'object') {
+      try {
+        return JSON.stringify(val, null, 2);
+      } catch (e) {
+        console.warn('Failed to stringify object:', e);
+        return String(val);
+      }
+    }
+    return String(val);
+  };
+
   // 初始化数据
   useEffect(() => {
     if (isOpen) {
       if (initialData) {
-        setTitle(initialData.title || '');
-        setChapterNumber(initialData.chapter_number);
-        setSelectedVolumeId(initialData.volumeId || volumeId);
-        setSelectedCharacters(initialData.characters || []);
-        setLocations(initialData.locations || []);
-        setOutline(initialData.outline || '');
-        setDetailOutline(initialData.detailOutline || '');
+        const initFromProps = () => {
+          setTitle(ensureString(initialData.title));
+          setChapterNumber(initialData.chapter_number);
+          setSelectedVolumeId(initialData.volumeId || volumeId);
+          setSelectedCharacters(initialData.characters || []);
+          setLocations(initialData.locations || []);
+          setOutline(ensureString(initialData.outline));
+          setDetailOutline(ensureString(initialData.detailOutline));
+        };
+
+        if (mode === 'edit' && initialData.id) {
+          const fetchChapterInfo = async () => {
+            try {
+              setIsLoading(true);
+              const chapterId = Number(initialData.id);
+              if (!isNaN(chapterId)) {
+                const response = await chaptersApi.getChapterDocument(chapterId);
+                console.log('📝 [ChapterSettingsModal] Fetched chapter info:', response);
+                const info = response.chapter_info;
+                console.log('📝 [ChapterSettingsModal] Chapter info details:', {
+                  title: info.title,
+                  outline: info.outline,
+                  detailed_outline: info.detailed_outline,
+                  metadata: info.metadata
+                });
+                
+                setTitle(ensureString(info.title));
+                setChapterNumber(info.chapter_number);
+                setSelectedVolumeId(initialData.volumeId || volumeId);
+                
+                // 从 metadata 获取大纲和细纲
+                const meta = info.metadata || {};
+                
+                // 增强的数据获取逻辑：尝试从 metadata 或顶层字段获取
+                let fetchedOutline = '';
+                let fetchedDetail = '';
+
+                // 1. 优先从 metadata 获取
+                if (meta.outline) {
+                  fetchedOutline = ensureString(meta.outline);
+                }
+                
+                if (meta.detailed_outline) {
+                  fetchedDetail = ensureString(meta.detailed_outline);
+                }
+
+                // 2. 如果 metadata 中没有，尝试从 info 顶层字段获取
+                // 注意：虽然类型定义为 Record，但后端可能返回字符串，或者我们在运行时应该兼容处理
+                if (!fetchedOutline && (info as any).outline) {
+                  const rawOutline = (info as any).outline;
+                  if (typeof rawOutline === 'string') {
+                    fetchedOutline = rawOutline;
+                  }
+                }
+
+                if (!fetchedDetail && (info as any).detailed_outline) {
+                  const rawDetail = (info as any).detailed_outline;
+                  if (typeof rawDetail === 'string') {
+                    fetchedDetail = rawDetail;
+                  }
+                }
+
+                // 3. 如果 API 没有返回有效数据，回退到 initialData
+                if (!fetchedOutline) fetchedOutline = ensureString(initialData.outline);
+                if (!fetchedDetail) fetchedDetail = ensureString(initialData.detailOutline);
+                
+                setOutline(fetchedOutline);
+                setDetailOutline(fetchedDetail);
+                
+                // 保持 initialData 中的其他字段
+                setSelectedCharacters(initialData.characters || []);
+                setLocations(initialData.locations || []);
+              } else {
+                initFromProps();
+              }
+            } catch (error) {
+              console.error('Failed to fetch chapter info:', error);
+              initFromProps();
+            } finally {
+              setIsLoading(false);
+            }
+          };
+          fetchChapterInfo();
+        } else {
+          initFromProps();
+        }
       } else {
         // 新建章节时重置
         setTitle('');
@@ -104,7 +200,7 @@ export default function ChapterSettingsModal({
       }
       setActiveTab('basic');
     }
-  }, [isOpen, initialData, volumeId]);
+  }, [isOpen, initialData, volumeId, mode]);
 
   const handleCharacterToggle = (characterId: string) => {
     setSelectedCharacters(prev => 
@@ -238,7 +334,12 @@ export default function ChapterSettingsModal({
         </div>
 
         <div className="chapter-modal-body">
-          {activeTab === 'basic' && (
+          {isLoading && (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
+              <LoadingSpinner message="正在加载章节信息..." />
+            </div>
+          )}
+          {!isLoading && activeTab === 'basic' && (
             <div className="modal-section-content">
               {/* 章节名称 */}
               <div className="form-group">
@@ -379,7 +480,7 @@ export default function ChapterSettingsModal({
             </div>
           )}
 
-          {activeTab === 'outline' && (
+          {!isLoading && activeTab === 'outline' && (
             <div className="modal-section-content">
               {/* 大纲 */}
               <div className="form-group">

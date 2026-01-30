@@ -241,7 +241,7 @@ class BookAnalysisService:
 5. detailed_outline字段必须包含sections数组，每个section包含section_number、title、content
 
 # 章节内容
-{content}
+@chapter.content
 
 # 开始分析
 请严格按照上述JSON格式输出分析结果："""
@@ -661,7 +661,7 @@ class BookAnalysisService:
                     sort_by="chapter_number",
                     sort_order="asc"
                 )
-            print(chapters)
+
             total_chapters = len(chapters)
             logger.info(f"开始为作品 {work_id} 的 {total_chapters} 个章节生成大纲和细纲")
             
