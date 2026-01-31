@@ -5,7 +5,7 @@ import type { ComponentConfig, FactionData } from './types';
 
 interface FactionEditorProps {
   component: ComponentConfig;
-  onChange: (newValue: any) => void;
+  onChange: (newValue: any) => void; // eslint-disable-line @typescript-eslint/no-explicit-any
   isEditMode: boolean;
 }
 

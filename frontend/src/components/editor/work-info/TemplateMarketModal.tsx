@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { X, Search, Save, Download, Globe, User, Edit2, Trash2 } from 'lucide-react';
 import { templatesApi } from '../../../utils/templatesApi';
 import type { WorkTemplate, TemplateConfig } from '../../../utils/templatesApi';
@@ -42,7 +42,7 @@ export default function TemplateMarketModal({
     loadUserInfo();
   }, []);
 
-  const fetchTemplates = async () => {
+  const fetchTemplates = useCallback(async () => {
     setLoading(true);
     try {
       const isPublic = activeTab === 'market';
@@ -69,13 +69,13 @@ export default function TemplateMarketModal({
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeTab, searchQuery, userInfo]);
 
   useEffect(() => {
     if (isOpen) {
       fetchTemplates();
     }
-  }, [isOpen, activeTab, searchQuery, userInfo]);
+  }, [isOpen, fetchTemplates]);
 
   const [targetTemplateConfig, setTargetTemplateConfig] = useState<TemplateConfig | undefined>(undefined);
   const [editingTemplate, setEditingTemplate] = useState<WorkTemplate | null>(null);

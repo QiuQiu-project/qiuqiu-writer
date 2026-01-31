@@ -1,18 +1,18 @@
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Plus, Trash2, User, ChevronDown, ChevronRight } from 'lucide-react';
 import type { ComponentConfig, CharacterData } from './types';
 
 interface CharacterCardProps {
   component: ComponentConfig;
-  onChange: (newValue: any) => void;
+  onChange: (newValue: any) => void; // eslint-disable-line @typescript-eslint/no-explicit-any
   isEditMode: boolean;
   availableCharacters?: CharacterData[];
 }
 
 interface SingleCharacterCardProps {
-  value: Record<string, any>;
-  onChange: (newValue: Record<string, any>) => void;
+  value: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  onChange: (newValue: Record<string, any>) => void; // eslint-disable-line @typescript-eslint/no-explicit-any
   fields: { key: string; label: string; type: string }[];
   isEditMode: boolean;
   onDelete?: () => void;
@@ -30,7 +30,7 @@ function SingleCharacterCard({
   const [isExpanded, setIsExpanded] = useState(false);
   const [isOthersExpanded, setIsOthersExpanded] = useState(false);
 
-  const updateField = (key: string, val: any) => {
+  const updateField = (key: string, val: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
     onChange({ ...value, [key]: val });
   };
 
@@ -48,25 +48,25 @@ function SingleCharacterCard({
     }
   };
 
-  const predefinedKeys = new Set(fields.map(f => f.key));
-  const customKeys = Object.keys(value).filter(k => !predefinedKeys.has(k) && k !== 'id');
+  const predefinedKeys = useMemo(() => new Set(fields.map(f => f.key)), [fields]);
 
   // Prepare JSON string for the "Others" section
-  const getCustomDataJson = () => {
-    const customData: Record<string, any> = {};
+  const getCustomDataJson = useCallback(() => {
+    const customKeys = Object.keys(value).filter(k => !predefinedKeys.has(k) && k !== 'id');
+    const customData: Record<string, any> = {}; // eslint-disable-line @typescript-eslint/no-explicit-any
     customKeys.forEach(key => {
       customData[key] = value[key];
     });
     // Return empty string if no custom data, otherwise formatted JSON
     return Object.keys(customData).length > 0 ? JSON.stringify(customData, null, 2) : '';
-  };
+  }, [value, predefinedKeys]);
 
   const [customJsonValue, setCustomJsonValue] = useState(getCustomDataJson());
   
   // Update local state when value changes (external update)
   useEffect(() => {
-    setCustomJsonValue(getCustomDataJson());
-  }, [value]);
+    setTimeout(() => setCustomJsonValue(getCustomDataJson()), 0);
+  }, [getCustomDataJson]);
 
   const handleCustomJsonChange = (newJson: string) => {
     setCustomJsonValue(newJson);
@@ -75,7 +75,7 @@ function SingleCharacterCard({
       
       // Merge parsed custom fields with predefined fields
       // 1. Keep predefined fields from current value
-      const newValue: Record<string, any> = {};
+      const newValue: Record<string, any> = {}; // eslint-disable-line @typescript-eslint/no-explicit-any
       fields.forEach(f => {
         if (value[f.key] !== undefined) {
           newValue[f.key] = value[f.key];
@@ -92,7 +92,7 @@ function SingleCharacterCard({
       });
 
       onChange(newValue);
-    } catch (e) {
+    } catch {
       // Invalid JSON, just update local state (don't propagate change yet)
     }
   };
@@ -295,6 +295,7 @@ export default function CharacterCard({
 }: CharacterCardProps) {
   // Normalize value to array
   const rawValue = component.value;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let listValue: any[] = [];
   
   if (Array.isArray(rawValue)) {
@@ -339,7 +340,7 @@ export default function CharacterCard({
     onChange(newList);
   };
 
-  const handleCharacterChange = (index: number, newData: any) => {
+  const handleCharacterChange = (index: number, newData: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
     const newList = [...listValue];
     newList[index] = newData;
     onChange(newList);

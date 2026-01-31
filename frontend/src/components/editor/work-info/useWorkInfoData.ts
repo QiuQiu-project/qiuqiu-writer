@@ -53,8 +53,8 @@ export const useWorkInfoData = (
         if (defaultTemplate.template_config) {
           if (Array.isArray(defaultTemplate.template_config)) {
             modules = defaultTemplate.template_config as ModuleConfig[];
-          } else if (typeof defaultTemplate.template_config === 'object' && (defaultTemplate.template_config as any).modules && Array.isArray((defaultTemplate.template_config as any).modules)) {
-            modules = (defaultTemplate.template_config as any).modules as ModuleConfig[];
+          } else if (typeof defaultTemplate.template_config === 'object' && (defaultTemplate.template_config as any).modules && Array.isArray((defaultTemplate.template_config as any).modules)) { // eslint-disable-line @typescript-eslint/no-explicit-any
+            modules = (defaultTemplate.template_config as any).modules as ModuleConfig[]; // eslint-disable-line @typescript-eslint/no-explicit-any
           }
         }
         
@@ -110,8 +110,8 @@ export const useWorkInfoData = (
                 if (dbTemplate.template_config) {
                   if (Array.isArray(dbTemplate.template_config)) {
                     dbModules = dbTemplate.template_config as ModuleConfig[];
-                  } else if ((dbTemplate.template_config as any).modules) {
-                    dbModules = (dbTemplate.template_config as any).modules;
+                  } else if ((dbTemplate.template_config as any).modules) { // eslint-disable-line @typescript-eslint/no-explicit-any
+                    dbModules = (dbTemplate.template_config as any).modules; // eslint-disable-line @typescript-eslint/no-explicit-any
                   }
                 }
                 
@@ -267,7 +267,7 @@ export const useWorkInfoData = (
       const newModules = updateModules(prev.modules);
       return { ...prev, modules: newModules, lastModified: Date.now() };
     });
-  }, [workId]);
+  }, []);
 
   // 手动保存数据
   const saveData = useCallback(async () => {

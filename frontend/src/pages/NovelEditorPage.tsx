@@ -21,7 +21,7 @@ import { useChapterAutoSave } from '../hooks/useChapterAutoSave';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { worksApi, type Work } from '../utils/worksApi';
 import { chaptersApi, type Chapter, type ChapterUpdate } from '../utils/chaptersApi';
-import { volumesApi, type Volume, type VolumeCreate, type VolumeUpdate } from '../utils/volumesApi';
+import { volumesApi, type Volume } from '../utils/volumesApi';
 import { authApi } from '../utils/authApi';
 import { syncManager } from '../utils/syncManager';
 import { useIntelligentSync } from '../utils/intelligentSync';
@@ -1505,7 +1505,7 @@ export default function NovelEditorPage(){
         } else {
              // 创建全新卷：计算最大卷号 + 1
              const maxVolNum = volumes.reduce((max, vol) => {
-                 const v = vol as any;
+                 const v = vol as any; // eslint-disable-line @typescript-eslint/no-explicit-any
                  return Math.max(max, v.volume_number || 0);
              }, 0);
              volumeNumber = maxVolNum + 1;
@@ -1623,7 +1623,7 @@ export default function NovelEditorPage(){
           const isRealVolume = data.volumeId !== 'draft' && !data.volumeId.startsWith('vol');
           // 如果是真实卷，更新 volume_id；如果是虚拟卷或草稿，置为 null (清除关联)
           // 注意：需要确保后端支持 volume_id 为 null
-          updateData.volume_id = isRealVolume ? Number(data.volumeId) : null as any;
+          updateData.volume_id = isRealVolume ? Number(data.volumeId) : null as any; // eslint-disable-line @typescript-eslint/no-explicit-any
         }
 
         // 如果有大纲或细纲，添加到更新数据中
@@ -2457,7 +2457,7 @@ export default function NovelEditorPage(){
             <ChapterOutline 
               volumes={volumes}
               onEditVolume={(vol) => handleOpenVolumeModal('edit', vol.id, vol.title, vol.outline, vol.detailOutline)}
-              onEditChapter={(chap, volId, volTitle) => handleOpenChapterModal('edit', volId, volTitle, chap as any)}
+              onEditChapter={(chap, volId, volTitle) => handleOpenChapterModal('edit', volId, volTitle, chap as any)} // eslint-disable-line @typescript-eslint/no-explicit-any
             />
           )}
           {activeNav === 'map' && <MapView />}

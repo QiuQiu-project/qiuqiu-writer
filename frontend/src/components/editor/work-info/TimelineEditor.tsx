@@ -133,7 +133,7 @@ export function TimelineCharacterSelector({
 
 interface TimelineEditorProps {
   component: ComponentConfig;
-  onChange: (newValue: any) => void;
+  onChange: (newValue: TimelineEditForm[]) => void;
   availableCharacters: CharacterData[];
   isEditMode: boolean;
 }
@@ -154,7 +154,7 @@ export default function TimelineEditor({
     location: ''
   });
 
-  const events = (Array.isArray(component.value) ? component.value : []) as any[];
+  const events = (Array.isArray(component.value) ? component.value : []) as TimelineEditForm[];
 
   const handleAddEvent = () => {
     setEditingEventId('new');
@@ -168,7 +168,7 @@ export default function TimelineEditor({
     });
   };
 
-  const handleEditEvent = (event: any, index: number) => {
+  const handleEditEvent = (event: TimelineEditForm, index: number) => {
     setEditingEventId(index.toString());
     setEditForm({
       characterIds: event.characterIds || [],
@@ -184,7 +184,7 @@ export default function TimelineEditor({
     if (!editForm.event.trim()) return;
 
     const newEvent = { ...editForm };
-    let newEvents = [...events];
+    const newEvents = [...events];
 
     if (editingEventId === 'new') {
       newEvents.push(newEvent);

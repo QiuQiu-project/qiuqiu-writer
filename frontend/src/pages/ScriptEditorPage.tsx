@@ -67,7 +67,7 @@ export default function ScriptEditorPage() {
         <div className="script-editor-main">
           {/* 根据导航项显示不同内容 */}
           {activeNav === 'tags' && <TagsManager />}
-          {activeNav === 'outline' && <ChapterOutline />}
+          {activeNav === 'outline' && <ChapterOutline volumes={[]} />}
           {activeNav === 'characters' && <ScriptCharacters />}
           {activeNav === 'work-info' && selectedEpisode !== null && <ScriptEditor />}
           {activeNav === 'work-info' && selectedEpisode === null && (

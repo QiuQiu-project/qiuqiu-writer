@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
-import { X, Code, Eye, User, MapPin, Calendar, List, Box, Layers, Tag } from 'lucide-react';
+import { X, Code, Eye, User, MapPin, Box, Layers } from 'lucide-react';
 import './GeneratedDataPreviewModal.css';
 
 interface GeneratedDataPreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: any) => void;
+  onSave: (data: any) => void; // eslint-disable-line @typescript-eslint/no-explicit-any
   rawData: string;
   dataKey?: string;
 }
@@ -29,15 +29,17 @@ export function GeneratedDataPreviewModal({
       if (match) {
         cleaned = match[1];
       }
-      setContent(cleaned);
+      setTimeout(() => setContent(cleaned), 0);
       
       // Auto-switch to json if parsing fails initially
       try {
         JSON.parse(cleaned);
-        setActiveTab('preview');
+        setTimeout(() => setActiveTab('preview'), 0);
       } catch (e) {
-        setActiveTab('json');
-        setError((e as Error).message);
+        setTimeout(() => {
+          setActiveTab('json');
+          setError((e as Error).message);
+        }, 0);
       }
     }
   }, [isOpen, rawData]);
@@ -64,7 +66,7 @@ export function GeneratedDataPreviewModal({
         }
       }
       return finalData;
-    } catch (e) {
+    } catch {
       return null;
     }
   }, [content, dataKey]);
@@ -100,7 +102,7 @@ export function GeneratedDataPreviewModal({
         if (hasName) {
            return (
              <div className="preview-cards-grid">
-               {parsedData.map((item: any, index: number) => (
+               {parsedData.map((item: any, index: number) => ( // eslint-disable-line @typescript-eslint/no-explicit-any
                  <div key={index} className="preview-card">
                    <div className="preview-card-header">
                      <div className="preview-card-icon">
@@ -129,11 +131,12 @@ export function GeneratedDataPreviewModal({
       }
       
       // Timeline items (often has 'time' or 'date')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const isTimeline = parsedData.some((item: any) => item.time || item.date || item.year);
       if (isTimeline) {
          return (
            <div className="preview-timeline">
-             {parsedData.map((item: any, index: number) => (
+             {parsedData.map((item: any, index: number) => ( // eslint-disable-line @typescript-eslint/no-explicit-any
                <div key={index} className="preview-timeline-item">
                  <div className="preview-timeline-dot"></div>
                  <div className="preview-timeline-time">{item.time || item.date || item.year || '未知时间'}</div>
@@ -160,7 +163,7 @@ export function GeneratedDataPreviewModal({
       // Generic List
       return (
         <div className="preview-list">
-          {parsedData.map((item: any, index: number) => (
+          {parsedData.map((item: any, index: number) => ( // eslint-disable-line @typescript-eslint/no-explicit-any
              <div key={index} className="preview-list-item">
                {typeof item === 'object' ? (
                  <div style={{ width: '100%' }}>

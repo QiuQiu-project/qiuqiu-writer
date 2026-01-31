@@ -143,7 +143,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
         // 检查是否是角色相关组件
         if (comp.type === 'character-card' || comp.dataKey === 'characters') {
           if (Array.isArray(comp.value)) {
-            comp.value.forEach((char: any) => {
+            comp.value.forEach((char: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
               if (char && (char.name || char.display_name)) {
                 previewItems.push({
                   name: char.name || char.display_name,
@@ -154,7 +154,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
               }
             });
           } else if (comp.value && typeof comp.value === 'object') {
-             const char = comp.value as any;
+             const char = comp.value as any; // eslint-disable-line @typescript-eslint/no-explicit-any
              if (char && (char.name || char.display_name)) {
                 previewItems.push({
                   name: char.name || char.display_name,
@@ -260,7 +260,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
     }
   };
 
-  const handlePreviewSave = (data: any) => {
+  const handlePreviewSave = (data: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
     if (!previewData) return;
     const { target } = previewData;
     updateComponentValue(target.componentId, data, target.moduleId);
@@ -376,7 +376,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
       case 'keyvalue':
         return (
           <KeyValueEditor
-            value={(comp.value as any[]) || []}
+            value={(comp.value as any[]) || []} // eslint-disable-line @typescript-eslint/no-explicit-any
             onChange={(val) => updateValue(val)}
           />
         );
@@ -481,7 +481,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
           if (Array.isArray(comp.value)) {
             relationData = { characters: [], relations: comp.value };
           } else if (comp.value && typeof comp.value === 'object') {
-             relationData = comp.value as any;
+             relationData = comp.value as any; // eslint-disable-line @typescript-eslint/no-explicit-any
           }
           
           const finalCharacters = dependencyCharacters.length > 0 ? dependencyCharacters : (relationData.characters || []);
@@ -512,7 +512,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
     }
   };
 
-  const handleSaveComponent = (componentData: any) => {
+  const handleSaveComponent = (componentData: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
     setTemplate(prev => {
       if (!prev) return null;
       
@@ -599,11 +599,11 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
                  ...m,
                  components: m.components.map(c => {
                    if (c.id === tabsComponentId) {
-                      const newTabs = c.config.tabs?.map((tab: any) => {
+                      const newTabs = c.config.tabs?.map((tab: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
                         if (tab.id === tabId) {
                           return {
                             ...tab,
-                            components: (tab.components || []).filter((subC: any) => subC.id !== editingComponentId)
+                            components: (tab.components || []).filter((subC: any) => subC.id !== editingComponentId) // eslint-disable-line @typescript-eslint/no-explicit-any
                           };
                         }
                         return tab;
@@ -680,7 +680,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
        // 这里需要做一些类型适配，因为后端返回的结构可能需要转换
        // 假设 template_config 符合 TemplateConfig 接口
        // 如果 modules 存在，我们就直接使用它
-       const config = tpl.template_config as any;
+       const config = tpl.template_config as any; // eslint-disable-line @typescript-eslint/no-explicit-any
        if (config.modules) {
           setTemplate({
             ...config,

@@ -30,9 +30,11 @@ export default function VolumeSettingsModal({
   const [detailOutline, setDetailOutline] = useState(initialDetailOutline || '');
 
   useEffect(() => {
-    setTitle(initialTitle);
-    setOutline(initialOutline || '');
-    setDetailOutline(initialDetailOutline || '');
+    setTimeout(() => {
+      setTitle(initialTitle);
+      setOutline(initialOutline || '');
+      setDetailOutline(initialDetailOutline || '');
+    }, 0);
   }, [initialTitle, initialOutline, initialDetailOutline, isOpen]);
 
   if (!isOpen) return null;

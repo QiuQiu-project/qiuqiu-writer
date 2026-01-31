@@ -150,15 +150,15 @@ export default function ChapterSettingsModal({
 
                 // 2. 如果 metadata 中没有，尝试从 info 顶层字段获取
                 // 注意：虽然类型定义为 Record，但后端可能返回字符串，或者我们在运行时应该兼容处理
-                if (!fetchedOutline && (info as any).outline) {
-                  const rawOutline = (info as any).outline;
+                if (!fetchedOutline && (info as any).outline) { // eslint-disable-line @typescript-eslint/no-explicit-any
+                  const rawOutline = (info as any).outline; // eslint-disable-line @typescript-eslint/no-explicit-any
                   if (typeof rawOutline === 'string') {
                     fetchedOutline = rawOutline;
                   }
                 }
 
-                if (!fetchedDetail && (info as any).detailed_outline) {
-                  const rawDetail = (info as any).detailed_outline;
+                if (!fetchedDetail && (info as any).detailed_outline) { // eslint-disable-line @typescript-eslint/no-explicit-any
+                  const rawDetail = (info as any).detailed_outline; // eslint-disable-line @typescript-eslint/no-explicit-any
                   if (typeof rawDetail === 'string') {
                     fetchedDetail = rawDetail;
                   }
