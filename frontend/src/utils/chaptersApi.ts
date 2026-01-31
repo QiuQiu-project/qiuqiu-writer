@@ -16,6 +16,7 @@ export interface Chapter {
   title: string;
   chapter_number: number;
   volume_number: number;
+  volume_id?: number;
   status: string;
   word_count: number;
   content?: string;
@@ -33,6 +34,7 @@ export interface ChapterCreate {
   title: string;
   chapter_number?: number;  // 可选，如果未提供，后端自动计算
   volume_number?: number;
+  volume_id?: number;
   content?: string;
 }
 
@@ -43,6 +45,7 @@ export interface ChapterUpdate {
   word_count?: number;
   chapter_number?: number;
   volume_number?: number;
+  volume_id?: number;
   chapter_metadata?: {
     outline?: string;
     detailed_outline?: string;

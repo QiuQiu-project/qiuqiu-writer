@@ -31,65 +31,14 @@ async def get_db_session(db: AsyncSession = Depends(get_async_db)) -> AsyncSessi
 from memos.api.services.chapter_service import ChapterService
 from memos.api.services.work_service import WorkService
 from memos.api.services.sharedb_service import ShareDBService
-# Chapter schemas will be created later
-# from memos.api.schemas.chapter import (
-#     ChapterCreate, ChapterUpdate, ChapterResponse, ChapterListResponse,
-#     ChapterVersionCreate, ChapterVersionResponse
-# )
 from memos.api.models.chapter import Chapter, ChapterVersion
+from memos.api.schemas.chapter import (
+    ChapterCreate, ChapterUpdate, ChapterResponse, ChapterListResponse,
+    ChapterVersionCreate, ChapterVersionResponse
+)
 import logging
 
 logger = logging.getLogger(__name__)
-
-# Temporary schemas - will be replaced with proper schema files
-from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
-
-class ChapterCreate(BaseModel):
-    work_id: int
-    title: str
-    chapter_number: Optional[int] = None  # 如果未提供，后端自动计算
-    volume_number: Optional[int] = 1
-    content: Optional[str] = None
-
-class ChapterUpdate(BaseModel):
-    title: Optional[str] = None
-    chapter_number: Optional[int] = None
-    volume_number: Optional[int] = None
-    content: Optional[str] = None
-    status: Optional[str] = None
-    word_count: Optional[int] = None
-    chapter_metadata: Optional[Dict[str, Any]] = None
-
-class ChapterResponse(BaseModel):
-    id: int
-    work_id: int
-    title: str
-    chapter_number: int
-    volume_number: int
-    status: str
-    word_count: int
-    created_at: str
-    updated_at: str
-    content: Optional[str] = None
-
-class ChapterListResponse(BaseModel):
-    chapters: List[ChapterResponse]
-    total: int
-    page: int
-    size: int
-    pages: int
-
-class ChapterVersionCreate(BaseModel):
-    content: str
-    change_description: Optional[str] = None
-
-class ChapterVersionResponse(BaseModel):
-    id: int
-    chapter_id: int
-    version_number: int
-    title: str
-    created_at: str
 
 router = APIRouter(prefix="/api/v1/chapters", tags=["章节管理"])
 sharedb_service = ShareDBService()

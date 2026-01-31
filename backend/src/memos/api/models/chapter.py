@@ -22,6 +22,7 @@ class Chapter(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     work_id = Column(Integer, ForeignKey("works.id", ondelete="CASCADE"), nullable=False, index=True)
+    volume_id = Column(Integer, ForeignKey("volumes.id", ondelete="SET NULL"), nullable=True, index=True)
     title = Column(String(200), nullable=False)
     chapter_number = Column(Integer, nullable=False)
     volume_number = Column(Integer, default=1, index=True)
@@ -40,6 +41,7 @@ class Chapter(Base):
 
     # 关系
     work = relationship("Work", back_populates="chapters")
+    volume = relationship("Volume", back_populates="chapters")
     versions = relationship("ChapterVersion", back_populates="chapter", cascade="all, delete-orphan")
 
     def __repr__(self):
@@ -80,6 +82,7 @@ class Chapter(Base):
             "title": self.title,
             "chapter_number": self.chapter_number,
             "volume_number": self.volume_number,
+            "volume_id": self.volume_id,
             "status": self.status,
             "word_count": self.word_count,
             "estimated_reading_time": self.estimated_reading_time,

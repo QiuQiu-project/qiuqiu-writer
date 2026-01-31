@@ -38,7 +38,7 @@ class ChapterService:
         """创建章节"""
         # 过滤掉 Chapter 模型不支持的字段（如 content，内容存储在 ShareDB 中）
         chapter_fields = {
-            'work_id', 'title', 'chapter_number', 'volume_number', 'status',
+            'work_id', 'title', 'chapter_number', 'volume_number', 'volume_id', 'status',
             'word_count', 'estimated_reading_time', 'content_hash', 'tags',
             'summary', 'notes', 'chapter_metadata', 'sort_order'
         }

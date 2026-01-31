@@ -49,6 +49,7 @@ class Work(Base):
     owner = relationship("User", back_populates="works")
     collaborators = relationship("WorkCollaborator", back_populates="work", cascade="all, delete-orphan")
     chapters = relationship("Chapter", back_populates="work", cascade="all, delete-orphan")
+    volumes = relationship("Volume", back_populates="work", cascade="all, delete-orphan")
     # 注意：characters和locations现在保存在work_metadata中，不再使用单独的Character表
     # characters = relationship("Character", back_populates="work", cascade="all, delete-orphan")
     factions = relationship("Faction", back_populates="work", cascade="all, delete-orphan")

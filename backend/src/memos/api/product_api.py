@@ -37,10 +37,14 @@ try:
     from memos.api.routers import (
         get_chapters_router,
         get_works_router,
+        get_volumes_router,
     )
     
     app.include_router(get_chapters_router())
     logger.info("✅ Chapters router registered successfully")
+
+    app.include_router(get_volumes_router())
+    logger.info("✅ Volumes router registered successfully")
     
     app.include_router(get_works_router())
     logger.info("✅ Works router registered successfully")

@@ -31,3 +31,7 @@ def get_product_router():
 def get_server_router():
     from memos.api.routers.server_router import router
     return router
+
+def get_volumes_router():
+    from memos.api.routers.volumes_router import router
+    return router

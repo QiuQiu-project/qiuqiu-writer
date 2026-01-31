@@ -60,6 +60,7 @@ try:
     # 导入各个路由模块
     auth_router_module = importlib.import_module('memos.api.routers.auth_router')
     chapters_router_module = importlib.import_module('memos.api.routers.chapters_router')
+    volumes_router_module = importlib.import_module('memos.api.routers.volumes_router')
     templates_router_module = importlib.import_module('memos.api.routers.templates_router')
     works_router_module = importlib.import_module('memos.api.routers.works_router')
     prompt_template_router_module = importlib.import_module('memos.api.routers.prompt_template_router')
@@ -67,6 +68,7 @@ try:
     # 获取路由对象
     auth_router = auth_router_module.router
     chapters_router = chapters_router_module.router
+    volumes_router = volumes_router_module.router
     templates_router = templates_router_module.router
     works_router = works_router_module.router
     prompt_template_router = prompt_template_router_module.router
@@ -80,6 +82,7 @@ try:
     
     app.include_router(auth_router)
     app.include_router(chapters_router)
+    app.include_router(volumes_router)
     app.include_router(templates_router)
     app.include_router(works_router)
     app.include_router(prompt_template_router)

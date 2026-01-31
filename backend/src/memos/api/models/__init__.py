@@ -15,6 +15,7 @@ __all__ = [
     "User", "UserProfile",
     "Work", "WorkCollaborator",
     "Chapter", "ChapterVersion",
+    "Volume",
     "WorkTemplate", "TemplateField", "WorkInfoExtended",
     "Faction",
     "WritingPrompt", "AIAnalysis",

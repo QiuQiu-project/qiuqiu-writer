@@ -87,7 +87,7 @@ async def init_db():
     async with engine.begin() as conn:
         # 导入所有模型以确保它们被注册
         from memos.api.models import (
-            user, work, chapter, template,
+            user, work, chapter, template, volume,
             characters, writing, system, document, prompt_template
         )
 
