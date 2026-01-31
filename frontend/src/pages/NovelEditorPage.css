@@ -413,12 +413,12 @@
 }
 
 .left-sidebar-wrapper {
-  width: 304px; /* 280px + 24px padding */
+  width: clamp(200px, 20%, 320px);
   padding: 24px 0 24px 24px;
 }
 
 .right-sidebar-wrapper {
-  width: 344px; /* 320px + 24px padding */
+  width: clamp(240px, 25%, 360px);
   padding: 24px 24px 24px 0;
 }
 
@@ -861,7 +861,7 @@
   height: 100%;
   width: 100%;
   display: block;
-  font-size: 16px;
+  font-size: clamp(16px, 1rem + 0.2vw, 20px);
   line-height: 1.8;
   color: #222222;
 }
@@ -871,7 +871,7 @@
 }
 
 .novel-editor-content h1 {
-  font-size: 32px;
+  font-size: clamp(28px, 2rem + 0.5vw, 40px);
   font-weight: 700;
   margin: 32px 0 16px 0;
   line-height: 1.3;
@@ -920,11 +920,28 @@
   width: 100%;
   padding: 12px 24px;
   box-shadow: none;
-  background: transparent;
+  background: var(--bg-primary);
   border: none;
   margin: 0;
   max-width: none;
-  border-radius: 0;
+  border-radius: 12px 12px 0 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 隐藏滚动条但保持可滚动（可选，根据用户喜好，这里保留默认滚动条以便用户发现可滚动） */
+.embedded-toolbar .novel-editor-toolbar::-webkit-scrollbar {
+  height: 4px; /* 细滚动条 */
+}
+
+.embedded-toolbar .novel-editor-toolbar::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 2px;
+}
+
+.embedded-toolbar .novel-editor-toolbar::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 /* 顶部导航栏中的保存和设置按钮 */
@@ -1115,7 +1132,7 @@
 
 .chapter-content-wrapper {
   width: 100%;
-  max-width: 800px;
+  max-width: clamp(600px, 60%, 1000px);
   display: flex;
   flex-direction: column;
   background: transparent;
