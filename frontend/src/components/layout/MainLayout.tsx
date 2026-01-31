@@ -116,6 +116,7 @@ export default function MainLayout() {
   };
 
   const isHomePage = location.pathname === '/';
+  const isWorksPage = location.pathname === '/works';
   const isUserPage = location.pathname.startsWith('/users/');
 
   return (
@@ -139,8 +140,8 @@ export default function MainLayout() {
                 </Link>
                 {isAuthenticated && (
                   <Link 
-                    to={`/users/${userInfo?.id}`}
-                    className={`nav-link ${isUserPage ? 'active' : ''}`}
+                    to="/works"
+                    className={`nav-link ${isWorksPage ? 'active' : ''}`}
                   >
                     我的作品
                   </Link>
@@ -205,7 +206,7 @@ export default function MainLayout() {
                       </div>
                       <div className="menu-divider"></div>
                       <Link
-                        to={`/users/${userInfo?.id}`}
+                        to="/works"
                         className="menu-item"
                         onClick={() => setUserMenuOpen(false)}
                       >
@@ -261,7 +262,7 @@ export default function MainLayout() {
             {isAuthenticated && (
               <>
             <Link
-              to={`/users/${userInfo?.id}`}
+              to="/works"
               className="mobile-menu-item"
               onClick={() => setMobileMenuOpen(false)}
             >

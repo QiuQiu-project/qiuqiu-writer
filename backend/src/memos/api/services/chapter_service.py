@@ -230,17 +230,17 @@ class ChapterService:
         user_id: str,
         action: str,
         target_type: str,
-        target_id: int,
+        target_id: Any,
         details: Dict[str, Any],
         ip_address: Optional[str] = None,
         user_agent: Optional[str] = None
     ):
-        """创建审计日志"""
+        """创建审计日志（target_id 存 VARCHAR，统一转 str）"""
         audit_log = AuditLog(
             user_id=user_id,
             action=action,
             target_type=target_type,
-            target_id=target_id,
+            target_id=str(target_id) if target_id is not None else None,
             details=details,
             ip_address=ip_address,
             user_agent=user_agent

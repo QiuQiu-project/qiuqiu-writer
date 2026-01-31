@@ -415,9 +415,8 @@ export default function NovelEditorPage(){
       await worksApi.deleteWork(workId!);
       alert('作品删除成功');
       // 导航到当前用户的作品页面
-      const currentUser = authApi.getUserInfo();
-      if (currentUser?.id) {
-        navigate(`/users/${currentUser.id}`);
+      if (authApi.isAuthenticated()) {
+        navigate('/works');
       } else {
         navigate('/');
       }
@@ -2165,9 +2164,8 @@ export default function NovelEditorPage(){
         <div style={{ padding: '40px', textAlign: 'center', color: 'var(--error, #666666)' }}>
           {error || '作品不存在'}
           <button onClick={() => {
-            const currentUser = authApi.getUserInfo();
-            if (currentUser?.id) {
-              navigate(`/users/${currentUser.id}`);
+            if (authApi.isAuthenticated()) {
+              navigate('/works');
             } else {
               navigate('/');
             }
@@ -2186,7 +2184,12 @@ export default function NovelEditorPage(){
         <div className="header-left">
           <button className="exit-btn" onClick={() => {
             if (work?.owner_id) {
-              navigate(`/users/${work.owner_id}`);
+              const currentUser = authApi.getUserInfo();
+              if (currentUser?.id && work.owner_id === currentUser.id) {
+                navigate('/works');
+              } else {
+                navigate(`/users/${work.owner_id}`);
+              }
             } else {
               navigate(-1);
             }

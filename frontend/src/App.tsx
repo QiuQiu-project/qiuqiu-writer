@@ -7,6 +7,7 @@ import LoadingSpinner from './components/common/LoadingSpinner';
 // 路由懒加载 - 提升首屏加载性能
 const HomePage = lazy(() => import('./pages/HomePage'));
 const UserWorksPage = lazy(() => import('./pages/UserWorksPage'));
+const WorksPage = lazy(() => import('./pages/WorksPage'));
 const NovelPage = lazy(() => import('./pages/NovelPage'));
 const ScriptPage = lazy(() => import('./pages/ScriptPage'));
 const EditorPage = lazy(() => import('./pages/EditorPage'));
@@ -21,6 +22,7 @@ function AppContent() {
       <Routes>
         <Route element={<MainLayout />}>
           <Route path="/" element={<HomePage />} />
+          <Route path="/works" element={<WorksPage />} />
           <Route path="/users/:userId" element={<UserWorksPage />} />
           <Route path="/novel" element={<NovelPage />} />
           <Route path="/script" element={<ScriptPage />} />
