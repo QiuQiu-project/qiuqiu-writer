@@ -642,20 +642,22 @@
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
-  background: var(--accent-gradient);
+  background: var(--accent-primary);
   color: white;
-  border: none;
+  border: 1px solid var(--accent-primary);
   border-radius: var(--radius-sm);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
   transition: all var(--transition-base);
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
 }
 
 .send-button:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  transform: none;
+  box-shadow: none;
 }
 
 .send-button:disabled {

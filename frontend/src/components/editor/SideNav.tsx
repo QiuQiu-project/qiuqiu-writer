@@ -31,6 +31,8 @@ interface Volume {
   id: string;
   title: string;
   chapters: Chapter[];
+  outline?: string;
+  detailOutline?: string;
 }
 
 interface SideNavProps {
@@ -39,6 +41,7 @@ interface SideNavProps {
   selectedChapter?: string | null;
   onChapterSelect?: (chapterId: string | null) => void;
   onOpenChapterModal?: (mode: 'create' | 'edit', volumeId: string, volumeTitle: string, chapterData?: ChapterFullData) => void;
+  onOpenVolumeModal?: (mode: 'create' | 'edit', volumeId?: string, currentTitle?: string, currentOutline?: string, currentDetailOutline?: string) => void;
   onChapterDelete?: (chapterId: string) => void;  // 删除章节回调
   volumes?: Volume[];
   onVolumesChange?: (volumes: Volume[]) => void;
@@ -48,7 +51,7 @@ interface SideNavProps {
 // 导出 Chapter, Volume, SideNavProps 类型供外部使用
 export type { Chapter, Volume, SideNavProps };
 
-export default function SideNav({ activeNav, onNavChange, selectedChapter, onChapterSelect, onOpenChapterModal, onChapterDelete, volumes: externalVolumes, onVolumesChange }: SideNavProps) {
+export default function SideNav({ activeNav, onNavChange, selectedChapter, onChapterSelect, onOpenChapterModal, onOpenVolumeModal, onChapterDelete, volumes: externalVolumes, onVolumesChange }: SideNavProps) {
   const [chaptersExpanded, setChaptersExpanded] = useState(true);
   const [isChaptersReversed, setIsChaptersReversed] = useState(false); // 章节排序状态
   
@@ -199,8 +202,22 @@ export default function SideNav({ activeNav, onNavChange, selectedChapter, onCha
                     >
                       {volumesExpanded[volume.id] ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                     </button>
-                    <button className="nav-volume-item">
+                    <div className="nav-volume-item">
                       <span>{volume.title}</span>
+                    </div>
+                    <button
+                      className="nav-volume-settings-btn"
+                      title="卷纲设置"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onOpenVolumeModal) {
+                          onOpenVolumeModal('edit', volume.id, volume.title, volume.outline, volume.detailOutline);
+                        } else {
+                          console.log('Open volume settings for:', volume.title);
+                        }
+                      }}
+                    >
+                      <Settings size={12} />
                     </button>
                     <button 
                       className="nav-add-btn small" 

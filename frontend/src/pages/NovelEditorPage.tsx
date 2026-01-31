@@ -10,6 +10,7 @@ import AIAssistant from '../components/editor/AIAssistant';
 import TagsManager from '../components/editor/TagsManager';
 import ChapterOutline from '../components/editor/ChapterOutline';
 import ChapterSettingsModal from '../components/editor/ChapterSettingsModal';
+import VolumeSettingsModal from '../components/editor/VolumeSettingsModal';
 import MapView from '../components/editor/MapView';
 import Characters from '../components/editor/Characters';
 import Factions from '../components/editor/Factions';
@@ -66,6 +67,14 @@ export default function NovelEditorPage(){
   const [currentVolumeTitle, setCurrentVolumeTitle] = useState('');
   const [currentChapterData, setCurrentChapterData] = useState<ChapterFullData | undefined>();
   
+  // 卷设置弹框状态
+  const [isVolumeModalOpen, setIsVolumeModalOpen] = useState(false);
+  const [volumeModalMode, setVolumeModalMode] = useState<'create' | 'edit'>('create');
+  const [editingVolumeId, setEditingVolumeId] = useState<string | undefined>();
+  const [editingVolumeTitle, setEditingVolumeTitle] = useState<string>('');
+  const [editingVolumeOutline, setEditingVolumeOutline] = useState<string>('');
+  const [editingVolumeDetailedOutline, setEditingVolumeDetailedOutline] = useState<string>('');
+
   // 标题下拉菜单状态
   const [headingMenuOpen, setHeadingMenuOpen] = useState(false);
   
@@ -1407,6 +1416,37 @@ export default function NovelEditorPage(){
     setIsChapterModalOpen(true);
   };
 
+  // 打开卷设置弹框
+  const handleOpenVolumeModal = (mode: 'create' | 'edit', volumeId?: string, currentTitle?: string, currentOutline?: string, currentDetailOutline?: string) => {
+    setVolumeModalMode(mode);
+    setEditingVolumeId(volumeId);
+    setEditingVolumeTitle(currentTitle || '');
+    setEditingVolumeOutline(currentOutline || '');
+    setEditingVolumeDetailedOutline(currentDetailOutline || '');
+    setIsVolumeModalOpen(true);
+  };
+
+  // 保存卷设置
+  const handleSaveVolume = (title: string, volumeId?: string, outline?: string, detailOutline?: string) => {
+    if (volumeModalMode === 'edit' && volumeId) {
+      setVolumes(prev => prev.map(vol => 
+        vol.id === volumeId ? { 
+          ...vol, 
+          title,
+          outline: outline || '',
+          detailOutline: detailOutline || ''
+        } : vol
+      ));
+    }
+  };
+
+  // 删除卷
+  const handleDeleteVolume = (volumeId: string) => {
+    setVolumes(prev => prev.filter(vol => vol.id !== volumeId));
+    // 注意：这里仅更新了前端显示的卷列表，实际的章节删除逻辑可能需要配合后端接口完善
+    // 如果后端不支持卷的概念，那么这里只是删除了前端的视图分组
+  };
+
   // 保存章节/草稿数据
   const handleSaveChapter = async (data: {
     id?: string;
@@ -2159,6 +2199,7 @@ export default function NovelEditorPage(){
                 setActiveNav('work-info');
               }}
               onOpenChapterModal={handleOpenChapterModal}
+              onOpenVolumeModal={handleOpenVolumeModal}
               onChapterDelete={handleDeleteChapter}
               volumes={volumes}
               onVolumesChange={setVolumes}
@@ -2200,6 +2241,7 @@ export default function NovelEditorPage(){
                     setMobileMenuOpen(false);
                   }}
                   onOpenChapterModal={handleOpenChapterModal}
+                  onOpenVolumeModal={handleOpenVolumeModal}
                   onChapterDelete={handleDeleteChapter}
                   volumes={volumes}
                   onVolumesChange={setVolumes}
@@ -2488,6 +2530,19 @@ export default function NovelEditorPage(){
           </div>
         </div>
       )}
+
+      {/* 卷设置弹框 */}
+      <VolumeSettingsModal
+        isOpen={isVolumeModalOpen}
+        mode={volumeModalMode}
+        volumeId={editingVolumeId}
+        initialTitle={editingVolumeTitle}
+        initialOutline={editingVolumeOutline}
+        initialDetailOutline={editingVolumeDetailedOutline}
+        onClose={() => setIsVolumeModalOpen(false)}
+        onSave={handleSaveVolume}
+        onDelete={handleDeleteVolume}
+      />
 
       {/* 章节设置弹框 */}
       <ChapterSettingsModal

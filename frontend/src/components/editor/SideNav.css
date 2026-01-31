@@ -351,21 +351,45 @@
 
 .nav-volume-item {
   flex: 1;
-  padding: 10px 14px;
-  border: none;
+  padding: 6px 8px;
   background: transparent;
   color: var(--text-primary);
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
   text-align: left;
-  cursor: pointer;
   border-radius: 8px;
-  transition: all 0.2s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  /* transition: all 0.2s ease; */
+  /* Remove pointer events since it's just text now */
+  /* cursor: default; */
 }
 
-.nav-volume-item:hover {
-  background: var(--accent-light);
-  color: var(--accent-primary);
+.nav-volume-settings-btn {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  border-radius: 6px;
+  margin-right: 4px;
+}
+
+.nav-volume-header:hover .nav-volume-settings-btn {
+  display: flex;
+}
+
+.nav-volume-settings-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
 .nav-chapters {
