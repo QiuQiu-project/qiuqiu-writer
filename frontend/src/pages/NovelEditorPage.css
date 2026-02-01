@@ -97,9 +97,7 @@
   text-overflow: ellipsis;
 }
 
-.work-title:hover {
-  /* 悬停时不改变背景 */
-}
+/* 悬停时不改变背景 */
 
 .work-title-editable {
   cursor: text;
@@ -109,9 +107,7 @@
   min-height: 1.4em;
 }
 
-.work-title-editable:hover {
-  /* 悬停时不改变背景 */
-}
+/* 悬停时不改变背景 */
 
 .work-title-editable:focus {
   /* 聚焦时不改变背景 */
@@ -1194,9 +1190,7 @@
   min-height: 1.4em;
 }
 
-.chapter-name-editable:hover {
-  /* 悬停时不改变任何样式 */
-}
+/* 悬停时不改变任何样式 */
 
 .chapter-name-editable:focus {
   /* 聚焦时不改变任何样式 */

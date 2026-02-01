@@ -929,8 +929,8 @@ export default function NovelEditorPage(){
                     volumeId: vol.id,
                     title: chapter.title,
                     chapter_number: chapter.chapter_number,
-                    characters: [],
-                    locations: [],
+                    characters: (chapter.metadata as any)?.component_data?.characters || [],
+                    locations: (chapter.metadata as any)?.component_data?.locations || [],
                     outline: chapter.metadata?.outline || '',
                     detailOutline: chapter.metadata?.detailed_outline || ''
                 }))
@@ -966,8 +966,8 @@ export default function NovelEditorPage(){
                 volumeTitle: volTitle,
                 title: chapter.title,
                 chapter_number: chapter.chapter_number,
-                characters: [],
-                locations: [],
+                characters: (chapter.metadata as any)?.component_data?.characters || [],
+                locations: (chapter.metadata as any)?.component_data?.locations || [],
                 outline: chapter.metadata?.outline || '',
                 detailOutline: chapter.metadata?.detailed_outline || '',
             };
@@ -1659,13 +1659,21 @@ export default function NovelEditorPage(){
           updateData.volume_id = isRealVolume ? Number(data.volumeId) : null as any; // eslint-disable-line @typescript-eslint/no-explicit-any
         }
 
-        // 如果有大纲或细纲，添加到更新数据中
-        if (data.outline || data.detailOutline) {
-          updateData.chapter_metadata = {
-            outline: data.outline || '',
-            detailed_outline: data.detailOutline || '',
+        // 构造 metadata
+        const metadata: any = {
+          outline: data.outline || '',
+          detailed_outline: data.detailOutline || '',
+        };
+
+        // 如果有角色或地点数据，添加到 component_data
+        if ((data.characters && data.characters.length > 0) || (data.locations && data.locations.length > 0)) {
+          metadata.component_data = {
+            characters: data.characters || [],
+            locations: data.locations || []
           };
         }
+
+        updateData.chapter_metadata = metadata;
 
         // 调用 API 更新章节到数据库
         await chaptersApi.updateChapter(chapterId, updateData);
@@ -1792,13 +1800,22 @@ export default function NovelEditorPage(){
         const chapterId = String(newChapter.id);
         const newChapterNumber = maxChapterNumber + 1;
         
-        // 如果创建章节时有大纲或细纲，立即更新保存
-        if (data.outline || data.detailOutline) {
+        // 如果创建章节时有大纲、细纲或组件数据，立即更新保存
+        if (data.outline || data.detailOutline || (data.characters && data.characters.length > 0) || (data.locations && data.locations.length > 0)) {
+          const metadata: any = {
+            outline: data.outline || '',
+            detailed_outline: data.detailOutline || '',
+          };
+
+          if ((data.characters && data.characters.length > 0) || (data.locations && data.locations.length > 0)) {
+            metadata.component_data = {
+              characters: data.characters || [],
+              locations: data.locations || []
+            };
+          }
+
           await chaptersApi.updateChapter(newChapter.id, {
-            chapter_metadata: {
-              outline: data.outline || '',
-              detailed_outline: data.detailOutline || '',
-            },
+            chapter_metadata: metadata,
           });
         }
         
@@ -2495,7 +2512,7 @@ export default function NovelEditorPage(){
             />
           )}
           {activeNav === 'map' && <MapView />}
-          {activeNav === 'characters' && <Characters availableCharacters={[]} />}
+          {activeNav === 'characters' && <Characters availableCharacters={((work?.metadata as any)?.component_data?.characters || (work?.metadata as any)?.characters || [])} />}
           {activeNav === 'factions' && <Factions />}
           {activeNav === 'settings' && (
             <div className="placeholder-content">
@@ -2730,7 +2747,34 @@ export default function NovelEditorPage(){
         volumeId={currentVolumeId}
         volumeTitle={currentVolumeTitle}
         initialData={currentChapterData}
-        availableCharacters={[]}
+        availableCharacters={(() => {
+          const meta = work?.metadata as any;
+          // 合并多个来源的角色数据，防止遗漏
+          const source1 = meta?.characters || [];
+          const source2 = meta?.component_data?.characters || [];
+          
+          // 合并数组
+          const allChars = [...source1, ...source2];
+          
+          // 去重（优先根据 ID，其次根据 Name）
+          const uniqueCharsMap = new Map();
+          
+          allChars.forEach((c: any, index: number) => {
+            // 确保有临时 ID
+            const tempId = c.id ? String(c.id) : (c.name || `char-index-${index}`);
+            const charObj = { ...c, id: tempId };
+            
+            // 使用 Name 作为去重键（如果 ID 不存在或不稳定，Name 通常是唯一的）
+            // 或者如果 ID 存在，使用 ID
+            const uniqueKey = c.id ? String(c.id) : (c.name || tempId);
+            
+            if (!uniqueCharsMap.has(uniqueKey)) {
+              uniqueCharsMap.set(uniqueKey, charObj);
+            }
+          });
+          
+          return Array.from(uniqueCharsMap.values());
+        })()}
         availableLocations={[]}
         availableVolumes={volumes.map(vol => ({ id: vol.id, title: vol.title }))}
         onClose={() => setIsChapterModalOpen(false)}

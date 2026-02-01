@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Sparkles, Plus, MapPin, Users, FileText, BookOpen } from 'lucide-react';
+import { X, Sparkles, Plus, MapPin, Users, FileText, BookOpen, ChevronDown, ChevronRight, Check } from 'lucide-react';
 import { chaptersApi } from '../../utils/chaptersApi';
 import LoadingSpinner from '../common/LoadingSpinner';
 import MessageModal from '../common/MessageModal';
@@ -10,6 +10,13 @@ interface Character {
   id: string;
   name: string;
   avatar?: string;
+  appearance?: Record<string, string>;
+  personality?: Record<string, string>;
+  description?: string;
+  display_name?: string;
+  gender?: string;
+  type?: string;
+  [key: string]: any;
 }
 
 interface Location {
@@ -50,6 +57,107 @@ interface ChapterSettingsModalProps {
   onGenerateContent?: (content: string, isFinal?: boolean) => void;  // 生成内容回调（支持流式）
 }
 
+interface CharacterSelectionCardProps {
+  character: Character;
+  isSelected: boolean;
+  onToggle: () => void;
+}
+
+function CharacterSelectionCard({ character, isSelected, onToggle }: CharacterSelectionCardProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <div className={`character-selection-card ${isSelected ? 'selected' : ''}`}>
+      <div 
+        className="card-header" 
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <div className="header-left">
+          <div 
+            className="checkbox-wrapper"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle();
+            }}
+            style={{ cursor: 'pointer', display: 'flex' }}
+          >
+            {isSelected ? (
+              <div style={{ 
+                width: '18px', 
+                height: '18px', 
+                background: 'var(--accent-primary)', 
+                borderRadius: '4px', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                color: 'white'
+              }}>
+                <Check size={12} strokeWidth={3} />
+              </div>
+            ) : (
+              <div style={{ 
+                width: '18px', 
+                height: '18px', 
+                border: '2px solid var(--border-color)', 
+                borderRadius: '4px',
+                background: 'var(--bg-secondary)'
+              }} />
+            )}
+          </div>
+          <span className="character-name">{character.name}</span>
+          {character.gender && <span className="character-tag">{character.gender}</span>}
+          {character.type && <span className="character-tag">{character.type}</span>}
+        </div>
+        
+        <div className="header-right">
+          {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+        </div>
+      </div>
+      
+      {isExpanded && (
+        <div className="card-content">
+          {character.description && (
+            <div className="detail-section">
+              <div className="detail-title">简介</div>
+              <div style={{ lineHeight: '1.5', color: 'var(--text-secondary)' }}>
+                {character.description}
+              </div>
+            </div>
+          )}
+          
+          {character.appearance && Object.keys(character.appearance).length > 0 && (
+            <div className="detail-section">
+              <div className="detail-title">外貌</div>
+              <div className="detail-grid">
+                {Object.entries(character.appearance).map(([key, value]) => (
+                  <div key={key} className="detail-row">
+                    <span className="detail-key">{key}:</span>
+                    <span className="detail-value">{String(value)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {character.personality && Object.keys(character.personality).length > 0 && (
+            <div className="detail-section">
+              <div className="detail-title">性格</div>
+              <div className="detail-grid">
+                {Object.entries(character.personality).map(([key, value]) => (
+                  <div key={key} className="detail-row">
+                    <span className="detail-key">{key}:</span>
+                    <span className="detail-value">{String(value)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ChapterSettingsModal({
   isOpen,
   mode,
@@ -63,7 +171,7 @@ export default function ChapterSettingsModal({
   onSave,
   onGenerateContent,
 }: ChapterSettingsModalProps) {
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState(initialData?.title || '');
   const [chapterNumber, setChapterNumber] = useState<number | undefined>(undefined);
   const [selectedVolumeId, setSelectedVolumeId] = useState<string>(volumeId);
   const [selectedCharacters, setSelectedCharacters] = useState<string[]>([]);
@@ -75,7 +183,7 @@ export default function ChapterSettingsModal({
   const [isGeneratingDetail, setIsGeneratingDetail] = useState(false);
   const [isGeneratingContent, setIsGeneratingContent] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'basic' | 'outline'>('basic');
+  const [activeTab, setActiveTab] = useState<'basic' | 'outline' | 'characters'>('basic');
   
   const [messageState, setMessageState] = useState<{
     isOpen: boolean;
@@ -112,6 +220,46 @@ export default function ChapterSettingsModal({
   // 使用传入的地点数据，如果没有则使用空数组
   const locationsToShow: Location[] = availableLocations.length > 0 ? availableLocations : [];
 
+  // 辅助函数：标准化选中的角色ID（处理 ID 变化或仅有 Name 的情况）
+  const normalizeSelectedCharacters = (savedIds: any[], available: Character[]): string[] => {
+    if (!savedIds || savedIds.length === 0) return [];
+    
+    console.log('🔄 [ChapterSettingsModal] Normalizing characters:', { savedIds, availableCount: available.length });
+
+    const normalized = savedIds.map(savedItem => {
+      // 处理 savedItem 可能是对象的情况
+      let lookupKey: string;
+      if (typeof savedItem === 'object' && savedItem !== null) {
+        lookupKey = savedItem.id ? String(savedItem.id) : (savedItem.name || '');
+      } else {
+        lookupKey = String(savedItem);
+      }
+
+      if (!lookupKey) return null;
+
+      // 1. 直接匹配 ID
+      const matchById = available.find(c => String(c.id) === lookupKey);
+      if (matchById) return String(matchById.id);
+      
+      // 2. 尝试匹配 Name (兼容旧数据或无 ID 数据)
+      const matchByName = available.find(c => c.name === lookupKey || c.display_name === lookupKey);
+      if (matchByName) return String(matchByName.id);
+      
+      // 3. 如果是对象且有 name，尝试用 name 再次匹配（针对 lookupKey 是 ID 但没匹配上的情况）
+      if (typeof savedItem === 'object' && savedItem.name) {
+         const matchByObjName = available.find(c => c.name === savedItem.name);
+         if (matchByObjName) return String(matchByObjName.id);
+      }
+
+      // 4. 如果都匹配不上，但 lookupKey 本身看起来像个 ID 或 Name，就先返回它
+      // 但为了避免显示问题，如果它不在 available 里，可能不会显示选中状态
+      return lookupKey;
+    }).filter((id): id is string => id !== null);
+
+    console.log('✅ [ChapterSettingsModal] Normalized result:', normalized);
+    return normalized;
+  };
+
   const ensureString = (val: unknown): string => {
     if (typeof val === 'string') return val;
     if (val === null || val === undefined) return '';
@@ -134,7 +282,7 @@ export default function ChapterSettingsModal({
           setTitle(ensureString(initialData.title));
           setChapterNumber(initialData.chapter_number);
           setSelectedVolumeId(initialData.volumeId || volumeId);
-          setSelectedCharacters(initialData.characters || []);
+          setSelectedCharacters(normalizeSelectedCharacters(initialData.characters || [], availableCharacters || []));
           setLocations(initialData.locations || []);
           setOutline(ensureString(initialData.outline));
           setDetailOutline(ensureString(initialData.detailOutline));
@@ -161,7 +309,8 @@ export default function ChapterSettingsModal({
                 setSelectedVolumeId(initialData.volumeId || volumeId);
                 
                 // 从 metadata 获取大纲和细纲
-                const meta = info.metadata || {};
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const meta = (info.metadata || {}) as any;
                 
                 // 增强的数据获取逻辑：尝试从 metadata 或顶层字段获取
                 let fetchedOutline = '';
@@ -199,9 +348,24 @@ export default function ChapterSettingsModal({
                 setOutline(fetchedOutline);
                 setDetailOutline(fetchedDetail);
                 
-                // 保持 initialData 中的其他字段
-                setSelectedCharacters(initialData.characters || []);
-                setLocations(initialData.locations || []);
+                // 从 metadata.component_data 获取角色列表
+                const componentData = meta.component_data || {};
+                console.log('📦 [ChapterSettingsModal] Metadata component_data:', componentData);
+                
+                if (componentData.characters && Array.isArray(componentData.characters)) {
+                  // 直接传递原始数组，由 normalizeSelectedCharacters 处理对象或字符串
+                  setSelectedCharacters(normalizeSelectedCharacters(componentData.characters, availableCharacters || []));
+                } else {
+                  console.log('⚠️ [ChapterSettingsModal] No characters in component_data, falling back to initialData');
+                  setSelectedCharacters(normalizeSelectedCharacters(initialData.characters || [], availableCharacters || []));
+                }
+
+                if (componentData.locations && Array.isArray(componentData.locations)) {
+                  const locs = componentData.locations.map((l: unknown) => String(l));
+                  setLocations(locs);
+                } else {
+                  setLocations(initialData.locations || []);
+                }
               } else {
                 initFromProps();
               }
@@ -359,9 +523,16 @@ export default function ChapterSettingsModal({
             <BookOpen size={16} />
             <span>大纲细纲</span>
           </button>
+          <button
+            className={`modal-tab ${activeTab === 'characters' ? 'active' : ''}`}
+            onClick={() => setActiveTab('characters')}
+          >
+            <Users size={16} />
+            <span>角色信息</span>
+          </button>
         </div>
 
-        <div className="chapter-modal-body">
+        <div className="chapter-modal-content">
           {isLoading && (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
               <LoadingSpinner message="正在加载章节信息..." />
@@ -424,28 +595,6 @@ export default function ChapterSettingsModal({
                     placeholder="请输入章节号"
                     min="1"
                   />
-                </div>
-              )}
-
-              {/* 出场人物 - 只在有角色设定时显示 */}
-              {charactersToShow.length > 0 && (
-                <div className="form-group">
-                  <label className="form-label">
-                    <Users size={16} />
-                    出场人物
-                  </label>
-                  <div className="character-grid">
-                    {charactersToShow.map(char => (
-                      <button
-                        key={char.id}
-                        className={`character-chip ${selectedCharacters.includes(char.id) ? 'selected' : ''}`}
-                        onClick={() => handleCharacterToggle(char.id)}
-                      >
-                        <span className="character-avatar">{char.name[0]}</span>
-                        <span>{char.name}</span>
-                      </button>
-                    ))}
-                  </div>
                 </div>
               )}
 
@@ -518,12 +667,17 @@ export default function ChapterSettingsModal({
                     大纲
                   </label>
                   <button
-                    className={`ai-generate-btn ${isGeneratingOutline ? 'generating' : ''}`}
+                    className="icon-btn"
                     onClick={handleGenerateOutline}
                     disabled={isGeneratingOutline}
+                    title={isGeneratingOutline ? '生成中...' : 'AI生成大纲'}
+                    style={{ padding: '4px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#3b82f6' }}
                   >
-                    <Sparkles size={14} />
-                    <span>{isGeneratingOutline ? '生成中...' : 'AI生成'}</span>
+                    {isGeneratingOutline ? (
+                      <span className="loading-spinner small" style={{ width: '16px', height: '16px', border: '2px solid #e2e8f0', borderTopColor: '#3b82f6', borderRadius: '50%', display: 'block', animation: 'spin 1s linear infinite' }}></span>
+                    ) : (
+                      <Sparkles size={16} />
+                    )}
                   </button>
                 </div>
                 <textarea
@@ -543,12 +697,17 @@ export default function ChapterSettingsModal({
                     细纲
                   </label>
                   <button
-                    className={`ai-generate-btn ${isGeneratingDetail ? 'generating' : ''}`}
+                    className="icon-btn"
                     onClick={handleGenerateDetailOutline}
                     disabled={isGeneratingDetail}
+                    title={isGeneratingDetail ? '生成中...' : 'AI生成细纲'}
+                    style={{ padding: '4px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#3b82f6' }}
                   >
-                    <Sparkles size={14} />
-                    <span>{isGeneratingDetail ? '生成中...' : 'AI生成'}</span>
+                    {isGeneratingDetail ? (
+                      <span className="loading-spinner small" style={{ width: '16px', height: '16px', border: '2px solid #e2e8f0', borderTopColor: '#3b82f6', borderRadius: '50%', display: 'block', animation: 'spin 1s linear infinite' }}></span>
+                    ) : (
+                      <Sparkles size={16} />
+                    )}
                   </button>
                 </div>
                 <textarea
@@ -564,10 +723,13 @@ export default function ChapterSettingsModal({
               {onGenerateContent && (
                 <div className="form-group">
                   <button
-                    className={`ai-generate-content-btn ${isGeneratingContent ? 'generating' : ''}`}
+                    className="icon-btn"
+                    style={{ padding: '4px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#3b82f6' }}
+                    title={isGeneratingContent ? '生成中...' : '根据大纲和细纲生成章节内容'}
+                    disabled={isGeneratingContent || !outline.trim() || !detailOutline.trim()}
                     onClick={async () => {
                       if (!outline.trim() || !detailOutline.trim()) {
-                        alert('请先填写大纲和细纲');
+                        showMessage('请先填写大纲和细纲', 'warning');
                         return;
                       }
                       setIsGeneratingContent(true);
@@ -609,11 +771,45 @@ export default function ChapterSettingsModal({
                         setIsGeneratingContent(false);
                       }
                     }}
-                    disabled={isGeneratingContent || !outline.trim() || !detailOutline.trim()}
                   >
-                    <Sparkles size={16} />
-                    <span>{isGeneratingContent ? '生成中...' : '根据大纲和细纲生成章节内容'}</span>
+                    {isGeneratingContent ? (
+                      <span className="loading-spinner small" style={{ width: '16px', height: '16px', border: '2px solid #e2e8f0', borderTopColor: '#3b82f6', borderRadius: '50%', display: 'block', animation: 'spin 1s linear infinite' }}></span>
+                    ) : (
+                      <Sparkles size={16} />
+                    )}
                   </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!isLoading && activeTab === 'characters' && (
+            <div className="modal-section-content">
+              {charactersToShow.length > 0 ? (
+                <div className="form-group">
+                  <label className="form-label">
+                    <Users size={16} />
+                    选择出场人物
+                  </label>
+                  <div className="character-selection-list">
+                    {charactersToShow.map(char => (
+                      <CharacterSelectionCard
+                        key={char.id}
+                        character={char}
+                        isSelected={selectedCharacters.includes(char.id)}
+                        onToggle={() => handleCharacterToggle(char.id)}
+                      />
+                    ))}
+                  </div>
+                  <p className="form-hint" style={{ marginTop: '12px', color: 'var(--text-tertiary)', fontSize: '13px' }}>
+                    选择本章登场的角色，有助于AI更好地理解剧情上下文。
+                  </p>
+                </div>
+              ) : (
+                <div className="empty-state" style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-tertiary)' }}>
+                  <Users size={48} style={{ opacity: 0.2, marginBottom: '16px' }} />
+                  <p>暂无角色数据</p>
+                  <p style={{ fontSize: '12px', marginTop: '4px' }}>请在"角色管理"中添加角色</p>
                 </div>
               )}
             </div>
