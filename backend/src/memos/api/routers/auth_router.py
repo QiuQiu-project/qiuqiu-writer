@@ -325,7 +325,7 @@ async def refresh_token(
 async def logout(
     request: LogoutRequest,
     http_request: Request,
-    current_user_id: int = Depends(security)
+    current_user_id: str = Depends(get_current_user_id)
 ) -> AuthResponse:
     """
     用户登出

@@ -150,6 +150,7 @@ class AuthApiClient {
    */
   async logout(): Promise<void> {
     const token = this.getToken();
+    const refreshToken = this.getRefreshToken();
     if (!token) {
       return;
     }
@@ -161,6 +162,7 @@ class AuthApiClient {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify(refreshToken ? { refresh_token: refreshToken } : {}),
       });
     } catch (error) {
       console.error('登出请求失败:', error);
