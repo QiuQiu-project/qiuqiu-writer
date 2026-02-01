@@ -30,7 +30,9 @@ function RedirectToMyWorks() {
           try {
             const user = await authApi.getCurrentUser();
             if (user?.id) setUserId(user.id);
-          } catch (_) {}
+          } catch {
+            // ignore error
+          }
         }
       }
       setLoading(false);
