@@ -10,6 +10,8 @@ import { templatesApi } from '../../utils/templatesApi';
 import type { WorkTemplate } from '../../utils/templatesApi';
 import { generateComponentData } from '../../utils/bookAnalysisApi';
 import { GeneratedDataPreviewModal } from './work-info/GeneratedDataPreviewModal';
+import MessageModal from '../common/MessageModal';
+import type { MessageType } from '../common/MessageModal';
 import './WorkInfoManager.css';
 
 // Import refactored modules
@@ -82,6 +84,33 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [, setCurrentImageId] = useState<string | null>(null);
   const [generatingComponents, setGeneratingComponents] = useState<Record<string, boolean>>({});
+  
+  // 消息提示状态
+  const [messageState, setMessageState] = useState<{
+    isOpen: boolean;
+    type: MessageType;
+    message: string;
+    title?: string;
+    onConfirm?: () => void;
+  }>({
+    isOpen: false,
+    type: 'info',
+    message: '',
+  });
+
+  const showMessage = (message: string, type: MessageType = 'info', title?: string, onConfirm?: () => void) => {
+    setMessageState({
+      isOpen: true,
+      type,
+      message,
+      title,
+      onConfirm,
+    });
+  };
+
+  const closeMessage = () => {
+    setMessageState(prev => ({ ...prev, isOpen: false }));
+  };
 
   // 生成数据预览状态
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
@@ -224,7 +253,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
     const promptId = comp.generatePromptId;
     
     if (!prompt && !promptId) {
-      alert('请先在组件配置中设置生成 Prompt');
+      showMessage('请先在组件配置中设置生成 Prompt', 'warning');
       return;
     }
     
@@ -254,7 +283,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
        }
     } catch (error) {
       console.error('Generate failed', error);
-      alert('生成失败: ' + (error instanceof Error ? error.message : String(error)));
+      showMessage('生成失败: ' + (error instanceof Error ? error.message : String(error)), 'error');
     } finally {
       setGeneratingComponents(prev => ({ ...prev, [comp.id]: false }));
     }
@@ -661,18 +690,24 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
   const handleDeleteModule = () => {
     if (!activeModule) return;
     
-    if (window.confirm(`确定要删除模块 "${activeModule.name}" 吗？此操作将删除该模块下的所有数据且不可恢复。`)) {
-      setTemplate(prev => {
-        if (!prev) return null;
-        const newModules = prev.modules.filter(m => m.id !== activeModule.id);
-        return {
-          ...prev,
-          modules: newModules
-        };
-      });
-      // Reset index to 0
-      setActiveModuleIndex(0);
-    }
+    showMessage(
+      `确定要删除模块 "${activeModule.name}" 吗？此操作将删除该模块下的所有数据且不可恢复。`,
+      'warning',
+      '删除模块',
+      () => {
+        setTemplate(prev => {
+          if (!prev) return null;
+          const newModules = prev.modules.filter(m => m.id !== activeModule.id);
+          return {
+            ...prev,
+            modules: newModules
+          };
+        });
+        // Reset index to 0
+        setActiveModuleIndex(0);
+        showMessage('模块已删除', 'success');
+      }
+    );
   };
 
   const handleSelectTemplate = (tpl: WorkTemplate) => {
@@ -690,11 +725,12 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
             description: tpl.description || ''
           });
           setShowTemplateMarket(false);
+          showMessage('模板应用成功', 'success');
        } else {
-         alert('该模板格式不正确，缺少模块配置');
+         showMessage('该模板格式不正确，缺少模块配置', 'error');
        }
     } else {
-      alert('无法加载模板配置');
+      showMessage('无法加载模板配置', 'error');
     }
   };
 
@@ -894,6 +930,18 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
         onSave={handlePreviewSave}
         rawData={previewData?.rawData || ''}
         dataKey={previewData?.dataKey}
+      />
+      
+      <MessageModal
+        isOpen={messageState.isOpen}
+        onClose={closeMessage}
+        title={messageState.title}
+        message={messageState.message}
+        type={messageState.type}
+        onConfirm={() => {
+          closeMessage();
+          if (messageState.onConfirm) messageState.onConfirm();
+        }}
       />
     </div>
   );

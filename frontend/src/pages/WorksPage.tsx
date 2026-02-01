@@ -5,6 +5,8 @@ import { worksApi, type Work } from '../utils/worksApi';
 import { exportAsText, exportAsWord, exportAsPdf } from '../utils/exportUtils';
 import ImportWorkModal from '../components/ImportWorkModal';
 import WorkRecoveryModal from '../components/WorkRecoveryModal';
+import MessageModal from '../components/common/MessageModal';
+import type { MessageType } from '../components/common/MessageModal';
 import './WorksPage.css';
 
 type ViewMode = 'grid' | 'list';
@@ -25,6 +27,33 @@ export default function WorksPage() {
   const [total, setTotal] = useState(0);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
+
+  // 消息提示状态
+  const [messageState, setMessageState] = useState<{
+    isOpen: boolean;
+    type: MessageType;
+    message: string;
+    title?: string;
+    onConfirm?: () => void;
+  }>({
+    isOpen: false,
+    type: 'info',
+    message: '',
+  });
+
+  const showMessage = (message: string, type: MessageType = 'info', title?: string, onConfirm?: () => void) => {
+    setMessageState({
+      isOpen: true,
+      type,
+      message,
+      title,
+      onConfirm,
+    });
+  };
+
+  const closeMessage = () => {
+    setMessageState(prev => ({ ...prev, isOpen: false }));
+  };
 
   const loadWorks = useCallback(async () => {
     setLoading(true);
@@ -81,48 +110,43 @@ export default function WorksPage() {
     const workTitle = workToDelete?.title || '这个作品';
     
     // 确认删除
-    const confirmed = window.confirm(
-      `确定要删除作品《${workTitle}》吗？\n\n⚠️ 警告：此操作不可恢复！\n将永久删除作品及其所有章节、内容。`
-    );
-    
-    if (!confirmed) {
-      return;
-    }
-    
-    try {
-      setLoading(true);
-      setError(null);
-      
-      
-      
-      // 调用删除API
-      await worksApi.deleteWork(workId);
-      
-      
-      
-      // 显示成功提示
-      alert(`作品《${workTitle}》已成功删除`);
-      
-      // 如果当前页只有这一个作品，且不是第一页，则返回上一页
-      if (works.length === 1 && currentPage > 1) {
-        setCurrentPage(prev => prev - 1);
-      } else {
-        // 重新加载作品列表
-        await loadWorks();
+    showMessage(
+      `确定要删除作品《${workTitle}》吗？\n\n⚠️ 警告：此操作不可恢复！\n将永久删除作品及其所有章节、内容。`,
+      'warning',
+      '删除作品',
+      async () => {
+        try {
+          setLoading(true);
+          setError(null);
+          
+          // 调用删除API
+          await worksApi.deleteWork(workId);
+          
+          // 显示成功提示
+          showMessage(`作品《${workTitle}》已成功删除`, 'success');
+          
+          // 如果当前页只有这一个作品，且不是第一页，则返回上一页
+          if (works.length === 1 && currentPage > 1) {
+            setCurrentPage(prev => prev - 1);
+          } else {
+            // 重新加载作品列表
+            await loadWorks();
+          }
+        } catch (err) {
+          console.error('删除作品失败:', err);
+          console.error('错误详情:', {
+            message: err instanceof Error ? err.message : String(err),
+            stack: err instanceof Error ? err.stack : undefined,
+            workId,
+          });
+          const errorMessage = err instanceof Error ? err.message : '删除作品失败，请稍后重试';
+          setError(errorMessage);
+          showMessage(`删除失败：${errorMessage}`, 'error');
+        } finally {
+          setLoading(false);
+        }
       }
-    } catch (err) {
-      console.error('删除作品失败:', err);
-      console.error('错误详情:', {
-        message: err instanceof Error ? err.message : String(err),
-        stack: err instanceof Error ? err.stack : undefined,
-        workId,
-      });
-      const errorMessage = err instanceof Error ? err.message : '删除作品失败，请稍后重试';
-      setError(errorMessage);
-      alert(`删除失败：${errorMessage}`);
-    } finally {
-      setLoading(false);
-    }
+    );
   };
 
   // 处理菜单项点击
@@ -150,19 +174,19 @@ export default function WorksPage() {
               
               await exportAsText(work);
               
-              alert(`✅ 导出成功！\n\n文件：${work.title}.txt\n\n文件已开始下载，请查看浏览器下载文件夹。`);
+              showMessage(`✅ 导出成功！\n\n文件：${work.title}.txt\n\n文件已开始下载，请查看浏览器下载文件夹。`, 'success');
             } else if (format === 'word') {
               
               await exportAsWord(work);
               
-              alert(`✅ 导出成功！\n\n文件：${work.title}.doc\n\n文件已开始下载，请查看浏览器下载文件夹。`);
+              showMessage(`✅ 导出成功！\n\n文件：${work.title}.doc\n\n文件已开始下载，请查看浏览器下载文件夹。`, 'success');
             } else if (format === 'pdf') {
               
               await exportAsPdf(work);
               
-              alert(`✅ 导出成功！\n\n正在打开打印对话框，请选择"另存为 PDF"保存文件。`);
+              showMessage(`✅ 导出成功！\n\n正在打开打印对话框，请选择"另存为 PDF"保存文件。`, 'success');
             } else {
-              alert('❌ 不支持的导出格式');
+              showMessage('❌ 不支持的导出格式', 'error');
             }
           } catch (err) {
             console.error('❌ 导出失败:', err);
@@ -173,7 +197,7 @@ export default function WorksPage() {
               format,
               workId,
             });
-            alert(`❌ 导出失败\n\n错误：${errorMessage}\n\n请查看浏览器控制台（F12）获取更多信息。`);
+            showMessage(`❌ 导出失败\n\n错误：${errorMessage}\n\n请查看浏览器控制台（F12）获取更多信息。`, 'error');
             throw err; // 重新抛出错误，让调用者知道失败了
           } finally {
             setLoading(false);
@@ -188,7 +212,7 @@ export default function WorksPage() {
               // 使用 Clipboard API 复制链接
               await navigator.clipboard.writeText(workLink);
               // 显示成功提示
-              alert('链接已复制到剪贴板');
+              showMessage('链接已复制到剪贴板', 'success');
             } catch (clipboardErr) {
               // 如果 Clipboard API 不可用，使用备用方法
               console.warn('Clipboard API 不可用，使用备用方法:', clipboardErr);
@@ -208,25 +232,25 @@ export default function WorksPage() {
                 document.body.removeChild(textArea);
                 
                 if (successful) {
-                  alert('链接已复制到剪贴板');
+                  showMessage('链接已复制到剪贴板', 'success');
                 } else {
                   // 如果复制失败，显示链接让用户手动复制
-                  const userConfirmed = window.confirm(
-                    `无法自动复制链接，请手动复制：\n\n${workLink}\n\n点击"确定"打开链接`
+                  showMessage(
+                    `无法自动复制链接，请手动复制：\n\n${workLink}\n\n点击"确定"打开链接`,
+                    'warning',
+                    '复制链接',
+                    () => window.open(workLink, '_blank')
                   );
-                  if (userConfirmed) {
-                    window.open(workLink, '_blank');
-                  }
                 }
               } catch {
                 document.body.removeChild(textArea);
                 // 最后的后备方案：显示链接并询问是否打开
-                const userConfirmed = window.confirm(
-                  `无法复制链接，请手动复制：\n\n${workLink}\n\n点击"确定"打开链接`
+                showMessage(
+                  `无法复制链接，请手动复制：\n\n${workLink}\n\n点击"确定"打开链接`,
+                  'warning',
+                  '复制链接',
+                  () => window.open(workLink, '_blank')
                 );
-                if (userConfirmed) {
-                  window.open(workLink, '_blank');
-                }
               }
             }
           }
@@ -236,7 +260,7 @@ export default function WorksPage() {
       }
     } catch (err) {
       console.error('操作失败:', err);
-      alert(err instanceof Error ? err.message : '操作失败');
+      showMessage(err instanceof Error ? err.message : '操作失败', 'error');
     }
   };
 
@@ -270,7 +294,7 @@ export default function WorksPage() {
     } catch (err) {
       console.error('❌ [handleCreateWork] 创建作品失败:', err);
       const errorMessage = err instanceof Error ? err.message : '创建作品失败';
-      alert(`创建作品失败: ${errorMessage}`);
+      showMessage(`创建作品失败: ${errorMessage}`, 'error');
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -281,7 +305,7 @@ export default function WorksPage() {
   const handleImportSuccess = (_workId: number, _workTitle: string) => {
     // 重新加载作品列表
     loadWorks();
-    alert(`导入成功：${_workTitle}`);
+    showMessage(`导入成功：${_workTitle}`, 'success');
     // 可选：跳转到作品页面
     navigate(`/novel/editor?workId=${_workId}`);
   };
@@ -449,7 +473,7 @@ export default function WorksPage() {
                                 await exportAsText(workData);
                                 
                                 
-                                alert(`✅ 导出成功！\n\n文件：${workData.title}.txt\n\n文件已开始下载，请查看浏览器下载文件夹。`);
+                                showMessage(`✅ 导出成功！\n\n文件：${workData.title}.txt\n\n文件已开始下载，请查看浏览器下载文件夹。`, 'success');
                                 
                               } catch (err) {
                                 console.error('❌ [Text] 导出失败:', err);
@@ -460,7 +484,7 @@ export default function WorksPage() {
                                   error: err,
                                   name: err instanceof Error ? err.name : 'Unknown'
                                 });
-                                alert(`❌ 导出失败\n\n错误：${errorMsg}\n\n请查看浏览器控制台（F12）获取更多信息。`);
+                                showMessage(`❌ 导出失败\n\n错误：${errorMsg}\n\n请查看浏览器控制台（F12）获取更多信息。`, 'error');
                               } finally {
                                 setLoading(false);
                                 
@@ -483,7 +507,7 @@ export default function WorksPage() {
                               
                             } catch (err) {
                               console.error('❌ 导出失败（外层捕获）:', err);
-                              alert(`导出失败：${err instanceof Error ? err.message : '未知错误'}`);
+                              showMessage(`导出失败：${err instanceof Error ? err.message : '未知错误'}`, 'error');
                             }
                           }}
                         >
@@ -568,6 +592,18 @@ export default function WorksPage() {
           loadWorks();
           // 可选：跳转到恢复的作品
           navigate(`/novel/editor?workId=${workId}`);
+        }}
+      />
+      
+      <MessageModal
+        isOpen={messageState.isOpen}
+        onClose={closeMessage}
+        title={messageState.title}
+        message={messageState.message}
+        type={messageState.type}
+        onConfirm={() => {
+          closeMessage();
+          if (messageState.onConfirm) messageState.onConfirm();
         }}
       />
     </div>

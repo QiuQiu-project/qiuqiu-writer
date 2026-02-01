@@ -14,12 +14,41 @@ import {
 } from 'lucide-react';
 import { authApi } from '../utils/authApi';
 import { worksApi } from '../utils/worksApi';
+import MessageModal from '../components/common/MessageModal';
+import type { MessageType } from '../components/common/MessageModal';
 import './HomePage.css';
 
 export default function HomePage() {
   const navigate = useNavigate();
   const isAuthenticated = authApi.isAuthenticated();
   const [creating, setCreating] = useState(false);
+
+  // 消息提示状态
+  const [messageState, setMessageState] = useState<{
+    isOpen: boolean;
+    type: MessageType;
+    message: string;
+    title?: string;
+    onConfirm?: () => void;
+  }>({
+    isOpen: false,
+    type: 'info',
+    message: '',
+  });
+
+  const showMessage = (message: string, type: MessageType = 'info', title?: string, onConfirm?: () => void) => {
+    setMessageState({
+      isOpen: true,
+      type,
+      message,
+      title,
+      onConfirm,
+    });
+  };
+
+  const closeMessage = () => {
+    setMessageState(prev => ({ ...prev, isOpen: false }));
+  };
 
   const features = [
     {
@@ -100,7 +129,7 @@ export default function HomePage() {
     } catch (err) {
       console.error('❌ [HomePage.handleGetStarted] 操作失败:', err);
       const errorMessage = err instanceof Error ? err.message : '操作失败';
-      alert(`操作失败: ${errorMessage}`);
+      showMessage(`操作失败: ${errorMessage}`, 'error');
     } finally {
       setCreating(false);
     }
@@ -210,6 +239,18 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      <MessageModal
+        isOpen={messageState.isOpen}
+        onClose={closeMessage}
+        title={messageState.title}
+        message={messageState.message}
+        type={messageState.type}
+        onConfirm={() => {
+          closeMessage();
+          if (messageState.onConfirm) messageState.onConfirm();
+        }}
+      />
     </div>
   );
 }

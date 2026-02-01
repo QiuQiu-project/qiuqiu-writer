@@ -3,6 +3,8 @@ import { Plus, Trash2, MapPin, ArrowRight } from 'lucide-react';
 import { ExtensionCategory, Graph, register } from '@antv/g6';
 import { ReactNode } from '@antv/g6-extension-react';
 import type { GraphData } from '@antv/g6';
+import MessageModal from '../common/MessageModal';
+import type { MessageType } from '../common/MessageModal';
 import './MapView.css';
 
 // 注册 React 节点扩展
@@ -90,6 +92,33 @@ export default function MapView() {
   }>({});
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<Graph | null>(null);
+
+  // 消息提示状态
+  const [messageState, setMessageState] = useState<{
+    isOpen: boolean;
+    type: MessageType;
+    message: string;
+    title?: string;
+    onConfirm?: () => void;
+  }>({
+    isOpen: false,
+    type: 'info',
+    message: '',
+  });
+
+  const showMessage = (message: string, type: MessageType = 'info', title?: string, onConfirm?: () => void) => {
+    setMessageState({
+      isOpen: true,
+      type,
+      message,
+      title,
+      onConfirm,
+    });
+  };
+
+  const closeMessage = () => {
+    setMessageState(prev => ({ ...prev, isOpen: false }));
+  };
 
   // 使用 useMemo 来稳定数据引用
   const graphData = useMemo(() => {
@@ -326,7 +355,7 @@ export default function MapView() {
 
   const handleAddConnection = () => {
     if (locations.length < 2) {
-      alert('请至少创建两个地点才能添加连接');
+      showMessage('请至少创建两个地点才能添加连接', 'warning');
       return;
     }
     setAddingConnection(true);
@@ -346,7 +375,7 @@ export default function MapView() {
           (c.from === editForm.connectionTo && c.to === editForm.connectionFrom)
       );
       if (exists) {
-        alert('这两个地点之间已经存在连接');
+        showMessage('这两个地点之间已经存在连接', 'warning');
         return;
       }
 
@@ -697,6 +726,18 @@ export default function MapView() {
           </div>
         ) : null;
       })()}
+      
+      <MessageModal
+        isOpen={messageState.isOpen}
+        onClose={closeMessage}
+        title={messageState.title}
+        message={messageState.message}
+        type={messageState.type}
+        onConfirm={() => {
+          closeMessage();
+          if (messageState.onConfirm) messageState.onConfirm();
+        }}
+      />
     </div>
   );
 }

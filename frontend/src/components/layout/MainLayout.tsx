@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { User, Plus, Menu, X } from 'lucide-react';
 import LoginModal from '../auth/LoginModal';
+import MessageModal from '../common/MessageModal';
+import type { MessageType } from '../common/MessageModal';
 import { authApi, type UserInfo } from '../../utils/authApi';
 import { worksApi } from '../../utils/worksApi';
 import { getUserAvatarUrl } from '../../utils/avatarUtils';
@@ -17,6 +19,33 @@ export default function MainLayout() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
+
+  // 消息提示状态
+  const [messageState, setMessageState] = useState<{
+    isOpen: boolean;
+    type: MessageType;
+    message: string;
+    title?: string;
+    onConfirm?: () => void;
+  }>({
+    isOpen: false,
+    type: 'info',
+    message: '',
+  });
+
+  const showMessage = (message: string, type: MessageType = 'info', title?: string, onConfirm?: () => void) => {
+    setMessageState({
+      isOpen: true,
+      type,
+      message,
+      title,
+      onConfirm,
+    });
+  };
+
+  const closeMessage = () => {
+    setMessageState(prev => ({ ...prev, isOpen: false }));
+  };
 
   // 检查登录状态
   useEffect(() => {
@@ -114,7 +143,7 @@ export default function MainLayout() {
     } catch (err) {
       console.error('❌ [MainLayout.handleCreateWork] 创建作品失败:', err);
       const errorMessage = err instanceof Error ? err.message : '创建作品失败';
-      alert(`创建作品失败: ${errorMessage}`);
+      showMessage(`创建作品失败: ${errorMessage}`, 'error');
     }
   };
 
@@ -321,6 +350,18 @@ export default function MainLayout() {
         isOpen={loginModalOpen}
         onClose={() => setLoginModalOpen(false)}
         onLoginSuccess={handleLoginSuccess}
+      />
+      
+      <MessageModal
+        isOpen={messageState.isOpen}
+        onClose={closeMessage}
+        title={messageState.title}
+        message={messageState.message}
+        type={messageState.type}
+        onConfirm={() => {
+          closeMessage();
+          if (messageState.onConfirm) messageState.onConfirm();
+        }}
       />
     </div>
   );

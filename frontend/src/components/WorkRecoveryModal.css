@@ -89,18 +89,31 @@
 
 .work-recovery-retry-btn {
   margin-top: 16px;
-  padding: 8px 16px;
-  background: var(--primary-color, #999999);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  height: 36px;
+  min-width: 80px;
+  background: var(--accent-primary, #444444);
   color: white;
   border: none;
   border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
-  transition: background 0.2s;
+  font-weight: 500;
+  transition: all 0.2s;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .work-recovery-retry-btn:hover {
-  background: var(--primary-hover, #444444);
+  background: var(--accent-hover, #666666);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.work-recovery-retry-btn:active {
+  transform: translateY(0);
 }
 
 .work-recovery-list-hint {
@@ -147,24 +160,37 @@
 .work-recovery-item-btn {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 8px 16px;
-  background: var(--primary-color, #999999);
+  padding: 0 16px;
+  height: 36px;
+  min-width: 80px;
+  background: var(--accent-primary, #444444);
   color: white;
   border: none;
   border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
-  transition: background 0.2s;
+  font-weight: 500;
+  transition: all 0.2s;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .work-recovery-item-btn:hover:not(:disabled) {
-  background: var(--primary-hover, #444444);
+  background: var(--accent-hover, #666666);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.work-recovery-item-btn:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .work-recovery-item-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .work-recovery-progress {

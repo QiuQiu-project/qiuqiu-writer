@@ -4,6 +4,8 @@ import { templatesApi } from '../../../utils/templatesApi';
 import type { WorkTemplate, TemplateConfig } from '../../../utils/templatesApi';
 import { authApi } from '../../../utils/authApi';
 import type { UserInfo } from '../../../utils/authApi';
+import MessageModal from '../../common/MessageModal';
+import type { MessageType } from '../../common/MessageModal';
 
 interface TemplateMarketModalProps {
   isOpen: boolean;
@@ -29,6 +31,32 @@ export default function TemplateMarketModal({
     is_public: false
   });
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+
+  const [messageState, setMessageState] = useState<{
+    isOpen: boolean;
+    type: MessageType;
+    message: string;
+    title?: string;
+    onConfirm?: () => void;
+  }>({
+    isOpen: false,
+    type: 'info',
+    message: '',
+  });
+
+  const showMessage = (message: string, type: MessageType = 'info', title?: string, onConfirm?: () => void) => {
+    setMessageState({
+      isOpen: true,
+      type,
+      message,
+      title,
+      onConfirm,
+    });
+  };
+
+  const closeMessage = () => {
+    setMessageState(prev => ({ ...prev, isOpen: false }));
+  };
 
   useEffect(() => {
     const loadUserInfo = async () => {
@@ -60,7 +88,7 @@ export default function TemplateMarketModal({
       let filteredData = data;
       if (activeTab === 'mine' && userInfo) {
         // 在“我的模板”中，只显示我自己创建的
-        filteredData = data.filter(t => t.creator_id === userInfo.id);
+        filteredData = data.filter(t => t.creator_id !== undefined && String(t.creator_id) === String(userInfo.id));
       }
       
       setTemplates(filteredData);
@@ -91,14 +119,14 @@ export default function TemplateMarketModal({
           description: saveForm.description,
           is_public: saveForm.is_public
         });
-        alert('模板更新成功！');
+        showMessage('模板更新成功！', 'success');
         setShowSaveForm(false);
         setEditingTemplate(null);
         setSaveForm({ name: '', description: '', is_public: false });
         fetchTemplates();
       } catch (error) {
         console.error('Failed to update template:', error);
-        alert('更新失败，请重试');
+        showMessage('更新失败，请重试', 'error');
       }
       return;
     }
@@ -117,7 +145,7 @@ export default function TemplateMarketModal({
         source_template_id: sourceTemplateId
       });
       
-      alert('模板保存成功！');
+      showMessage('模板保存成功！', 'success');
       setShowSaveForm(false);
       setSaveForm({ name: '', description: '', is_public: false });
       setTargetTemplateConfig(undefined);
@@ -127,7 +155,7 @@ export default function TemplateMarketModal({
       }
     } catch (error) {
       console.error('Failed to save template:', error);
-      alert('保存失败，请重试');
+      showMessage('保存失败，请重试', 'error');
     }
   };
 
@@ -151,15 +179,16 @@ export default function TemplateMarketModal({
   };
 
   const handleDeleteTemplate = async (templateId: number) => {
-    if (!confirm('确定要删除这个模板吗？此操作无法撤销。')) return;
-    try {
-      await templatesApi.deleteTemplate(templateId);
-      alert('模板删除成功');
-      fetchTemplates();
-    } catch (error) {
-      console.error('Failed to delete template:', error);
-      alert('删除失败，请重试');
-    }
+    showMessage('确定要删除这个模板吗？此操作无法撤销。', 'warning', '确认删除', async () => {
+      try {
+        await templatesApi.deleteTemplate(templateId);
+        showMessage('模板删除成功', 'success');
+        fetchTemplates();
+      } catch (error) {
+        console.error('Failed to delete template:', error);
+        showMessage('删除失败，请重试', 'error');
+      }
+    });
   };
 
 
@@ -364,7 +393,7 @@ export default function TemplateMarketModal({
                         if (config) {
                            openSaveForm(config, tpl.id);
                         } else {
-                           alert('无法读取该模板配置');
+                           showMessage('无法读取该模板配置', 'error');
                         }
                       }}
                       style={{ 
@@ -476,6 +505,18 @@ export default function TemplateMarketModal({
             </div>
           </div>
         )}
+
+        <MessageModal
+          isOpen={messageState.isOpen}
+          onClose={closeMessage}
+          title={messageState.title}
+          message={messageState.message}
+          type={messageState.type}
+          onConfirm={() => {
+            closeMessage();
+            if (messageState.onConfirm) messageState.onConfirm();
+          }}
+        />
       </div>
     </div>
   );

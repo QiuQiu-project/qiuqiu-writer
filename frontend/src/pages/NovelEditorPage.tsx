@@ -11,6 +11,8 @@ import TagsManager from '../components/editor/TagsManager';
 import ChapterOutline from '../components/editor/ChapterOutline';
 import ChapterSettingsModal from '../components/editor/ChapterSettingsModal';
 import VolumeSettingsModal from '../components/editor/VolumeSettingsModal';
+import MessageModal from '../components/common/MessageModal';
+import type { MessageType } from '../components/common/MessageModal';
 import MapView from '../components/editor/MapView';
 import Characters from '../components/editor/Characters';
 import Factions from '../components/editor/Factions';
@@ -78,6 +80,33 @@ export default function NovelEditorPage(){
   
   // 数据更新触发器
   const [updateTrigger, setUpdateTrigger] = useState(0);
+
+  // 消息提示状态
+  const [messageState, setMessageState] = useState<{
+    isOpen: boolean;
+    type: MessageType;
+    message: string;
+    title?: string;
+    onConfirm?: () => void;
+  }>({
+    isOpen: false,
+    type: 'info',
+    message: '',
+  });
+
+  const showMessage = (message: string, type: MessageType = 'info', title?: string, onConfirm?: () => void) => {
+    setMessageState({
+      isOpen: true,
+      type,
+      message,
+      title,
+      onConfirm,
+    });
+  };
+
+  const closeMessage = () => {
+    setMessageState(prev => ({ ...prev, isOpen: false }));
+  };
 
   // 标题下拉菜单状态
   const [headingMenuOpen, setHeadingMenuOpen] = useState(false);
@@ -307,7 +336,7 @@ export default function NovelEditorPage(){
       console.log('✅ 标题已更新（本地状态）:', newTitle);
     } catch (err) {
       console.error('更新标题失败:', err);
-      alert(err instanceof Error ? err.message : '更新标题失败');
+      showMessage(err instanceof Error ? err.message : '更新标题失败', 'error');
       // 恢复原值
       e.currentTarget.textContent = currentTitle;
     }
@@ -380,7 +409,7 @@ export default function NovelEditorPage(){
       console.log('✅ 章节名已更新:', newTitle);
     } catch (err) {
       console.error('更新章节名失败:', err);
-      alert(err instanceof Error ? err.message : '更新章节名失败');
+      showMessage(err instanceof Error ? err.message : '更新章节名失败', 'error');
       // 恢复原值
       e.currentTarget.textContent = currentTitle;
     }
@@ -408,18 +437,23 @@ export default function NovelEditorPage(){
   const handleDeleteWork = async () => {
     if (!workId || !work) return;
     
-    const confirmed = window.confirm(`确定要删除作品《${work.title}》吗？此操作不可恢复！`);
-    if (!confirmed) return;
-    
-    try {
-      await worksApi.deleteWork(workId!);
-      alert('作品删除成功');
-      const uid = authApi.getUserInfo()?.id;
-      navigate(uid ? `/users/${uid}` : '/');
-    } catch (err) {
-      console.error('删除作品失败:', err);
-      alert(err instanceof Error ? err.message : '删除作品失败');
-    }
+    showMessage(
+      `确定要删除作品《${work.title}》吗？此操作不可恢复！`,
+      'warning',
+      '删除作品',
+      async () => {
+        try {
+          await worksApi.deleteWork(workId!);
+          showMessage('作品删除成功', 'success', undefined, () => {
+            const uid = authApi.getUserInfo()?.id;
+            navigate(uid ? `/users/${uid}` : '/');
+          });
+        } catch (err) {
+          console.error('删除作品失败:', err);
+          showMessage(err instanceof Error ? err.message : '删除作品失败', 'error');
+        }
+      }
+    );
   };
 
   // 处理替换功能（打开/关闭面板）
@@ -589,13 +623,13 @@ export default function NovelEditorPage(){
       const newHtmlContent = htmlContent.replace(regex, replaceText);
       editor.commands.setContent(newHtmlContent);
       
-      alert(`已替换 ${matches.length} 处"${findText}"为"${replaceText}"`);
+      showMessage(`已替换 ${matches.length} 处"${findText}"为"${replaceText}"`, 'success');
       setMatches([]);
       setCurrentMatchIndex(-1);
       setFindText('');
     } catch (err) {
       console.error('替换失败:', err);
-      alert('替换失败，请重试');
+      showMessage('替换失败，请重试', 'error');
     }
   };
 
@@ -628,9 +662,9 @@ export default function NovelEditorPage(){
       return { success: false, message };
     }
     
-    const notify = (msg: string) => {
+    const notify = (msg: string, type: MessageType = 'info') => {
       if (!options?.quiet) {
-        alert(msg);
+        showMessage(msg, type);
       }
     };
 
@@ -684,7 +718,7 @@ export default function NovelEditorPage(){
             console.warn('分析错误详情:', errorMessages);
           }
           
-          notify(message);
+          notify(message, 'success');
           
           // 静默刷新数据（不刷新整个页面）
           if (workId) {
@@ -707,7 +741,7 @@ export default function NovelEditorPage(){
           };
         } else {
           const message = `分析失败: ${data.message || '未知错误'}`;
-          notify(message);
+          notify(message, 'error');
           return { success: false, message };
         }
       } else {
@@ -742,7 +776,7 @@ export default function NovelEditorPage(){
                 } else if (data.type === 'all_chapters_complete') {
                   // 分析完成，显示结果
                   const message = `分析完成！共分析了 ${analyzedCount} 章。`;
-                  notify(message);
+                  notify(message, 'success');
                   // 静默刷新数据（不刷新整个页面）
                   if (workId) {
                     // 重新加载作品和章节数据
@@ -754,7 +788,7 @@ export default function NovelEditorPage(){
                   return { success: true, message, analyzedCount };
                 } else if (data.type === 'error' || data.type === 'chapter_insert_error') {
                   console.error('分析错误:', data.message);
-                  notify(`分析失败: ${data.message}`);
+                  notify(`分析失败: ${data.message}`, 'error');
                   return { success: false, message: data.message };
                 }
               } catch (e) {
@@ -766,14 +800,14 @@ export default function NovelEditorPage(){
         }
 
         const message = `分析完成！共分析了 ${analyzedCount} 章。`;
-        notify(message);
+        notify(message, 'success');
         return { success: true, message, analyzedCount };
       }
     } catch (err) {
       console.error('分析失败:', err);
       const message = err instanceof Error ? err.message : '分析失败';
       if (!options?.quiet) {
-        alert(message);
+        showMessage(message, 'error');
       }
       return { success: false, message };
     } finally {
@@ -1212,13 +1246,13 @@ export default function NovelEditorPage(){
         
         // 显示提示：已保存到缓存，但服务器同步失败
         if (isOffline) {
-          alert('已保存到本地缓存（离线模式）');
+          showMessage('已保存到本地缓存（离线模式）', 'info');
         } else {
-          alert('已保存到本地缓存，但服务器同步失败。网络恢复后将自动同步。');
+          showMessage('已保存到本地缓存，但服务器同步失败。网络恢复后将自动同步。', 'warning');
         }
       } catch (cacheErr) {
         console.error('❌ [手动保存] 保存到缓存也失败:', cacheErr);
-        alert('保存失败: ' + (err instanceof Error ? err.message : String(err)));
+        showMessage('保存失败: ' + (err instanceof Error ? err.message : String(err)), 'error');
       }
       
       // 恢复按钮状态
@@ -1533,40 +1567,44 @@ export default function NovelEditorPage(){
 
     } catch (err) {
       console.error('保存卷信息失败:', err);
-      alert('保存卷信息失败');
+      showMessage('保存卷信息失败', 'error');
     }
   };
 
   // 删除卷
   const handleDeleteVolume = async (volumeId: string) => {
-    if (!window.confirm('确定要删除此卷吗？卷内的章节将被移至"未分卷"。')) {
-        return;
-    }
-
-    try {
-        const isVirtual = volumeId.startsWith('vol') && isNaN(Number(volumeId));
-        
-        if (!isVirtual) {
-            // 真实卷：调用 API 删除
-            await volumesApi.deleteVolume(parseInt(volumeId));
-        } else {
-            // 虚拟卷：将章节移至未分卷 (volume_number = 0)
-            const virtualVol = volumes.find(v => v.id === volumeId);
-            if (virtualVol) {
-                 const updatePromises = virtualVol.chapters.map(chap => 
-                     chaptersApi.updateChapter(parseInt(chap.id), { volume_number: 0 })
-                 );
-                 await Promise.all(updatePromises);
+    showMessage(
+      '确定要删除此卷吗？卷内的章节将被移至"未分卷"。',
+      'warning',
+      '删除卷',
+      async () => {
+        try {
+            const isVirtual = volumeId.startsWith('vol') && isNaN(Number(volumeId));
+            
+            if (!isVirtual) {
+                // 真实卷：调用 API 删除
+                await volumesApi.deleteVolume(parseInt(volumeId));
+            } else {
+                // 虚拟卷：将章节移至未分卷 (volume_number = 0)
+                const virtualVol = volumes.find(v => v.id === volumeId);
+                if (virtualVol) {
+                     const updatePromises = virtualVol.chapters.map(chap => 
+                         chaptersApi.updateChapter(parseInt(chap.id), { volume_number: 0 })
+                     );
+                     await Promise.all(updatePromises);
+                }
             }
-        }
 
-        // 触发数据重新加载
-        setUpdateTrigger(prev => prev + 1);
-        
-    } catch (err) {
-        console.error('删除卷失败:', err);
-        alert('删除卷失败');
-    }
+            // 触发数据重新加载
+            setUpdateTrigger(prev => prev + 1);
+            showMessage('卷删除成功', 'success');
+            
+        } catch (err) {
+            console.error('删除卷失败:', err);
+            showMessage('删除卷失败', 'error');
+        }
+      }
+    );
   };
 
   // 保存章节/草稿数据
@@ -1584,13 +1622,13 @@ export default function NovelEditorPage(){
   }) => {
     if (!workId) {
       console.error('❌ [handleSaveChapter] workId 为空，无法创建章节');
-      alert('作品ID缺失，请刷新页面重试');
+      showMessage('作品ID缺失，请刷新页面重试', 'error');
       return;
     }
     
     if (!work) {
       console.error('❌ [handleSaveChapter] work 对象为空，无法创建章节');
-      alert('作品信息未加载，请稍候再试');
+      showMessage('作品信息未加载，请稍候再试', 'error');
       return;
     }
 
@@ -1805,7 +1843,7 @@ export default function NovelEditorPage(){
     } catch (err) {
       console.error('❌ [handleSaveChapter] 保存章节失败:', err);
       const errorMessage = err instanceof Error ? err.message : '保存章节失败';
-      alert(`保存章节失败: ${errorMessage}`);
+      showMessage(`保存章节失败: ${errorMessage}`, 'error');
       // 即使失败也关闭弹窗，让用户可以重试
       setIsChapterModalOpen(false);
     } finally {
@@ -1901,7 +1939,7 @@ export default function NovelEditorPage(){
       (chapterNumber ? `第${chapterNumber}章` : `章节 ${chapterIdNum}`);
 
     if (!options?.silent) {
-      alert(`开始分析章节：${chapterTitle}\n正在生成大纲和细纲，请稍候...`);
+      showMessage(`开始分析章节：${chapterTitle}\n正在生成大纲和细纲，请稍候...`, 'info');
     }
 
     try {
@@ -1947,7 +1985,7 @@ export default function NovelEditorPage(){
       });
 
       if (!options?.silent) {
-        alert(`章节分析完成！\n章节：${chapterTitle}\n大纲和细纲已保存到章节信息中。`);
+        showMessage(`章节分析完成！\n章节：${chapterTitle}\n大纲和细纲已保存到章节信息中。`, 'success');
       }
 
       return {
@@ -1961,7 +1999,7 @@ export default function NovelEditorPage(){
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '分析章节失败';
       if (!options?.silent) {
-        alert(`分析失败：${errorMessage}\n请检查网络连接或稍后重试。`);
+        showMessage(`分析失败：${errorMessage}\n请检查网络连接或稍后重试。`, 'error');
       }
       throw new Error(errorMessage);
     }
@@ -2027,7 +2065,7 @@ export default function NovelEditorPage(){
       }
     } catch (err) {
       console.error('删除章节失败:', err);
-      alert(err instanceof Error ? err.message : '删除章节失败');
+      showMessage(err instanceof Error ? err.message : '删除章节失败', 'error');
     }
   };
 
@@ -2719,6 +2757,17 @@ export default function NovelEditorPage(){
           } else {
             console.warn('编辑器未初始化，无法填充内容');
           }
+        }}
+      />
+      <MessageModal
+        isOpen={messageState.isOpen}
+        onClose={closeMessage}
+        title={messageState.title}
+        message={messageState.message}
+        type={messageState.type}
+        onConfirm={() => {
+          closeMessage();
+          if (messageState.onConfirm) messageState.onConfirm();
         }}
       />
     </div>

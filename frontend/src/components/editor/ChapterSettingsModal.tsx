@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { X, Sparkles, Plus, MapPin, Users, FileText, BookOpen } from 'lucide-react';
 import { chaptersApi } from '../../utils/chaptersApi';
 import LoadingSpinner from '../common/LoadingSpinner';
+import MessageModal from '../common/MessageModal';
+import type { MessageType } from '../common/MessageModal';
 import './ChapterSettingsModal.css';
 
 interface Character {
@@ -74,6 +76,32 @@ export default function ChapterSettingsModal({
   const [isGeneratingContent, setIsGeneratingContent] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'basic' | 'outline'>('basic');
+  
+  const [messageState, setMessageState] = useState<{
+    isOpen: boolean;
+    type: MessageType;
+    message: string;
+    title?: string;
+    onConfirm?: () => void;
+  }>({
+    isOpen: false,
+    type: 'info',
+    message: '',
+  });
+
+  const showMessage = (message: string, type: MessageType = 'info', title?: string, onConfirm?: () => void) => {
+    setMessageState({
+      isOpen: true,
+      type,
+      message,
+      title,
+      onConfirm,
+    });
+  };
+
+  const closeMessage = () => {
+    setMessageState(prev => ({ ...prev, isOpen: false }));
+  };
   
   // 是否显示卷号选择器（编辑章节时）
   const showVolumeSelector = mode === 'edit';
@@ -273,7 +301,7 @@ export default function ChapterSettingsModal({
 
   const handleSave = () => {
     if (!title.trim()) {
-      alert('请输入章节名称');
+      showMessage('请输入章节名称', 'warning');
       return;
     }
 
@@ -573,11 +601,10 @@ export default function ChapterSettingsModal({
                           },
                         );
 
-                        alert('章节内容生成完成！已流式填充到编辑器中。');
-                        onClose(); // 关闭弹窗
+                        showMessage('章节内容生成完成！已流式填充到编辑器中。', 'success', '生成完成', onClose);
                       } catch (error) {
                         console.error('生成内容失败:', error);
-                        alert(error instanceof Error ? error.message : '生成内容失败');
+                        showMessage(error instanceof Error ? error.message : '生成内容失败', 'error');
                       } finally {
                         setIsGeneratingContent(false);
                       }
@@ -602,6 +629,18 @@ export default function ChapterSettingsModal({
             {mode === 'create' ? '创建章节' : '保存修改'}
           </button>
         </div>
+
+        <MessageModal
+          isOpen={messageState.isOpen}
+          onClose={closeMessage}
+          title={messageState.title}
+          message={messageState.message}
+          type={messageState.type}
+          onConfirm={() => {
+            closeMessage();
+            if (messageState.onConfirm) messageState.onConfirm();
+          }}
+        />
       </div>
     </div>
   );
