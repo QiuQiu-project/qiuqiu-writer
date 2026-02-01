@@ -302,7 +302,7 @@ export default function WorksPage() {
   };
 
   // 处理导入成功
-  const handleImportSuccess = (_workId: number, _workTitle: string) => {
+  const handleImportSuccess = (_workId: string, _workTitle: string) => {
     // 重新加载作品列表
     loadWorks();
     showMessage(`导入成功：${_workTitle}`, 'success');

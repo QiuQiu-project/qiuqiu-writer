@@ -18,7 +18,7 @@ function htmlToText(html: string): string {
 /**
  * 分页获取所有章节（后端限制 size 最大为 100）
  */
-async function getAllChapters(workId: number): Promise<Chapter[]> {
+async function getAllChapters(workId: string): Promise<Chapter[]> {
   const allChapters: Chapter[] = [];
   let page = 1;
   const pageSize = 100; // 后端限制最大为 100

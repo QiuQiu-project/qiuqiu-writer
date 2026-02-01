@@ -7,7 +7,7 @@ import './ImportWorkModal.css';
 interface ImportWorkModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess?: (workId: number, workTitle: string) => void;
+  onSuccess?: (workId: string, workTitle: string) => void;
 }
 
 interface Chapter {

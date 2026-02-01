@@ -71,8 +71,8 @@ interface CharacterFromMetadata {
 
 export default function AIAssistant({
   workId,
-  onAnalyzeChapterCommand,
-  onAnalyzeWorkCommand,
+  // onAnalyzeChapterCommand,
+  // onAnalyzeWorkCommand,
   onGenerateChapterFromOutline,
 }: AIAssistantProps) {
   const [message, setMessage] = useState('');
@@ -104,7 +104,7 @@ export default function AIAssistant({
 
     const loadData = async () => {
       try {
-        const workIdStr = workId;
+        const workIdStr = String(workId);
         
         // 加载章节列表
         const chaptersResponse = await chaptersApi.listChapters({

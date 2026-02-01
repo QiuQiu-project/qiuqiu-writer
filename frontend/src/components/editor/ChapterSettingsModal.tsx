@@ -16,6 +16,7 @@ interface Character {
   display_name?: string;
   gender?: string;
   type?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any;
 }
 
@@ -169,7 +170,7 @@ export default function ChapterSettingsModal({
   availableVolumes = [],
   onClose,
   onSave,
-  onGenerateContent,
+  // onGenerateContent,
 }: ChapterSettingsModalProps) {
   const [title, setTitle] = useState(initialData?.title || '');
   const [chapterNumber, setChapterNumber] = useState<number | undefined>(undefined);
@@ -181,7 +182,6 @@ export default function ChapterSettingsModal({
   const [detailOutline, setDetailOutline] = useState('');
   const [isGeneratingOutline, setIsGeneratingOutline] = useState(false);
   const [isGeneratingDetail, setIsGeneratingDetail] = useState(false);
-  const [isGeneratingContent, setIsGeneratingContent] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'basic' | 'outline' | 'characters'>('basic');
   
@@ -221,6 +221,7 @@ export default function ChapterSettingsModal({
   const locationsToShow: Location[] = availableLocations.length > 0 ? availableLocations : [];
 
   // 辅助函数：标准化选中的角色ID（处理 ID 变化或仅有 Name 的情况）
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const normalizeSelectedCharacters = (savedIds: any[], available: Character[]): string[] => {
     if (!savedIds || savedIds.length === 0) return [];
     
@@ -392,7 +393,7 @@ export default function ChapterSettingsModal({
       }
       setActiveTab('basic');
     }
-  }, [isOpen, initialData, volumeId, mode]);
+  }, [isOpen, initialData, volumeId, mode, availableCharacters]);
 
   const handleCharacterToggle = (characterId: string) => {
     setSelectedCharacters(prev => 
@@ -556,95 +557,88 @@ export default function ChapterSettingsModal({
                 />
               </div>
 
-              {/* 卷号选择器 - 只在长篇作品编辑章节时显示 */}
-              {showVolumeSelector && (
-                <div className="form-group">
-                  <label className="form-label">
-                    <BookOpen size={16} />
-                    所属卷
-                  </label>
-                  <select
-                    className="form-input"
-                    value={selectedVolumeId}
-                    onChange={(e) => setSelectedVolumeId(e.target.value)}
-                  >
-                    {availableVolumes.map(vol => (
-                      <option key={vol.id} value={vol.id}>
-                        {vol.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              <div className="form-row">
+                {/* 卷号选择器 - 只在长篇作品编辑章节时显示 */}
+                {showVolumeSelector && (
+                  <div className="form-group half">
+                    <label className="form-label">
+                      <BookOpen size={16} />
+                      所属卷
+                    </label>
+                    <div className="select-wrapper">
+                      <select
+                        className="form-select"
+                        value={selectedVolumeId}
+                        onChange={(e) => setSelectedVolumeId(e.target.value)}
+                      >
+                        {availableVolumes.map(vol => (
+                          <option key={vol.id} value={vol.id}>
+                            {vol.title}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="select-arrow" size={16} />
+                    </div>
+                  </div>
+                )}
 
-              {/* 章节号 - 只在编辑章节时显示 */}
-              {mode === 'edit' && (
-                <div className="form-group">
+                {/* 章节序号 */}
+                <div className={`form-group ${showVolumeSelector ? 'half' : ''}`}>
                   <label className="form-label">
-                    <FileText size={16} />
-                    章节号
+                    <span className="hashtag-icon">#</span>
+                    章节序号
                   </label>
                   <input
                     type="number"
                     className="form-input"
-                    value={chapterNumber ?? ''}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setChapterNumber(value === '' ? undefined : parseInt(value, 10));
-                    }}
-                    placeholder="请输入章节号"
-                    min="1"
+                    value={chapterNumber || ''}
+                    onChange={(e) => setChapterNumber(parseInt(e.target.value) || undefined)}
+                    placeholder="自动生成"
                   />
+                  <div className="form-hint">留空则自动顺延</div>
                 </div>
-              )}
+              </div>
 
-              {/* 剧情地点 - 只在有地点设定时显示 */}
-              {locationsToShow.length > 0 && (
-                <div className="form-group">
-                  <label className="form-label">
-                    <MapPin size={16} />
-                    剧情地点
-                  </label>
-                  <div className="location-input-row">
-                    <input
-                      type="text"
-                      className="form-input location-input"
-                      value={newLocation}
-                      onChange={(e) => setNewLocation(e.target.value)}
-                      placeholder="输入地点名称"
-                      onKeyDown={(e) => e.key === 'Enter' && handleAddLocation()}
-                    />
-                    <button className="add-location-btn" onClick={handleAddLocation}>
-                      <Plus size={16} />
-                      添加
-                    </button>
-                  </div>
-                  {/* 预设地点 */}
-                  <div className="preset-locations">
-                    <span className="preset-label">快速选择：</span>
-                    {locationsToShow.map(loc => (
-                      <button
-                        key={loc.id}
-                        className={`preset-location-chip ${locations.includes(loc.name) ? 'selected' : ''}`}
-                        onClick={() => handleSelectPresetLocation(loc.name)}
-                      >
-                        {loc.name}
-                      </button>
-                    ))}
-                  </div>
+              {/* 地点设置 */}
+              <div className="form-group">
+                <label className="form-label">
+                  <MapPin size={16} />
+                  相关地点
+                </label>
+                
+                <div className="location-input-group">
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={newLocation}
+                    onChange={(e) => setNewLocation(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddLocation();
+                      }
+                    }}
+                    placeholder="输入地点名称按回车添加"
+                  />
+                  <button 
+                    type="button"
+                    className="icon-btn add-location-btn"
+                    onClick={handleAddLocation}
+                    disabled={!newLocation.trim()}
+                  >
+                    <Plus size={18} />
+                  </button>
                 </div>
-              )}
-              
-              {/* 已选地点 */}
-              {locations.length > 0 && (
-                <div className="form-group">
-                  <div className="selected-locations">
-                    {locations.map(loc => (
-                      <span key={loc} className="location-tag">
+
+                {/* 已选地点标签 */}
+                {locations.length > 0 && (
+                  <div className="location-tags">
+                    {locations.map((loc, index) => (
+                      <span key={index} className="location-tag">
                         <MapPin size={12} />
                         {loc}
-                        <button
-                          className="remove-location-btn"
+                        <button 
+                          className="tag-remove-btn"
                           onClick={() => handleRemoveLocation(loc)}
                         >
                           <X size={12} />
@@ -652,75 +646,85 @@ export default function ChapterSettingsModal({
                       </span>
                     ))}
                   </div>
-                </div>
-              )}
+                )}
+
+                {/* 推荐地点 */}
+                {locationsToShow.length > 0 && (
+                  <div className="suggested-locations">
+                    <span className="suggestion-label">推荐：</span>
+                    <div className="suggestion-list">
+                      {locationsToShow
+                        .filter(l => !locations.includes(l.name))
+                        .slice(0, 5)
+                        .map(loc => (
+                          <button
+                            key={loc.id}
+                            className="suggestion-chip"
+                            onClick={() => handleSelectPresetLocation(loc.name)}
+                          >
+                            {loc.name}
+                          </button>
+                        ))
+                      }
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
           {!isLoading && activeTab === 'outline' && (
             <div className="modal-section-content">
-              {/* 大纲 */}
               <div className="form-group">
-                <div className="form-label-row">
+                <div className="label-with-action">
                   <label className="form-label">
-                    <FileText size={16} />
-                    大纲
+                    <BookOpen size={16} />
+                    章节大纲
                   </label>
-                  <button
-                    className="icon-btn"
+                  <button 
+                    className={`ai-generate-btn ${isGeneratingOutline ? 'loading' : ''}`}
                     onClick={handleGenerateOutline}
                     disabled={isGeneratingOutline}
-                    title={isGeneratingOutline ? '生成中...' : 'AI生成大纲'}
-                    style={{ padding: '4px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#3b82f6' }}
                   >
-                    {isGeneratingOutline ? (
-                      <span className="loading-spinner small" style={{ width: '16px', height: '16px', border: '2px solid #e2e8f0', borderTopColor: '#3b82f6', borderRadius: '50%', display: 'block', animation: 'spin 1s linear infinite' }}></span>
-                    ) : (
-                      <Sparkles size={16} />
-                    )}
+                    <Sparkles size={14} />
+                    {isGeneratingOutline ? '生成中...' : 'AI 生成大纲'}
                   </button>
                 </div>
                 <textarea
-                  className="form-textarea"
+                  className="form-textarea outline-textarea"
                   value={outline}
                   onChange={(e) => setOutline(e.target.value)}
-                  placeholder="在这里编写本章大纲，概括主要情节走向、核心事件..."
-                  rows={8}
+                  placeholder="在此输入本章的故事梗概..."
+                  rows={6}
                 />
               </div>
 
-              {/* 细纲 */}
               <div className="form-group">
-                <div className="form-label-row">
+                <div className="label-with-action">
                   <label className="form-label">
                     <FileText size={16} />
-                    细纲
+                    详细细纲
                   </label>
-                  <button
-                    className="icon-btn"
+                  <button 
+                    className={`ai-generate-btn ${isGeneratingDetail ? 'loading' : ''}`}
                     onClick={handleGenerateDetailOutline}
                     disabled={isGeneratingDetail}
-                    title={isGeneratingDetail ? '生成中...' : 'AI生成细纲'}
-                    style={{ padding: '4px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#3b82f6' }}
                   >
-                    {isGeneratingDetail ? (
-                      <span className="loading-spinner small" style={{ width: '16px', height: '16px', border: '2px solid #e2e8f0', borderTopColor: '#3b82f6', borderRadius: '50%', display: 'block', animation: 'spin 1s linear infinite' }}></span>
-                    ) : (
-                      <Sparkles size={16} />
-                    )}
+                    <Sparkles size={14} />
+                    {isGeneratingDetail ? '生成中...' : 'AI 生成细纲'}
                   </button>
                 </div>
                 <textarea
-                  className="form-textarea detail"
+                  className="form-textarea detail-textarea"
                   value={detailOutline}
                   onChange={(e) => setDetailOutline(e.target.value)}
-                  placeholder="在这里编写本章细纲，详细描述每个场景、对话要点、情绪转折..."
-                  rows={12}
+                  placeholder="在此输入详细的场景描写、对话要点等..."
+                  rows={10}
                 />
               </div>
 
               {/* 生成内容按钮 */}
-              {onGenerateContent && (
+              {/* {onGenerateContent && (
                 <div className="form-group">
                   <button
                     className="icon-btn"
@@ -779,37 +783,28 @@ export default function ChapterSettingsModal({
                     )}
                   </button>
                 </div>
-              )}
+              )} */}
             </div>
           )}
 
           {!isLoading && activeTab === 'characters' && (
             <div className="modal-section-content">
               {charactersToShow.length > 0 ? (
-                <div className="form-group">
-                  <label className="form-label">
-                    <Users size={16} />
-                    选择出场人物
-                  </label>
-                  <div className="character-selection-list">
-                    {charactersToShow.map(char => (
-                      <CharacterSelectionCard
-                        key={char.id}
-                        character={char}
-                        isSelected={selectedCharacters.includes(char.id)}
-                        onToggle={() => handleCharacterToggle(char.id)}
-                      />
-                    ))}
-                  </div>
-                  <p className="form-hint" style={{ marginTop: '12px', color: 'var(--text-tertiary)', fontSize: '13px' }}>
-                    选择本章登场的角色，有助于AI更好地理解剧情上下文。
-                  </p>
+                <div className="character-selection-grid">
+                  {charactersToShow.map(char => (
+                    <CharacterSelectionCard
+                      key={char.id}
+                      character={char}
+                      isSelected={selectedCharacters.includes(String(char.id))}
+                      onToggle={() => handleCharacterToggle(String(char.id))}
+                    />
+                  ))}
                 </div>
               ) : (
-                <div className="empty-state" style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-tertiary)' }}>
-                  <Users size={48} style={{ opacity: 0.2, marginBottom: '16px' }} />
-                  <p>暂无角色数据</p>
-                  <p style={{ fontSize: '12px', marginTop: '4px' }}>请在"角色管理"中添加角色</p>
+                <div className="empty-state">
+                  <Users size={48} />
+                  <p>暂无可用角色</p>
+                  <span className="empty-hint">请先在角色管理中添加角色</span>
                 </div>
               )}
             </div>

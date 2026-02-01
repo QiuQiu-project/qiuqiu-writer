@@ -35,7 +35,7 @@ export interface SyncResponse {
   }>;
   error?: string;
   work?: {
-    id: number;
+    id: string;
     word_count: number;
     [key: string]: unknown;
   };

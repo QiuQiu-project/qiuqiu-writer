@@ -8,7 +8,7 @@ export default function NovelPage() {
   const navigate = useNavigate();
   const [showImportModal, setShowImportModal] = useState(false);
 
-  const handleImportSuccess = (workId: number) => {
+  const handleImportSuccess = (workId: string) => {
     // 导入成功后可以跳转到作品页面
     navigate(`/novel/editor?workId=${workId}`);
   };

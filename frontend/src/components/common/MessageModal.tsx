@@ -29,7 +29,8 @@ export default function MessageModal({
 
   useEffect(() => {
     if (isOpen) {
-      setVisible(true);
+      const timer = requestAnimationFrame(() => setVisible(true));
+      return () => cancelAnimationFrame(timer);
     } else {
       const timer = setTimeout(() => setVisible(false), 200);
       return () => clearTimeout(timer);

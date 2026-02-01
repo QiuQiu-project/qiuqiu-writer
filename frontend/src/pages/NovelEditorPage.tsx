@@ -929,7 +929,9 @@ export default function NovelEditorPage(){
                     volumeId: vol.id,
                     title: chapter.title,
                     chapter_number: chapter.chapter_number,
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     characters: (chapter.metadata as any)?.component_data?.characters || [],
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     locations: (chapter.metadata as any)?.component_data?.locations || [],
                     outline: chapter.metadata?.outline || '',
                     detailOutline: chapter.metadata?.detailed_outline || ''
@@ -966,7 +968,9 @@ export default function NovelEditorPage(){
                 volumeTitle: volTitle,
                 title: chapter.title,
                 chapter_number: chapter.chapter_number,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 characters: (chapter.metadata as any)?.component_data?.characters || [],
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 locations: (chapter.metadata as any)?.component_data?.locations || [],
                 outline: chapter.metadata?.outline || '',
                 detailOutline: chapter.metadata?.detailed_outline || '',
@@ -1660,6 +1664,7 @@ export default function NovelEditorPage(){
         }
 
         // 构造 metadata
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const metadata: any = {
           outline: data.outline || '',
           detailed_outline: data.detailOutline || '',
@@ -1802,6 +1807,7 @@ export default function NovelEditorPage(){
         
         // 如果创建章节时有大纲、细纲或组件数据，立即更新保存
         if (data.outline || data.detailOutline || (data.characters && data.characters.length > 0) || (data.locations && data.locations.length > 0)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const metadata: any = {
             outline: data.outline || '',
             detailed_outline: data.detailOutline || '',
@@ -2055,7 +2061,7 @@ export default function NovelEditorPage(){
     if (isNaN(chapterIdNum)) {
       throw new Error('无效的章节');
     }
-    let chapterData = chaptersData[selectedChapter];
+    const chapterData = chaptersData[selectedChapter];
     let outline = (chapterData.outline ?? '').trim();
     let detailOutline = (chapterData.detailOutline ?? '').trim();
     const title = chapterData.title ?? '';
@@ -2585,7 +2591,10 @@ export default function NovelEditorPage(){
             />
           )}
           {activeNav === 'map' && <MapView />}
-          {activeNav === 'characters' && <Characters availableCharacters={((work?.metadata as any)?.component_data?.characters || (work?.metadata as any)?.characters || [])} />}
+          {activeNav === 'characters' && <Characters availableCharacters={
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            ((work?.metadata as any)?.component_data?.characters || (work?.metadata as any)?.characters || [])
+          } />}
           {activeNav === 'factions' && <Factions />}
           {activeNav === 'settings' && (
             <div className="placeholder-content">
@@ -2823,6 +2832,7 @@ export default function NovelEditorPage(){
         volumeTitle={currentVolumeTitle}
         initialData={currentChapterData}
         availableCharacters={(() => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const meta = work?.metadata as any;
           // 合并多个来源的角色数据，防止遗漏
           const source1 = meta?.characters || [];
@@ -2834,6 +2844,7 @@ export default function NovelEditorPage(){
           // 去重（优先根据 ID，其次根据 Name）
           const uniqueCharsMap = new Map();
           
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           allChars.forEach((c: any, index: number) => {
             // 确保有临时 ID
             const tempId = c.id ? String(c.id) : (c.name || `char-index-${index}`);

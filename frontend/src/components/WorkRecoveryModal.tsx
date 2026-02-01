@@ -15,11 +15,11 @@ import './WorkRecoveryModal.css';
 interface WorkRecoveryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess?: (workId: number) => void;
+  onSuccess?: (workId: string) => void;
 }
 
 interface RecoverableWork {
-  workId: number;
+  workId: string;
   workTitle?: string;
   chapterCount: number;
   existsOnline: boolean;
@@ -59,7 +59,7 @@ export default function WorkRecoveryModal({
     }
   };
 
-  const handleRecover = async (workId: number) => {
+  const handleRecover = async (workId: string) => {
     setRecovering(true);
     setProgress(null);
     setError(null);

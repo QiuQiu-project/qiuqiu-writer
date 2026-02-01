@@ -12,7 +12,7 @@ import type { CachedWorkDoc, CachedChapterDoc } from '../types/document';
 const STORAGE_PREFIX = 'planetwriter_cache_';
 
 export interface RecoveryProgress {
-  workId?: number;
+  workId?: string;
   workTitle?: string;
   totalChapters: number;
   recoveredChapters: number;
@@ -51,10 +51,10 @@ export async function getCachedWorkKeys(): Promise<string[]> {
 /**
  * 从缓存键中提取作品ID
  */
-export function extractWorkIdFromKey(key: string): number | null {
+export function extractWorkIdFromKey(key: string): string | null {
   // 格式: work_{workId}_chapter_{chapterId} 或 work_{workId}
-  const match = key.match(/work_(\d+)/);
-  return match ? parseInt(match[1], 10) : null;
+  const match = key.match(/work_([^_]+)/);
+  return match ? match[1] : null;
 }
 
 /**
@@ -69,7 +69,7 @@ export function extractChapterIdFromKey(key: string): number | null {
 /**
  * 获取本地缓存中的作品信息
  */
-export async function getCachedWorkInfo(workId: number): Promise<{
+export async function getCachedWorkInfo(workId: string): Promise<{
   work?: CachedWorkDoc;
   chapters: Array<{
     chapterId: number;
@@ -173,7 +173,7 @@ export async function getCachedWorkInfo(workId: number): Promise<{
  * 检查作品是否存在于线上
  * 如果不存在但存储中有内容，返回恢复信息
  */
-export async function checkWorkExists(workId: number): Promise<{
+export async function checkWorkExists(workId: string): Promise<{
   exists: boolean;
   needsRecovery?: boolean;
   recoveryInfo?: unknown;
@@ -211,11 +211,11 @@ export async function checkWorkExists(workId: number): Promise<{
  * 从本地缓存恢复作品和章节
  */
 export async function recoverWorkFromCache(
-  workId: number,
+  workId: string,
   onProgress?: (progress: RecoveryProgress) => void
 ): Promise<{
   success: boolean;
-  workId?: number;
+  workId?: string;
   workCreated: boolean;
   chaptersCreated: number;
   error?: string;
@@ -480,14 +480,14 @@ export async function recoverWorkFromCache(
  * 获取所有可恢复的作品ID列表
  */
 export async function getRecoverableWorks(): Promise<Array<{
-  workId: number;
+  workId: string;
   workTitle?: string;
   chapterCount: number;
   existsOnline: boolean;
   needsRecovery?: boolean;
 }>> {
   const keys = await getCachedWorkKeys();
-  const workIds = new Set<number>();
+  const workIds = new Set<string>();
   
   // 提取所有作品ID
   keys.forEach(key => {
@@ -499,7 +499,7 @@ export async function getRecoverableWorks(): Promise<Array<{
   
   // 检查每个作品是否存在，并获取章节数量
   const results: Array<{
-    workId: number;
+    workId: string;
     workTitle?: string;
     chapterCount: number;
     existsOnline: boolean;
