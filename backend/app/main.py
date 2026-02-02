@@ -15,7 +15,7 @@ from contextlib import asynccontextmanager
 
 from memos.api.core.config import get_settings
 from memos.api.core.database import init_db, close_db
-from memos.api.routers import auth_router, chapters_router, templates_router, works_router, volumes_router
+from memos.api.routers import auth_router, chapters_router, templates_router, works_router, volumes_router, admin_router
 from memos.api.core.redis import get_redis
 from memos.api.services.sharedb_service import ShareDBService
 
@@ -295,6 +295,7 @@ async def root():
 # 包含API路由
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(auth_router.router)
+api_router.include_router(admin_router.router)
 api_router.include_router(chapters_router.router)
 api_router.include_router(templates_router.router)
 api_router.include_router(volumes_router.router)

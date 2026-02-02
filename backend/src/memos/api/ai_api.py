@@ -59,6 +59,7 @@ try:
     
     # 导入各个路由模块
     auth_router_module = importlib.import_module('memos.api.routers.auth_router')
+    admin_router_module = importlib.import_module('memos.api.routers.admin_router')
     chapters_router_module = importlib.import_module('memos.api.routers.chapters_router')
     volumes_router_module = importlib.import_module('memos.api.routers.volumes_router')
     templates_router_module = importlib.import_module('memos.api.routers.templates_router')
@@ -67,6 +68,7 @@ try:
     
     # 获取路由对象
     auth_router = auth_router_module.router
+    admin_router = admin_router_module.router
     chapters_router = chapters_router_module.router
     volumes_router = volumes_router_module.router
     templates_router = templates_router_module.router
@@ -81,6 +83,7 @@ try:
             logger.info(f"  {methods} {route.path}")
     
     app.include_router(auth_router)
+    app.include_router(admin_router)
     app.include_router(chapters_router)
     app.include_router(volumes_router)
     app.include_router(templates_router)
@@ -132,6 +135,7 @@ async def root():
         },
         "writerai": {
             "auth": "/api/v1/auth/*",
+            "admin": "/api/v1/admin/auth/*",
             "chapters": "/api/v1/chapters/*",
             "templates": "/api/v1/templates/*",
             "works": "/api/v1/works/*",
