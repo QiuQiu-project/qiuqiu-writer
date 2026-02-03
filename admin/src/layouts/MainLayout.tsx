@@ -9,6 +9,8 @@ import {
   LogoutOutlined,
   SettingOutlined,
   FileTextOutlined,
+  SafetyCertificateOutlined,
+  ToolOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 
@@ -63,6 +65,16 @@ const MainLayout: React.FC = () => {
       key: '/prompt-templates',
       icon: <FileTextOutlined />,
       label: 'Prompt Templates',
+    },
+    {
+      key: '/system-settings',
+      icon: <ToolOutlined />,
+      label: 'System Settings',
+    },
+    {
+      key: '/audit-logs',
+      icon: <SafetyCertificateOutlined />,
+      label: 'Audit Logs',
     },
     {
       key: '/settings',

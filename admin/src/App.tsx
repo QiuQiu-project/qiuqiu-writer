@@ -6,6 +6,8 @@ import Dashboard from './pages/Dashboard';
 import Users from './pages/Users';
 import Works from './pages/Works';
 import PromptTemplates from './pages/PromptTemplates';
+import SystemSettings from './pages/SystemSettings';
+import AuditLogs from './pages/AuditLogs';
 
 // Simple Auth Guard
 const RequireAuth: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -33,6 +35,8 @@ const App: React.FC = () => {
           <Route path="users" element={<Users />} />
           <Route path="works" element={<Works />} />
           <Route path="prompt-templates" element={<PromptTemplates />} />
+          <Route path="system-settings" element={<SystemSettings />} />
+          <Route path="audit-logs" element={<AuditLogs />} />
           <Route path="settings" element={<div>Settings (Coming Soon)</div>} />
         </Route>
       </Routes>
