@@ -1,6 +1,6 @@
 from typing import Any, ClassVar, Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, field_serializer, field_validator, model_validator
 
 from memos import settings
 from memos.configs.base import BaseConfig
@@ -75,3 +75,10 @@ class VectorDBConfigFactory(BaseConfig):
         config_class = self.backend_to_class[self.backend]
         self.config = config_class(**self.config)
         return self
+
+    @field_serializer("config")
+    def _serialize_config(self, value: Any) -> dict[str, Any]:
+        """Serialize config to dict for JSON/compatibility (avoids Pydantic serializer warning)."""
+        if hasattr(value, "model_dump"):
+            return value.model_dump(mode="json")
+        return value if isinstance(value, dict) else {}

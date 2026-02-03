@@ -252,6 +252,25 @@ class MySQLUserManager:
         finally:
             session.close()
 
+    def list_all_cubes(self, page: int = 1, size: int = 20) -> tuple[int, list[Cube]]:
+        """List all active cubes with pagination.
+
+        Args:
+            page (int): Page number.
+            size (int): Page size.
+
+        Returns:
+            tuple[int, list[Cube]]: Total count and list of cubes.
+        """
+        session = self._get_session()
+        try:
+            query = session.query(Cube).filter(Cube.is_active)
+            total = query.count()
+            cubes = query.offset((page - 1) * size).limit(size).all()
+            return total, cubes
+        finally:
+            session.close()
+
     def create_cube(
         self,
         cube_name: str,
@@ -466,7 +485,7 @@ class MySQLUserManager:
             session.close()
 
     def delete_cube(self, cube_id: str) -> bool:
-        """Soft delete a cube (set is_active to False).
+        """Soft delete a cube (set is_active to False) and delete its directory.
 
         Args:
             cube_id (str): The cube ID.
@@ -474,6 +493,9 @@ class MySQLUserManager:
         Returns:
             bool: True if successful, False otherwise.
         """
+        import shutil
+        import os
+        
         session = self._get_session()
         try:
             cube = session.query(Cube).filter(Cube.cube_id == cube_id).first()
@@ -483,6 +505,15 @@ class MySQLUserManager:
             cube.is_active = False
             session.commit()
             logger.info(f"Cube '{cube_id}' deactivated")
+            
+            # Remove directory if exists
+            if cube.cube_path and os.path.exists(cube.cube_path) and os.path.isdir(cube.cube_path):
+                try:
+                    shutil.rmtree(cube.cube_path)
+                    logger.info(f"Deleted cube directory: {cube.cube_path}")
+                except Exception as e:
+                    logger.error(f"Failed to delete cube directory {cube.cube_path}: {e}")
+
             return True
         except Exception as e:
             session.rollback()

@@ -9,13 +9,47 @@ from memos.api.schemas.admin import (
     UserListResponse, WorkListResponse, StatusUpdateRequest,
     PromptTemplateListResponse, PromptTemplateResponse, PromptTemplateCreate, PromptTemplateUpdate,
     SystemSettingResponse, SystemSettingUpdate, AuditLogResponse, AuditLogListResponse,
-    SystemMonitorResponse
+    SystemMonitorResponse, CubeListResponse, CubeResponse
 )
 from memos.api.services.admin_service import AdminService
+from memos.mem_user.mysql_user_manager import MySQLUserManager
+from memos.mem_user.persistent_factory import PersistentUserManagerFactory
+from memos.configs.mem_user import UserManagerConfigFactory
+from memos.api.config import APIConfig
 import psutil
 import platform as platform_info
 import sys
+import os
 import time
+
+_user_manager = None
+
+def get_user_manager():
+    global _user_manager
+    if _user_manager is None:
+        backend = os.getenv("MOS_USER_MANAGER_BACKEND", "sqlite").lower()
+        if backend == "mysql":
+            mysql_config = APIConfig.get_mysql_config()
+            config_factory = UserManagerConfigFactory(
+                backend="mysql",
+                config=mysql_config
+            )
+        elif backend == "postgres":
+            # Use APIConfig to get postgres config
+            postgres_config = APIConfig.get_postgres_config()
+            config_factory = UserManagerConfigFactory(
+                backend="postgres",
+                config=postgres_config
+            )
+        else:
+            # Default to sqlite
+            config_factory = UserManagerConfigFactory(
+                backend="sqlite",
+                config={"user_id": "root"}
+            )
+        
+        _user_manager = PersistentUserManagerFactory.from_config(config_factory)
+    return _user_manager
 
 router = APIRouter(prefix="/api/v1/admin", tags=["Admin"])
 security = HTTPBearer()
@@ -223,5 +257,31 @@ async def update_work_status(
     success = await service.update_work_status(work_id, data.status, admin_id=admin_id)
     if not success:
         raise HTTPException(status_code=404, detail="Work not found")
+    return {"success": True}
+
+@router.get("/cubes", response_model=CubeListResponse)
+async def list_cubes(
+    page: int = 1,
+    size: int = 20,
+    admin_id: str = Depends(get_current_admin)
+):
+    user_manager = get_user_manager()
+    total, cubes = user_manager.list_all_cubes(page, size)
+    
+    items = []
+    for cube in cubes:
+        items.append(CubeResponse.model_validate(cube))
+        
+    return CubeListResponse(total=total, items=items, page=page, size=size)
+
+@router.delete("/cubes/{cube_id}")
+async def delete_cube(
+    cube_id: str,
+    admin_id: str = Depends(get_current_admin)
+):
+    user_manager = get_user_manager()
+    success = user_manager.delete_cube(cube_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Cube not found")
     return {"success": True}
 

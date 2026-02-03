@@ -47,11 +47,11 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_MINUTES: int = 7 * 24 * 60  # 7天
 
     # PostgreSQL数据库配置
-    POSTGRES_HOST: str = "localhost"
-    POSTGRES_PORT: int = 5432
-    POSTGRES_USER: str = "postgres"
-    POSTGRES_PASSWORD: str = "password"
-    POSTGRES_DB: str = "writerai"
+    POSTGRES_HOST: str = os.getenv("POSTGRES_HOST", "localhost")
+    POSTGRES_PORT: int = int(os.getenv("POSTGRES_PORT", 5432))
+    POSTGRES_USER: str = os.getenv("POSTGRES_USER", "postgres")
+    POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", "password")
+    POSTGRES_DB: str = os.getenv("POSTGRES_DB", "writerai")
 
     @property
     def DATABASE_URL(self) -> str:

@@ -746,6 +746,18 @@ class APIConfig:
         }
 
     @staticmethod
+    def get_postgres_config() -> dict[str, Any]:
+        """Get PostgreSQL configuration."""
+        return {
+            "host": os.getenv("POSTGRES_HOST", "localhost"),
+            "port": int(os.getenv("POSTGRES_PORT", "5432")),
+            "username": os.getenv("POSTGRES_USER", "postgres"),
+            "password": os.getenv("POSTGRES_PASSWORD", "password"),
+            "database": os.getenv("POSTGRES_DB", "writerai"),
+            "charset": os.getenv("POSTGRES_CHARSET", "utf8"),
+        }
+
+    @staticmethod
     def get_scheduler_config() -> dict[str, Any]:
         """Get scheduler configuration."""
         return {
@@ -863,10 +875,16 @@ class APIConfig:
             config["enable_mem_scheduler"] = False
 
         # Add user manager configuration if enabled
-        if os.getenv("MOS_USER_MANAGER_BACKEND", "sqlite").lower() == "mysql":
+        user_manager_backend = os.getenv("MOS_USER_MANAGER_BACKEND", "sqlite").lower()
+        if user_manager_backend == "mysql":
             config["user_manager"] = {
                 "backend": "mysql",
                 "config": mysql_config,
+            }
+        elif user_manager_backend == "postgres":
+            config["user_manager"] = {
+                "backend": "postgres",
+                "config": APIConfig.get_postgres_config(),
             }
 
         return config
@@ -961,10 +979,16 @@ class APIConfig:
             config_dict["enable_mem_scheduler"] = False
 
         # Add user manager configuration if enabled
-        if os.getenv("MOS_USER_MANAGER_BACKEND", "sqlite").lower() == "mysql":
+        user_manager_backend = os.getenv("MOS_USER_MANAGER_BACKEND", "sqlite").lower()
+        if user_manager_backend == "mysql":
             config_dict["user_manager"] = {
                 "backend": "mysql",
                 "config": mysql_config,
+            }
+        elif user_manager_backend == "postgres":
+            config_dict["user_manager"] = {
+                "backend": "postgres",
+                "config": APIConfig.get_postgres_config(),
             }
 
         default_config = MOSConfig(**config_dict)

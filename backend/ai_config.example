@@ -43,6 +43,14 @@ MOS_CHAT_MODEL_PROVIDER=openai
 MOS_CHAT_MODEL=gpt-3.5-turbo
 MOS_CHAT_TEMPERATURE=0.7
 
+# Embedder 配置（文本向量化，用于记忆检索）
+# 默认 MOS_EMBEDDER_BACKEND=universal_api（使用 OpenAI 等 API）。
+# 使用 DeepSeek 时，DeepSeek 不支持 embedding，会自动回退到本地 sentence_transformer。
+# 若希望明确使用本地模型并消除 "backend mismatch" 警告，可设置：
+# MOS_EMBEDDER_BACKEND=sentence_transformer
+# MOS_EMBEDDER_MODEL=nomic-ai/nomic-embed-text-v1.5
+# 本地模型需先下载，详见 backend/模型缓存配置说明.md
+
 # 日志级别
 LOG_LEVEL=INFO
 
@@ -72,4 +80,13 @@ LOG_LEVEL=INFO
 # 其他可选模型：
 #    - claude-3-sonnet (需要配置对应的API)
 #    - claude-3-opus
+#
+# ==========================================
+# 流式输出分块用 tokenizer（可选）
+# ==========================================
+# 流式回复时用 tokenizer 做按 token 分块，默认从 Hugging Face 加载 Qwen/Qwen3-0.6B。
+# 若无法访问 Hugging Face 或希望禁用，可设为空，将退化为按字符分块：
+# MOS_STREAMING_TOKENIZER_MODEL=
+# 使用本地路径（需已下载模型）：
+# MOS_STREAMING_TOKENIZER_MODEL=/path/to/Qwen3-0.6B
 

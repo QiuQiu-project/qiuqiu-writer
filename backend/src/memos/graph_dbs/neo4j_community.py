@@ -167,32 +167,36 @@ class Neo4jCommunityGraphDB(Neo4jGraphDB):
             - If 'search_filter' is provided, it applies additional metadata-based filtering.
             - The returned IDs can be used to fetch full node data from Neo4j if needed.
         """
-        user_name = user_name if user_name else self.config.user_name
-        # Build VecDB filter
-        vec_filter = {}
-        if scope:
-            vec_filter["memory_type"] = scope
-        if status:
-            vec_filter["status"] = status
-        vec_filter["vector_sync"] = "success"
-        if kwargs.get("cube_name"):
-            vec_filter["user_name"] = kwargs["cube_name"]
-        else:
-            vec_filter["user_name"] = user_name
+        try:
+            user_name = user_name if user_name else self.config.user_name
+            # Build VecDB filter
+            vec_filter = {}
+            if scope:
+                vec_filter["memory_type"] = scope
+            if status:
+                vec_filter["status"] = status
+            vec_filter["vector_sync"] = "success"
+            if kwargs.get("cube_name"):
+                vec_filter["user_name"] = kwargs["cube_name"]
+            else:
+                vec_filter["user_name"] = user_name
 
-        # Add search_filter conditions
-        if search_filter:
-            vec_filter.update(search_filter)
+            # Add search_filter conditions
+            if search_filter:
+                vec_filter.update(search_filter)
 
-        # Perform vector search
-        results = self.vec_db.search(query_vector=vector, top_k=top_k, filter=vec_filter)
+            # Perform vector search
+            results = self.vec_db.search(query_vector=vector, top_k=top_k, filter=vec_filter)
 
-        # Filter by threshold
-        if threshold is not None:
-            results = [r for r in results if r.score is None or r.score >= threshold]
+            # Filter by threshold
+            if threshold is not None:
+                results = [r for r in results if r.score is None or r.score >= threshold]
 
-        # Return consistent format
-        return [{"id": r.id, "score": r.score} for r in results]
+            # Return consistent format
+            return [{"id": r.id, "score": r.score} for r in results]
+        except Exception as e:
+            logger.warning(f"Failed to search by embedding: {e}")
+            return []
 
     def get_all_memory_items(self, scope: str, **kwargs) -> list[dict]:
         """
@@ -203,26 +207,30 @@ class Neo4jCommunityGraphDB(Neo4jGraphDB):
         Returns:
             list[dict]: Full list of memory items under this scope.
         """
-        user_name = kwargs.get("user_name") if kwargs.get("user_name") else self.config.user_name
-        if scope not in {"WorkingMemory", "LongTermMemory", "UserMemory"}:
-            raise ValueError(f"Unsupported memory type scope: {scope}")
+        try:
+            user_name = kwargs.get("user_name") if kwargs.get("user_name") else self.config.user_name
+            if scope not in {"WorkingMemory", "LongTermMemory", "UserMemory"}:
+                raise ValueError(f"Unsupported memory type scope: {scope}")
 
-        where_clause = "WHERE n.memory_type = $scope"
-        params = {"scope": scope}
+            where_clause = "WHERE n.memory_type = $scope"
+            params = {"scope": scope}
 
-        if not self.config.use_multi_db and (self.config.user_name or user_name):
-            where_clause += " AND n.user_name = $user_name"
-            params["user_name"] = user_name
+            if not self.config.use_multi_db and (self.config.user_name or user_name):
+                where_clause += " AND n.user_name = $user_name"
+                params["user_name"] = user_name
 
-        query = f"""
-            MATCH (n:Memory)
-            {where_clause}
-            RETURN n
-            """
+            query = f"""
+                MATCH (n:Memory)
+                {where_clause}
+                RETURN n
+                """
 
-        with self.driver.session(database=self.db_name) as session:
-            results = session.run(query, params)
-            return [self._parse_node(dict(record["n"])) for record in results]
+            with self.driver.session(database=self.db_name) as session:
+                results = session.run(query, params)
+                return [self._parse_node(dict(record["n"])) for record in results]
+        except Exception as e:
+            logger.warning(f"Failed to get all memory items from Neo4j: {e}")
+            return []
 
     def clear(self, user_name: str | None = None) -> None:
         """
@@ -294,6 +302,9 @@ class Neo4jCommunityGraphDB(Neo4jGraphDB):
                     )
                 logger.debug("Index 'memory_user_name_index' ensured.")
         except Exception as e:
+            # Only warn if it's not a connection error (which is handled gracefully elsewhere)
+            # or if we really want to know about it.
+            # Since Neo4j is optional, we can just log this as a warning.
             logger.warning(f"Failed to create basic property indexes: {e}")
 
         # Step 2: VectorDB indexes

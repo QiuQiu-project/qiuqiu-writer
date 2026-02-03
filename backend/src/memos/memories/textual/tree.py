@@ -256,57 +256,61 @@ class TreeTextMemory(BaseTextMemory):
                  - 'nodes': List of unique nodes (core + neighbors) in the merged subgraph.
                  - 'edges': List of unique edges (as dicts with 'from', 'to', 'type') in the merged subgraph.
         """
-        # Step 1: Embed query
-        query_embedding = self.embedder.embed([query])[0]
+        try:
+            # Step 1: Embed query
+            query_embedding = self.embedder.embed([query])[0]
 
-        # Step 2: Get top-1 similar node
-        similar_nodes = self.graph_store.search_by_embedding(
-            query_embedding, top_k=top_k, user_name=user_name
-        )
-        if not similar_nodes:
-            logger.info("No similar nodes found for query embedding.")
+            # Step 2: Get top-1 similar node
+            similar_nodes = self.graph_store.search_by_embedding(
+                query_embedding, top_k=top_k, user_name=user_name
+            )
+            if not similar_nodes:
+                logger.info("No similar nodes found for query embedding.")
+                return {"core_id": None, "nodes": [], "edges": []}
+
+            # Step 3: Fetch neighborhood
+            all_nodes = {}
+            all_edges = set()
+            cores = []
+
+            for node in similar_nodes:
+                core_id = node["id"]
+                score = node["score"]
+
+                subgraph = self.graph_store.get_subgraph(
+                    center_id=core_id, depth=depth, center_status=center_status, user_name=user_name
+                )
+
+                if subgraph is None or not subgraph["core_node"]:
+                    logger.info(f"Skipping node {core_id} (inactive or not found).")
+                    continue
+
+                core_node = subgraph["core_node"]
+                neighbors = subgraph["neighbors"]
+                edges = subgraph["edges"]
+
+                # Collect nodes
+                all_nodes[core_node["id"]] = core_node
+                for n in neighbors:
+                    all_nodes[n["id"]] = n
+
+                # Collect edges
+                for e in edges:
+                    all_edges.add((e["source"], e["target"], e["type"]))
+
+                cores.append(
+                    {"id": core_id, "score": score, "core_node": core_node, "neighbors": neighbors}
+                )
+
+            top_core = cores[0] if cores else None
+            return {
+                "core_id": top_core["id"] if top_core else None,
+                "nodes": list(all_nodes.values()),
+                "edges": [{"source": f, "target": t, "type": ty} for (f, t, ty) in all_edges],
+            }
+        except Exception as e:
+            logger.warning(f"Failed to get relevant subgraph: {e}")
             return {"core_id": None, "nodes": [], "edges": []}
-
-        # Step 3: Fetch neighborhood
-        all_nodes = {}
-        all_edges = set()
-        cores = []
-
-        for node in similar_nodes:
-            core_id = node["id"]
-            score = node["score"]
-
-            subgraph = self.graph_store.get_subgraph(
-                center_id=core_id, depth=depth, center_status=center_status, user_name=user_name
-            )
-
-            if subgraph is None or not subgraph["core_node"]:
-                logger.info(f"Skipping node {core_id} (inactive or not found).")
-                continue
-
-            core_node = subgraph["core_node"]
-            neighbors = subgraph["neighbors"]
-            edges = subgraph["edges"]
-
-            # Collect nodes
-            all_nodes[core_node["id"]] = core_node
-            for n in neighbors:
-                all_nodes[n["id"]] = n
-
-            # Collect edges
-            for e in edges:
-                all_edges.add((e["source"], e["target"], e["type"]))
-
-            cores.append(
-                {"id": core_id, "score": score, "core_node": core_node, "neighbors": neighbors}
-            )
-
-        top_core = cores[0] if cores else None
-        return {
-            "core_id": top_core["id"] if top_core else None,
-            "nodes": list(all_nodes.values()),
-            "edges": [{"source": f, "target": t, "type": ty} for (f, t, ty) in all_edges],
-        }
 
     def extract(self, messages: MessageList) -> list[TextualMemoryItem]:
         raise NotImplementedError

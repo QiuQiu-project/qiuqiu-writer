@@ -164,6 +164,24 @@ class AuditLogListResponse(BaseModel):
     page: int
     size: int
 
+class CubeResponse(BaseModel):
+    cube_id: str
+    cube_name: str
+    cube_path: str | None = None
+    owner_id: str
+    created_at: datetime
+    updated_at: datetime
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+class CubeListResponse(BaseModel):
+    total: int
+    items: list[CubeResponse]
+    page: int
+    size: int
+
 class PromptTemplateUpdate(BaseModel):
     name: str | None = None
     description: str | None = None

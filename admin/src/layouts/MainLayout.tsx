@@ -11,6 +11,7 @@ import {
   FileTextOutlined,
   SafetyCertificateOutlined,
   ToolOutlined,
+  DatabaseOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 
@@ -60,6 +61,11 @@ const MainLayout: React.FC = () => {
       key: '/works',
       icon: <BookOutlined />,
       label: 'Works',
+    },
+    {
+      key: '/cubes',
+      icon: <DatabaseOutlined />,
+      label: 'Cubes',
     },
     {
       key: '/prompt-templates',

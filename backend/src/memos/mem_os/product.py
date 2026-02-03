@@ -154,16 +154,19 @@ class MOSProduct(MOSCore):
         # Note: self.user_manager is now the persistent user manager from parent class
         # No need for separate global_user_manager as they are the same instance
 
-        # Initialize tiktoken for streaming
-        try:
-            # Use gpt2 encoding which is more stable and widely compatible
-            self.tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B")
-            logger.info("tokenizer initialized successfully for streaming")
-        except Exception as e:
-            logger.warning(
-                f"Failed to initialize tokenizer, will use character-based chunking: {e}"
-            )
-            self.tokenizer = None
+        # Initialize tokenizer for streaming (token-based chunking)
+        # 可通过环境变量 MOS_STREAMING_TOKENIZER_MODEL 指定模型，设为空则禁用（仅用字符分块）
+        tokenizer_model = os.getenv("MOS_STREAMING_TOKENIZER_MODEL", "Qwen/Qwen3-0.6B").strip()
+        self.tokenizer = None
+        if tokenizer_model:
+            try:
+                self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_model)
+                logger.info(f"tokenizer initialized for streaming: {tokenizer_model}")
+            except Exception as e:
+                logger.warning(
+                    f"Failed to initialize tokenizer, will use character-based chunking: {e}"
+                )
+                self.tokenizer = None
 
         # Restore user instances from persistent storage
         self._restore_user_instances(default_cube_config=default_cube_config)

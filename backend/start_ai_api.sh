@@ -60,21 +60,16 @@ echo "  - API基础URL: http://$HOST:$PORT"
 echo "  - API文档: http://$HOST:$PORT/docs"
 echo ""
 
-# 构建 uvicorn 命令参数
-UVICORN_ARGS=(
-    "memos.api.ai_api:app"
-    "--host" "$HOST"
-    "--port" "$PORT"
-)
-
-# 如果启用热部署，添加 --reload 参数
+# 构建 uvicorn 命令（不用数组以兼容 sh/dash）
+UVICORN_APP="memos.api.ai_api:app"
+UVICORN_BASE="--host $HOST --port $PORT"
 if [ "$RELOAD" = "true" ]; then
-    UVICORN_ARGS+=("--reload")
-    # 指定需要监控的目录，提高性能
-    UVICORN_ARGS+=("--reload-dir" "$SRC_DIR")
+    UVICORN_EXTRA="--reload --reload-dir $SRC_DIR"
     echo "✅ 热部署已启用 - 代码变更将自动重新加载"
     echo "   监控目录: $SRC_DIR"
     echo ""
+else
+    UVICORN_EXTRA=""
 fi
 
 # 确保 src 目录在 PYTHONPATH 中
@@ -95,21 +90,43 @@ if [ -n "$HF_HOME" ]; then
     echo "✅ 使用自定义缓存目录: $HF_HOME"
 fi
 
+# Embedder 配置（文本向量化，用于记忆检索）
+# 默认使用本地 sentence_transformer，避免与 DeepSeek 回退时出现 backend mismatch 警告
+# 若需使用 API（如 OpenAI embedding），请在 .env 中设置 MOS_EMBEDDER_BACKEND=universal_api
+export MOS_EMBEDDER_BACKEND=${MOS_EMBEDDER_BACKEND:-sentence_transformer}
+export MOS_EMBEDDER_MODEL=${MOS_EMBEDDER_MODEL:-nomic-ai/nomic-embed-text-v1.5}
+if [ "$MOS_EMBEDDER_BACKEND" = "sentence_transformer" ]; then
+    echo "✅ Embedder: 本地模型, $MOS_EMBEDDER_BACKEND"
+    echo "   模型: $MOS_EMBEDDER_MODEL"
+    echo "   详见 backend/模型缓存配置说明.md，首次需下载模型"
+else
+    echo "✅ Embedder: $MOS_EMBEDDER_BACKEND, 模型: $MOS_EMBEDDER_MODEL"
+fi
+
+# 流式输出 Tokenizer（Qwen3-0.6B）：与 nomic 一样，若已下载到 models 则优先用本地路径
+if [ -z "$MOS_STREAMING_TOKENIZER_MODEL" ] && [ -d "$BACKEND_DIR/models/Qwen3-0.6B" ]; then
+    export MOS_STREAMING_TOKENIZER_MODEL="$BACKEND_DIR/models/Qwen3-0.6B"
+    echo "✅ 流式 Tokenizer: 使用本地模型 $MOS_STREAMING_TOKENIZER_MODEL"
+elif [ -n "$MOS_STREAMING_TOKENIZER_MODEL" ]; then
+    echo "✅ 流式 Tokenizer: $MOS_STREAMING_TOKENIZER_MODEL"
+fi
+echo ""
+
 # 已经在 backend 目录了，不需要再次切换
 
 # 检查Python环境并启动服务
-if command -v poetry &> /dev/null; then
+if command -v poetry 2>/dev/null; then
     echo "使用 Poetry 启动服务..."
-    poetry run uvicorn "${UVICORN_ARGS[@]}"
+    poetry run uvicorn "$UVICORN_APP" $UVICORN_BASE $UVICORN_EXTRA
 elif [ -d ".venv" ]; then
     echo "使用 .venv 启动服务..."
-    source .venv/bin/activate
-    uvicorn "${UVICORN_ARGS[@]}"
+    . .venv/bin/activate
+    uvicorn "$UVICORN_APP" $UVICORN_BASE $UVICORN_EXTRA
 elif [ -d "venv" ]; then
     echo "使用 venv 启动服务..."
-    source venv/bin/activate
-    uvicorn "${UVICORN_ARGS[@]}"
+    . venv/bin/activate
+    uvicorn "$UVICORN_APP" $UVICORN_BASE $UVICORN_EXTRA
 else
     echo "使用系统 Python 启动服务..."
-    uvicorn "${UVICORN_ARGS[@]}"
+    uvicorn "$UVICORN_APP" $UVICORN_BASE $UVICORN_EXTRA
 fi

@@ -34,13 +34,13 @@ class EmbedderFactory(BaseEmbedder):
             f"config_backend={backend}, env_backend={expected_backend}"
         )
         
-        # If backend doesn't match expected, log warning and clear cache
-        if backend != expected_backend:
+        # Known fallback: universal_api -> sentence_transformer when DeepSeek (no embeddings API)
+        is_known_fallback = backend == "sentence_transformer" and expected_backend == "universal_api"
+        if backend != expected_backend and not is_known_fallback:
             logger.warning(
                 f"⚠️ Embedder backend mismatch! Config says '{backend}' but env expects '{expected_backend}'. "
                 f"This may indicate a cached instance. Cache will be cleared."
             )
-            # Clear cache for this factory class to force recreation
             try:
                 _factory_singleton.clear_cache(cls)
                 logger.info("✅ Cleared embedder factory cache")

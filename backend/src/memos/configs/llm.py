@@ -1,6 +1,6 @@
 from typing import Any, ClassVar
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, field_serializer, field_validator, model_validator
 
 from memos.configs.base import BaseConfig
 
@@ -111,6 +111,13 @@ class LLMConfigFactory(BaseConfig):
         if backend not in cls.backend_to_class:
             raise ValueError(f"Invalid backend: {backend}")
         return backend
+
+    @field_serializer("config")
+    def _serialize_config(self, value: Any) -> dict[str, Any]:
+        """Serialize config to dict for JSON/compatibility (avoids Pydantic serializer warning)."""
+        if hasattr(value, "model_dump"):
+            return value.model_dump(mode="json")
+        return value if isinstance(value, dict) else {}
 
     @model_validator(mode="after")
     def create_config(self) -> "LLMConfigFactory":
