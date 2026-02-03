@@ -858,7 +858,8 @@ class APIConfig:
                     "chat_chunker": reader_config,
                 },
             },
-            "enable_textual_memory": True,
+            "enable_textual_memory": os.getenv("ENABLE_TEXTUAL_MEMORY", "true").lower()
+            == "true",
             "enable_activation_memory": os.getenv("ENABLE_ACTIVATION_MEMORY", "false").lower()
             == "true",
             "enable_preference_memory": os.getenv("ENABLE_PREFERENCE_MEMORY", "false").lower()
@@ -895,7 +896,8 @@ class APIConfig:
         config = {
             "user_id": os.getenv("MOS_USER_ID", "default_user"),
             "session_id": os.getenv("MOS_SESSION_ID", "default_session"),
-            "enable_textual_memory": True,
+            "enable_textual_memory": os.getenv("ENABLE_TEXTUAL_MEMORY", "true").lower()
+            == "true",
             "enable_activation_memory": os.getenv("ENABLE_ACTIVATION_MEMORY", "false").lower()
             == "true",
             "enable_preference_memory": os.getenv("ENABLE_PREFERENCE_MEMORY", "false").lower()
@@ -963,7 +965,8 @@ class APIConfig:
                     "chat_chunker": reader_config,
                 },
             },
-            "enable_textual_memory": True,
+            "enable_textual_memory": os.getenv("ENABLE_TEXTUAL_MEMORY", "true").lower()
+            == "true",
             "enable_activation_memory": os.getenv("ENABLE_ACTIVATION_MEMORY", "false").lower()
             == "true",
             "enable_preference_memory": os.getenv("ENABLE_PREFERENCE_MEMORY", "false").lower()
