@@ -277,16 +277,6 @@ class AdminService:
         old_status = work.status
         work.status = status
         
-        # Record audit log
-        audit_log = AuditLog(
-            user_id=admin_id, 
-            action="update_status",
-            target_type="work",
-            target_id=work.id,
-            details={"old_status": old_status, "new_status": status}
-        )
-        self.db.add(audit_log)
-        
         await self.db.commit()
         return True
 

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from datetime import datetime
 from typing import Any
 
@@ -23,6 +23,15 @@ class AdminUserResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class SystemMonitorResponse(BaseModel):
+    cpu_percent: float
+    cpu_cores: int
+    memory: dict  # total, available, percent, used
+    disk: dict    # total, used, free, percent
+    uptime: float
+    platform: str
+    python_version: str
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -133,12 +142,21 @@ class AuditLogResponse(BaseModel):
     target_type: str | None = None
     target_id: str | None = None
     details: dict | None = None
-    ip_address: str | None = None
+    ip_address: str | Any | None = None
     user_agent: str | None = None
     created_at: datetime | None = None
 
+    @field_validator('ip_address', mode='before')
+    @classmethod
+    def serialize_ip(cls, v):
+        if v is None:
+            return None
+        return str(v)
+
     class Config:
         from_attributes = True
+        # Allow arbitrary types for ip_address serialization (IPv4Address -> str)
+        arbitrary_types_allowed = True
 
 class AuditLogListResponse(BaseModel):
     total: int

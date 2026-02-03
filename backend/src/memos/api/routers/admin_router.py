@@ -8,9 +8,14 @@ from memos.api.schemas.admin import (
     AdminLoginRequest, TokenResponse, AdminCreateRequest, AdminUserResponse,
     UserListResponse, WorkListResponse, StatusUpdateRequest,
     PromptTemplateListResponse, PromptTemplateResponse, PromptTemplateCreate, PromptTemplateUpdate,
-    SystemSettingResponse, SystemSettingUpdate, AuditLogResponse, AuditLogListResponse
+    SystemSettingResponse, SystemSettingUpdate, AuditLogResponse, AuditLogListResponse,
+    SystemMonitorResponse
 )
 from memos.api.services.admin_service import AdminService
+import psutil
+import platform as platform_info
+import sys
+import time
 
 router = APIRouter(prefix="/api/v1/admin", tags=["Admin"])
 security = HTTPBearer()
@@ -25,6 +30,49 @@ async def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(
             headers={"WWW-Authenticate": "Bearer"},
         )
     return payload.get("sub")
+
+@router.get("/system-monitor", response_model=SystemMonitorResponse)
+async def get_system_monitor(
+    admin_id: str = Depends(get_current_admin)
+):
+    # CPU
+    cpu_percent = psutil.cpu_percent(interval=None)
+    cpu_cores = psutil.cpu_count()
+    
+    # Memory
+    mem = psutil.virtual_memory()
+    memory_info = {
+        "total": mem.total,
+        "available": mem.available,
+        "percent": mem.percent,
+        "used": mem.used
+    }
+    
+    # Disk
+    disk = psutil.disk_usage('/')
+    disk_info = {
+        "total": disk.total,
+        "used": disk.used,
+        "free": disk.free,
+        "percent": disk.percent
+    }
+    
+    # Uptime
+    uptime = time.time() - psutil.boot_time()
+    
+    # Platform
+    platform_str = f"{platform_info.system()} {platform_info.release()}"
+    python_ver = sys.version.split()[0]
+    
+    return SystemMonitorResponse(
+        cpu_percent=cpu_percent,
+        cpu_cores=cpu_cores,
+        memory=memory_info,
+        disk=disk_info,
+        uptime=uptime,
+        platform=platform_str,
+        python_version=python_ver
+    )
 
 @router.get("/system-settings", response_model=list[SystemSettingResponse])
 async def get_system_settings(
