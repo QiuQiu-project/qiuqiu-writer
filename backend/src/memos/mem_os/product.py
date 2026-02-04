@@ -992,7 +992,10 @@ class MOSProduct(MOSCore):
             user_config = self._create_user_config(user_id, user_config)
 
             # Create a default cube for the user using MOSCore's methods
-            default_cube_name = f"{user_name}_{user_id}_default_cube"
+            if user_name == user_id:
+                default_cube_name = f"{user_id}_default_cube"
+            else:
+                default_cube_name = f"{user_name}_{user_id}_default_cube"
             mem_cube_name_or_path = os.path.join(CUBE_PATH, default_cube_name)
             
             # 如果 cube 目录已存在，先删除它以确保使用新配置
