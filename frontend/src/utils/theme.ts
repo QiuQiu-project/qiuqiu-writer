@@ -54,7 +54,7 @@ export const themes: ThemeConfig[] = [
     id: 'dark',
     name: '深色模式',
     colors: {
-      bgPrimary: '#1b1b1b',
+      bgPrimary: '#2f2e2eff',
       bgSecondary: '#242424',
       bgTertiary: '#2a2a2a',
       bgSidebar: '#1b1b1b',

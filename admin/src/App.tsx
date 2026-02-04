@@ -9,6 +9,7 @@ import PromptTemplates from './pages/PromptTemplates';
 import SystemSettings from './pages/SystemSettings';
 import AuditLogs from './pages/AuditLogs';
 import Cubes from './pages/Cubes';
+import Maintenance from './pages/Maintenance';
 
 // Simple Auth Guard
 const RequireAuth: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -38,6 +39,7 @@ const App: React.FC = () => {
           <Route path="cubes" element={<Cubes />} />
           <Route path="prompt-templates" element={<PromptTemplates />} />
           <Route path="system-settings" element={<SystemSettings />} />
+          <Route path="maintenance" element={<Maintenance />} />
           <Route path="audit-logs" element={<AuditLogs />} />
           <Route path="settings" element={<div>Settings (Coming Soon)</div>} />
         </Route>

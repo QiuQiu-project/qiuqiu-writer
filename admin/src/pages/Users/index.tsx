@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Card, Input, Button, Tag, Space, Modal, message, Select } from 'antd';
-import { SearchOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { Table, Card, Input, Button, Tag, Space, Modal, message, Form } from 'antd';
+import { SearchOutlined, ExclamationCircleOutlined, EditOutlined } from '@ant-design/icons';
 import request from '@/utils/request';
 
 const { confirm } = Modal;
@@ -10,6 +10,10 @@ const Users: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20, total: 0 });
   const [keyword, setKeyword] = useState('');
+  
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [editingUser, setEditingUser] = useState<any>(null);
+  const [form] = Form.useForm();
 
   const fetchUsers = async (page = 1, size = 20, search = '') => {
     setLoading(true);
@@ -40,6 +44,30 @@ const Users: React.FC = () => {
 
   const handleSearch = () => {
     fetchUsers(1, pagination.pageSize, keyword);
+  };
+
+  const handleEdit = (record: any) => {
+    setEditingUser(record);
+    form.setFieldsValue({
+      email: record.email,
+      display_name: record.display_name,
+      phone: record.phone,
+      avatar_url: record.avatar_url,
+    });
+    setIsModalVisible(true);
+  };
+
+  const handleUpdate = async () => {
+    try {
+      const values = await form.validateFields();
+      await request.put(`/admin/users/${editingUser.id}`, values);
+      message.success('User updated successfully');
+      setIsModalVisible(false);
+      fetchUsers(pagination.current, pagination.pageSize, keyword);
+    } catch (error) {
+      console.error(error);
+      message.error('Failed to update user');
+    }
   };
 
   const handleStatusChange = (record: any, newStatus: string) => {
@@ -75,6 +103,11 @@ const Users: React.FC = () => {
       key: 'display_name',
     },
     {
+      title: 'Phone',
+      dataIndex: 'phone',
+      key: 'phone',
+    },
+    {
       title: 'Role',
       dataIndex: 'role',
       key: 'role',
@@ -104,6 +137,15 @@ const Users: React.FC = () => {
       key: 'action',
       render: (_: any, record: any) => (
         <Space size="middle">
+          <Button 
+            type="primary" 
+            ghost 
+            size="small" 
+            icon={<EditOutlined />} 
+            onClick={() => handleEdit(record)}
+          >
+            Edit
+          </Button>
           {record.status !== 'banned' ? (
             <Button danger size="small" onClick={() => handleStatusChange(record, 'banned')}>
               Ban
@@ -119,27 +161,51 @@ const Users: React.FC = () => {
   ];
 
   return (
-    <Card title="User Management" extra={
-      <Space>
-        <Input 
-          placeholder="Search username/email" 
-          value={keyword} 
-          onChange={(e) => setKeyword(e.target.value)} 
-          onPressEnter={handleSearch}
-          style={{ width: 200 }} 
+    <>
+      <Card title="User Management" extra={
+        <Space>
+          <Input 
+            placeholder="Search username/email" 
+            value={keyword} 
+            onChange={(e) => setKeyword(e.target.value)} 
+            onPressEnter={handleSearch}
+            style={{ width: 200 }} 
+          />
+          <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>Search</Button>
+        </Space>
+      }>
+        <Table
+          columns={columns}
+          dataSource={data}
+          rowKey="id"
+          pagination={pagination}
+          loading={loading}
+          onChange={handleTableChange}
         />
-        <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>Search</Button>
-      </Space>
-    }>
-      <Table
-        columns={columns}
-        dataSource={data}
-        rowKey="id"
-        pagination={pagination}
-        loading={loading}
-        onChange={handleTableChange}
-      />
-    </Card>
+      </Card>
+
+      <Modal
+        title={`Edit User: ${editingUser?.username}`}
+        open={isModalVisible}
+        onOk={handleUpdate}
+        onCancel={() => setIsModalVisible(false)}
+      >
+        <Form form={form} layout="vertical">
+          <Form.Item name="email" label="Email" rules={[{ type: 'email' }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="display_name" label="Display Name">
+            <Input />
+          </Form.Item>
+          <Form.Item name="phone" label="Phone">
+            <Input />
+          </Form.Item>
+          <Form.Item name="avatar_url" label="Avatar URL">
+            <Input />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </>
   );
 };
 

@@ -136,8 +136,8 @@ export const themes: ThemeConfig[] = [
     id: 'dark',
     name: '深色模式',
     colors: {
-      bgPrimary: '#1f2937',
-      bgSecondary: '#111827',
+      bgPrimary: '#2d2e2f55',
+      bgSecondary: '#1f2937',
       bgSidebar: '#1f2937',
       bgGradientStart: '#10b981',
       bgGradientEnd: '#059669',

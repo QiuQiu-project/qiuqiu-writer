@@ -260,6 +260,59 @@ select.full-width {
   --breakpoint-tablet: 1024px;
 }
 
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* 暖黑色系 - Warm/Cocoa Black */
+    /* 背景色：基于 HSL(30, 10-20%, L) 的深色系，呈现出深咖啡/巧克力色调 */
+    --bg-primary: #1F1D1B;     /* 深暖黑/可可黑 */
+    --bg-secondary: #2C2824;   /* 稍亮的暖灰黑 */
+    --bg-tertiary: #3A3530;    /* 明显的暖灰色 */
+    --bg-sidebar: #1F1D1B;
+    
+    /* 渐变色：使用同色系 */
+    --bg-gradient-start: #1F1D1B;
+    --bg-gradient-end: #141211;
+    --bg-gradient-light: #2C2824;
+    --bg-gradient-soft: #2C2824;
+
+    /* 文字颜色：使用米白色/奶茶色系，而非冷白 */
+    --text-primary: #EAE0D5;   /* 米白/暖白 */
+    --text-secondary: #A89F91; /* 暖灰 */
+    --text-tertiary: #7D746A;  /* 深暖灰 */
+    --text-inverse: #1F1D1B;   /* 反色为深暖黑 */
+
+    /* 边框：深褐灰色 */
+    --border-color: #453F3A;
+    --border-light: #2C2824;
+    --border-hover: #5E564F;
+
+    /* 主色系：使用暖调高亮色，如浅米色或淡金 */
+    --accent-primary: #EAE0D5; /* 暖白作为强调色 */
+    --accent-color: #EAE0D5;
+    --accent-secondary: #D6C3B0;
+    --accent-tertiary: #C2A68E;
+    --accent-hover: #FFF8F0;
+    --accent-light: rgba(234, 224, 213, 0.1);
+    --accent-gradient: #EAE0D5;
+
+    /* 辅助色系：调整为暖调 */
+    --success: #A7F3D0; /* 保持，或微调为暖绿 */
+    --success-light: rgba(167, 243, 208, 0.1);
+    --warning: #FDE68A; /* 暖黄 */
+    --warning-light: rgba(253, 230, 138, 0.1);
+    --error: #FCA5A5;   /* 暖红 */
+    --error-light: rgba(252, 165, 165, 0.1);
+    --info: #A89F91;
+    --info-light: rgba(168, 159, 145, 0.1);
+
+    /* 阴影 */
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.5);
+    --shadow-xl: 0 20px 32px rgba(0, 0, 0, 0.5);
+  }
+}
+
 /* ============================================
    统一按钮样式系统
    ============================================ */

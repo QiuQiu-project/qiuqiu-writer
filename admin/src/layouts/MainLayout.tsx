@@ -12,6 +12,7 @@ import {
   SafetyCertificateOutlined,
   ToolOutlined,
   DatabaseOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 
@@ -76,6 +77,11 @@ const MainLayout: React.FC = () => {
       key: '/system-settings',
       icon: <ToolOutlined />,
       label: 'System Settings',
+    },
+    {
+      key: '/maintenance',
+      icon: <ThunderboltOutlined />,
+      label: 'Maintenance',
     },
     {
       key: '/audit-logs',

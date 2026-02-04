@@ -350,8 +350,8 @@ export default function CharacterCard({
     <div className="character-card-list">
       {/* Import Character Section */}
       {availableCharacters.length > 0 && (
-         <div className="character-import-section" style={{ marginBottom: '16px', padding: '12px', background: '#f8fafc', borderRadius: '6px', border: '1px dashed #cbd5e1' }}>
-            <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '8px' }}>快速添加角色：</div>
+         <div className="character-import-section" style={{ marginBottom: '16px', padding: '12px', background: 'var(--bg-secondary)', borderRadius: '6px', border: '1px dashed var(--border-light)' }}>
+            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px' }}>快速添加角色：</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
               {availableCharacters.map(char => (
                 <button 
@@ -360,8 +360,9 @@ export default function CharacterCard({
                   style={{ 
                     padding: '4px 10px', 
                     fontSize: '12px', 
-                    background: 'white', 
-                    border: '1px solid #e2e8f0', 
+                    background: 'var(--bg-primary)', 
+                    border: '1px solid var(--border-color)', 
+                    color: 'var(--text-primary)',
                     borderRadius: '4px',
                     cursor: 'pointer',
                     display: 'flex',
@@ -378,9 +379,9 @@ export default function CharacterCard({
                 style={{ 
                   padding: '4px 10px', 
                   fontSize: '12px', 
-                  background: '#eff6ff', 
-                  border: '1px solid #bfdbfe', 
-                  color: '#2563eb',
+                  background: 'var(--bg-primary)', 
+                  border: '1px solid var(--accent-primary)', 
+                  color: 'var(--accent-primary)',
                   borderRadius: '4px',
                   cursor: 'pointer',
                   display: 'flex',
@@ -408,7 +409,7 @@ export default function CharacterCard({
         ))}
         
         {listValue.length === 0 && (
-           <div className="empty-state" style={{ padding: '32px', textAlign: 'center', color: '#94a3b8', background: '#f8fafc', borderRadius: '8px' }}>
+           <div className="empty-state" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-tertiary)', background: 'var(--bg-secondary)', borderRadius: '8px' }}>
               <User size={32} style={{ marginBottom: '8px', opacity: 0.5 }} />
               <div>暂无角色数据</div>
            </div>
@@ -422,10 +423,10 @@ export default function CharacterCard({
           width: '100%',
           padding: '12px',
           marginTop: '16px',
-          background: '#f8fafc',
-          border: '1px dashed #cbd5e1',
+          background: 'var(--bg-secondary)',
+          border: '1px dashed var(--border-color)',
           borderRadius: '8px',
-          color: '#64748b',
+          color: 'var(--text-secondary)',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',

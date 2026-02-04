@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Eye, EyeOff } from 'lucide-react';
 import { authApi, type LoginRequest, type RegisterRequest, type UserInfo } from '../../utils/authApi';
 import './LoginModal.css';
 
@@ -13,6 +13,8 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // 登录表单
   const [loginForm, setLoginForm] = useState<LoginRequest>({
@@ -141,16 +143,26 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
             </div>
             <div className="form-group">
               <label>密码</label>
-              <input
-                type="password"
-                value={loginForm.password}
-                onChange={(e) =>
-                  setLoginForm({ ...loginForm, password: e.target.value })
-                }
-                placeholder="请输入密码"
-                required
-                disabled={loading}
-              />
+              <div className="password-input-wrapper">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={loginForm.password}
+                  onChange={(e) =>
+                    setLoginForm({ ...loginForm, password: e.target.value })
+                  }
+                  placeholder="请输入密码"
+                  required
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  className="password-toggle-btn"
+                  onClick={() => setShowPassword(!showPassword)}
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
             <button type="submit" className="login-submit-btn" disabled={loading}>
               {loading ? '登录中...' : '登录'}
@@ -198,29 +210,49 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
             </div>
             <div className="form-group">
               <label>密码</label>
-              <input
-                type="password"
-                value={registerForm.password}
-                onChange={(e) =>
-                  setRegisterForm({ ...registerForm, password: e.target.value })
-                }
-                placeholder="至少8位，包含大小写字母、数字中的至少3种"
-                required
-                disabled={loading}
-              />
+              <div className="password-input-wrapper">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={registerForm.password}
+                  onChange={(e) =>
+                    setRegisterForm({ ...registerForm, password: e.target.value })
+                  }
+                  placeholder="至少8位，包含大小写字母、数字中的至少3种"
+                  required
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  className="password-toggle-btn"
+                  onClick={() => setShowPassword(!showPassword)}
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
             <div className="form-group">
               <label>确认密码</label>
-              <input
-                type="password"
-                value={registerForm.confirm_password}
-                onChange={(e) =>
-                  setRegisterForm({ ...registerForm, confirm_password: e.target.value })
-                }
-                placeholder="请再次输入密码"
-                required
-                disabled={loading}
-              />
+              <div className="password-input-wrapper">
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={registerForm.confirm_password}
+                  onChange={(e) =>
+                    setRegisterForm({ ...registerForm, confirm_password: e.target.value })
+                  }
+                  placeholder="请再次输入密码"
+                  required
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  className="password-toggle-btn"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  tabIndex={-1}
+                >
+                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
             <button type="submit" className="login-submit-btn" disabled={loading}>
               {loading ? '注册中...' : '注册'}
