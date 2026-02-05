@@ -1,7 +1,7 @@
 .user-works-page {
   width: 100%;
   min-height: calc(100vh - 62px);
-  background: var(--bg-primary);
+  background: var(--bg-secondary);
 }
 
 /* 作品头部操作按钮（桌面端） */
@@ -20,7 +20,7 @@
   font-size: 14px;
   font-weight: 500;
   color: var(--text-primary);
-  background: var(--bg-secondary);
+  background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   cursor: pointer;
@@ -73,9 +73,7 @@
 }
 
 .user-profile-card {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
   padding: 32px;
   text-align: center;
   box-shadow: none;
@@ -89,8 +87,8 @@
 }
 
 .user-avatar-large {
-  width: 120px;
-  height: 120px;
+  width: 180px;
+  height: 180px;
   border-radius: 50%;
   background: var(--bg-secondary);
   display: flex;
@@ -139,7 +137,7 @@
   font-size: 14px;
   font-weight: 500;
   color: var(--text-secondary);
-  background: transparent;
+  background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   cursor: pointer;
@@ -270,10 +268,95 @@
   border-bottom: 1px solid var(--border-color);
 }
 
+.works-header-filters {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.works-search {
+  flex: 1;
+  min-width: 180px;
+  max-width: 360px;
+}
+
+.works-search-input {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  font-size: 14px;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.works-search-input:focus {
+  border-color: var(--text-primary);
+}
+
+.works-sort-select {
+  height: 36px;
+  padding: 0 12px;
+  font-size: 14px;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
 .works-header-right {
   display: flex;
   align-items: center;
   gap: 16px;
+}
+
+.works-create-menu {
+  position: relative;
+}
+
+.works-create-trigger {
+  background: var(--bg-primary);
+}
+
+.works-create-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 160px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 10;
+}
+
+.works-create-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 14px;
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: left;
+}
+
+.works-create-item:hover {
+  background: var(--bg-secondary);
 }
 
 .works-tabs {
@@ -344,9 +427,9 @@
 
 /* List View Spacing Optimization */
 .works-content.list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px; /* Increased spacing between items */
+  list-style: none;
+  margin: 0;
+  padding: 0;
   border: none;
   border-radius: 0;
   overflow: visible;
@@ -364,10 +447,22 @@
 }
 
 .works-content.list .work-item {
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: none;
+  border-bottom: 1px solid var(--border-color);
+  border-radius: 0;
+  background: transparent;
   box-shadow: none;
-  padding: 20px;
+  padding: 16px 8px;
+  cursor: pointer;
+}
+
+.works-content.list .work-item {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
 }
 
 .works-content.list .work-item:last-child {
@@ -380,10 +475,9 @@
   transform: none;
 }
 
-.works-content.list .work-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.works-content.list .work-item:hover {
+  background: var(--bg-secondary);
+  border-bottom-color: var(--border-hover);
 }
 
 .work-item-header {
@@ -447,6 +541,11 @@
   justify-content: space-between;
   font-size: 12px;
   color: var(--text-tertiary);
+}
+
+.works-content.list .work-item-meta {
+  width: 100%;
+  margin-top: 4px;
 }
 
 .work-item-stats {

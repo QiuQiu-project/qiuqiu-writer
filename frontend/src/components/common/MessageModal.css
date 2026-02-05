@@ -134,7 +134,7 @@
 }
 
 /* Icon colors */
-.icon-success { color: #22c55e; }
-.icon-error { color: #ef4444; }
-.icon-warning { color: #f59e0b; }
+.icon-success { color: var(--success); }
+.icon-error { color: var(--error); }
+.icon-warning { color: var(--warning); }
 .icon-info { color: var(--accent-primary, #4a90e2); }

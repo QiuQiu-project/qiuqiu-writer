@@ -18,7 +18,6 @@ export default function ThemeSelector({ onClose }: ThemeSelectorProps) {
   // 打开时根据触发按钮位置计算下拉框的 fixed 定位（避免被抽屉裁剪，手机版可见）
   useLayoutEffect(() => {
     if (!isOpen || !wrapperRef.current) {
-      setDropdownPosition(null);
       return;
     }
     const measure = () => {
@@ -196,4 +195,3 @@ export default function ThemeSelector({ onClose }: ThemeSelectorProps) {
     </div>
   );
 }
-

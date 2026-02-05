@@ -3,7 +3,7 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: white;
+  background: var(--bg-primary);
 }
 
 .outline-header {
@@ -11,13 +11,13 @@
   justify-content: space-between;
   align-items: center;
   padding: 20px 24px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border-light);
 }
 
 .outline-title {
   font-size: 18px;
   font-weight: 600;
-  color: #222222;
+  color: var(--text-primary);
   margin: 0;
 }
 
@@ -30,7 +30,7 @@
   padding: 6px 16px;
   border: none;
   background: transparent;
-  color: #666666;
+  color: var(--text-secondary);
   font-size: 14px;
   border-radius: 6px;
   cursor: pointer;
@@ -38,12 +38,13 @@
 }
 
 .tab-btn.active {
-  background: #444444;
-  color: white;
+  background: var(--text-secondary);
+  color: var(--text-inverse);
 }
 
 .tab-btn:hover:not(.active) {
-  background: #f3f4f6;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 .outline-content {
@@ -54,10 +55,11 @@
 
 .outline-sidebar {
   width: 280px;
-  border-right: 1px solid #e5e7eb;
+  border-right: 1px solid var(--border-light);
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  background: var(--bg-primary);
 }
 
 .outline-list {
@@ -83,15 +85,17 @@
   cursor: pointer;
   transition: all 0.2s ease;
   position: relative;
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 .item-header:hover {
-  background: #f3f4f6;
+  background: var(--bg-secondary);
 }
 
 .item-header.active {
-  background: #ecfdf5;
-  color: #444444;
+  background: var(--accent-light);
+  color: var(--text-primary);
   font-weight: 500;
 }
 
@@ -109,7 +113,7 @@
   padding: 0;
   border: none;
   background: transparent;
-  color: #999999;
+  color: var(--text-tertiary);
   cursor: pointer;
   border-radius: 4px;
   display: flex;
@@ -124,8 +128,8 @@
 }
 
 .item-action-btn:hover {
-  background: #e5e7eb;
-  color: #222222;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
 .chapter-item {
@@ -137,17 +141,17 @@
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  color: #666666;
+  color: var(--text-secondary);
 }
 
 .chapter-item:hover {
-  background: #f3f4f6;
-  color: #222222;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 .chapter-item.active {
-  background: #ecfdf5;
-  color: #444444;
+  background: var(--accent-light);
+  color: var(--text-primary);
   font-weight: 500;
 }
 
@@ -165,9 +169,9 @@
   gap: 8px;
   padding: 12px 16px;
   margin: 16px;
-  border: 1px dashed #cccccc;
-  background: white;
-  color: #666666;
+  border: 1px dashed var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -175,9 +179,9 @@
 }
 
 .add-volume-btn:hover {
-  border-color: #444444;
-  color: #444444;
-  background: #f0fdf4;
+  border-color: var(--text-secondary);
+  color: var(--text-primary);
+  background: var(--accent-light);
 }
 
 .outline-editor {
@@ -185,6 +189,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background: var(--bg-primary);
 }
 
 .outline-editor-content {
@@ -199,13 +204,13 @@
   justify-content: space-between;
   align-items: center;
   padding: 20px 24px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border-light);
 }
 
 .editor-header h3 {
   font-size: 16px;
   font-weight: 600;
-  color: #222222;
+  color: var(--text-primary);
   margin: 0;
 }
 
@@ -219,9 +224,9 @@
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  border: 1px solid #e5e7eb;
-  background: white;
-  color: #666666;
+  border: 1px solid var(--border-light);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
   border-radius: 6px;
   font-size: 13px;
   cursor: pointer;
@@ -229,9 +234,9 @@
 }
 
 .action-btn:hover {
-  background: #f3f4f6;
-  border-color: #cccccc;
-  color: #222222;
+  background: var(--bg-secondary);
+  border-color: var(--border-hover);
+  color: var(--text-primary);
 }
 
 .editor-body {
@@ -243,7 +248,7 @@
 .outline-text {
   font-size: 14px;
   line-height: 1.8;
-  color: #444444;
+  color: var(--text-secondary);
   white-space: pre-wrap;
   min-height: 200px;
 }
@@ -254,7 +259,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #999999;
+  color: var(--text-tertiary);
   gap: 16px;
 }
 
@@ -266,4 +271,3 @@
   font-size: 14px;
   margin: 0;
 }
-

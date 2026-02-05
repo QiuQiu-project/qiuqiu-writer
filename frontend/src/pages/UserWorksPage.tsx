@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Grid, List, BookOpen, User, Calendar, FileText, Plus, Upload } from 'lucide-react';
 import { worksApi, type Work } from '../utils/worksApi';
@@ -14,11 +14,14 @@ export default function UserWorksPage() {
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [currentPage, setCurrentPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'updated_desc' | 'updated_asc' | 'words_desc' | 'words_asc' | 'title_asc'>('updated_desc');
   const [editFormData, setEditFormData] = useState({
     display_name: '',
     bio: '',
@@ -159,6 +162,30 @@ export default function UserWorksPage() {
     setShowImportModal(false);
   };
 
+  const filteredWorks = useMemo(() => {
+    const keyword = searchQuery.trim().toLowerCase();
+    const filtered = keyword
+      ? works.filter((work) => (work.title || '').toLowerCase().includes(keyword))
+      : works;
+
+    const sorted = [...filtered].sort((a, b) => {
+      if (sortBy === 'title_asc') {
+        return (a.title || '').localeCompare(b.title || '', 'zh-CN');
+      }
+      if (sortBy === 'words_desc') {
+        return (b.word_count || 0) - (a.word_count || 0);
+      }
+      if (sortBy === 'words_asc') {
+        return (a.word_count || 0) - (b.word_count || 0);
+      }
+      const timeA = new Date(a.updated_at).getTime();
+      const timeB = new Date(b.updated_at).getTime();
+      return sortBy === 'updated_asc' ? timeA - timeB : timeB - timeA;
+    });
+
+    return sorted;
+  }, [works, searchQuery, sortBy]);
+
   // 处理编辑资料
   const handleEditProfile = () => {
     if (userInfo) {
@@ -293,9 +320,7 @@ export default function UserWorksPage() {
                   value={editFormData.bio}
                   onChange={(e) => setEditFormData({ ...editFormData, bio: e.target.value })}
                 />
-                <p className="edit-profile-hint">
-                  你可以 @提及 其他用户和组织来链接到他们。
-                </p>
+
               </div>
 
               <div className="edit-profile-actions">
@@ -321,33 +346,34 @@ export default function UserWorksPage() {
         {/* 右侧作品列表 */}
         <main className="works-main">
           <div className="works-header">
-            {isCurrentUser && (
-              <div className="works-header-actions">
-                <button 
-                  className="action-btn"
-                  onClick={handleCreateWork}
-                >
-                  <Plus size={16} />
-                  <span>创建作品</span>
-                </button>
-                <button 
-                  className="action-btn"
-                  onClick={() => setShowImportModal(true)}
-                >
-                  <Upload size={16} />
-                  <span>导入作品</span>
-                </button>
+            <div className="works-header-filters">
+              <div className="works-search">
+                <input
+                  className="works-search-input"
+                  type="text"
+                  placeholder="查找作品..."
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                />
               </div>
-            )}
+              <div className="works-sort">
+                <select
+                  className="works-sort-select"
+                  value={sortBy}
+                  onChange={(event) =>
+                    setSortBy(event.target.value as typeof sortBy)
+                  }
+                >
+                  <option value="updated_desc">更新时间（新 → 旧）</option>
+                  <option value="updated_asc">更新时间（旧 → 新）</option>
+                  <option value="words_desc">字数（多 → 少）</option>
+                  <option value="words_asc">字数（少 → 多）</option>
+                  <option value="title_asc">标题（A → Z）</option>
+                </select>
+              </div>
+            </div>
             <div className="works-header-right">
               <div className="view-toggle">
-                <button
-                  className={`view-btn ${viewMode === 'grid' ? 'active' : ''}`}
-                  onClick={() => setViewMode('grid')}
-                  title="网格视图"
-                >
-                  <Grid size={18} />
-                </button>
                 <button
                   className={`view-btn ${viewMode === 'list' ? 'active' : ''}`}
                   onClick={() => setViewMode('list')}
@@ -355,7 +381,52 @@ export default function UserWorksPage() {
                 >
                   <List size={18} />
                 </button>
+                <button
+                  className={`view-btn ${viewMode === 'grid' ? 'active' : ''}`}
+                  onClick={() => setViewMode('grid')}
+                  title="网格视图"
+                >
+                  <Grid size={18} />
+                </button>
               </div>
+              {isCurrentUser && (
+                <div className="works-create-menu">
+                  <button
+                    className="header-btn icon-only works-create-trigger"
+                    onClick={() => setShowCreateMenu((prev) => !prev)}
+                    title="创建/导入"
+                    type="button"
+                  >
+                    <Plus size={18} />
+                  </button>
+                  {showCreateMenu && (
+                    <div className="works-create-dropdown">
+                      <button
+                        type="button"
+                        className="works-create-item"
+                        onClick={() => {
+                          setShowCreateMenu(false);
+                          handleCreateWork();
+                        }}
+                      >
+                        <Plus size={16} />
+                        创建作品
+                      </button>
+                      <button
+                        type="button"
+                        className="works-create-item"
+                        onClick={() => {
+                          setShowCreateMenu(false);
+                          setShowImportModal(true);
+                        }}
+                      >
+                        <Upload size={16} />
+                        导入作品
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -369,61 +440,67 @@ export default function UserWorksPage() {
           </div>
         ) : (
           <>
-            <div className={`works-content ${viewMode}`}>
-              {works.map((work) => (
-                <div
-                  key={work.id}
-                  className="work-item"
-                  onClick={() => handleWorkClick(work)}
-                >
-                  {viewMode === 'grid' ? (
-                    <>
+            {viewMode === 'grid' ? (
+              <div className="works-content grid">
+                {filteredWorks.map((work) => (
+                  <div
+                    key={work.id}
+                    className="work-item"
+                    onClick={() => handleWorkClick(work)}
+                  >
+                    <div className="work-item-header">
+                      <h3 className="work-item-title">{work.title}</h3>
+                    </div>
+                    {work.description && (
+                      <p className="work-item-description">{work.description}</p>
+                    )}
+                    <div className="work-item-footer">
+                      <div className="work-item-stats">
+                        <span className="stat-item">
+                          <FileText size={14} />
+                          {work.word_count || 0} 字
+                        </span>
+                      </div>
+                      <span className="work-item-date">
+                        <Calendar size={14} />
+                        {formatDate(work.updated_at)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <ul className="works-content list">
+                {filteredWorks.map((work) => (
+                  <li
+                    key={work.id}
+                    className="work-item"
+                    onClick={() => handleWorkClick(work)}
+                  >
+                    <div className="work-item-main">
                       <div className="work-item-header">
                         <h3 className="work-item-title">{work.title}</h3>
                       </div>
                       {work.description && (
                         <p className="work-item-description">{work.description}</p>
                       )}
-                      <div className="work-item-footer">
-                        <div className="work-item-stats">
-                          <span className="stat-item">
-                            <FileText size={14} />
-                            {work.word_count || 0} 字
-                          </span>
-                        </div>
-                        <span className="work-item-date">
-                          <Calendar size={14} />
-                          {formatDate(work.updated_at)}
+                    </div>
+                    <div className="work-item-meta">
+                      <div className="work-item-stats">
+                        <span className="stat-item">
+                          <FileText size={14} />
+                          {work.word_count || 0} 字
                         </span>
                       </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="work-item-main">
-                        <div className="work-item-header">
-                          <h3 className="work-item-title">{work.title}</h3>
-                        </div>
-                        {work.description && (
-                          <p className="work-item-description">{work.description}</p>
-                        )}
-                      </div>
-                      <div className="work-item-meta">
-                        <div className="work-item-stats">
-                          <span className="stat-item">
-                            <FileText size={14} />
-                            {work.word_count || 0} 字
-                          </span>
-                        </div>
-                        <span className="work-item-date">
-                          <Calendar size={14} />
-                          {formatDate(work.updated_at)}
-                        </span>
-                      </div>
-                    </>
-                  )}
-                </div>
-              ))}
-            </div>
+                      <span className="work-item-date">
+                        <Calendar size={14} />
+                        {formatDate(work.updated_at)}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
 
             {total > itemsPerPage && (
               <div className="pagination">

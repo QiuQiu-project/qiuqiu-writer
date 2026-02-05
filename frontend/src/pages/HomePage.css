@@ -3,12 +3,12 @@
   width: 100%;
   min-height: calc(100vh - 62px);
   /* 使用主题色叠加背景图，保证深浅色都可读 */
-  background-color: var(--bg-primary, #ffffff);
+  background-color: var(--bg-primary);
   background-image:
     linear-gradient(
       180deg,
-      color-mix(in srgb, var(--bg-primary, #ffffff) 78%, transparent) 0%,
-      color-mix(in srgb, var(--bg-primary, #ffffff) 88%, transparent) 100%
+      color-mix(in srgb, var(--bg-primary) 78%, transparent) 0%,
+      color-mix(in srgb, var(--bg-primary) 88%, transparent) 100%
     ),
     url('../assets/background.png');
   background-size: cover;
@@ -18,7 +18,7 @@
   overflow-y: auto;
   overflow-x: hidden;
   position: relative;
-  color: var(--text-primary, #000000);
+  color: var(--text-primary);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', 'Inter', 'SF Pro Display', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -45,13 +45,13 @@
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
-  background: color-mix(in srgb, var(--bg-secondary, #f8f8f8) 55%, transparent);
+  background: color-mix(in srgb, var(--bg-secondary) 55%, transparent);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  border: 1px solid color-mix(in srgb, var(--border-light, #e0e0e0) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border-light) 55%, transparent);
   border-radius: var(--radius-full);
   font-size: 14px;
-  color: var(--text-primary, #000000);
+  color: var(--text-primary);
   margin-bottom: 24px;
   font-weight: 500;
   box-shadow: var(--shadow-md);
@@ -61,29 +61,29 @@
   font-size: 64px;
   font-weight: 800;
   line-height: 1.1;
-  color: var(--text-primary, #000000);
+  color: var(--text-primary);
   margin: 0 0 20px 0;
   display: flex;
   flex-direction: column;
   gap: 16px;
   letter-spacing: -0.03em;
-  text-shadow: 0 2px 8px color-mix(in srgb, var(--bg-primary, #ffffff) 20%, transparent);
+  text-shadow: 0 2px 8px color-mix(in srgb, var(--bg-primary) 20%, transparent);
 }
 
 .hero-subtitle {
   font-size: 28px;
   font-weight: 400;
-  color: var(--text-secondary, #333333);
+  color: var(--text-secondary);
   letter-spacing: -0.01em;
-  text-shadow: 0 1px 4px color-mix(in srgb, var(--bg-primary, #ffffff) 16%, transparent);
+  text-shadow: 0 1px 4px color-mix(in srgb, var(--bg-primary) 16%, transparent);
 }
 
 .hero-description {
   font-size: 20px;
   line-height: 1.7;
-  color: var(--text-secondary, #333333);
+  color: var(--text-secondary);
   margin: 0 0 40px 0;
-  text-shadow: 0 1px 4px color-mix(in srgb, var(--bg-primary, #ffffff) 16%, transparent);
+  text-shadow: 0 1px 4px color-mix(in srgb, var(--bg-primary) 16%, transparent);
 }
 
 .hero-actions {
@@ -109,32 +109,32 @@
 }
 
 .landing-page .btn-primary {
-  color: var(--text-inverse, #ffffff) !important;
-  background: var(--accent-primary, #000000) !important;
+  color: var(--text-inverse) !important;
+  background: var(--accent-primary) !important;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid color-mix(in srgb, var(--border-light, #e0e0e0) 70%, transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--border-light) 70%, transparent) !important;
   box-shadow: var(--shadow-md) !important;
 }
 
 .landing-page .btn-primary:hover {
-  background: var(--accent-hover, #333333) !important;
-  border-color: var(--border-hover, #d0d0d0) !important;
+  background: var(--accent-hover) !important;
+  border-color: var(--border-hover) !important;
   transform: translateY(-2px);
   box-shadow: var(--shadow-lg) !important;
 }
 
 .btn-secondary {
-  color: var(--text-primary, #000000);
-  background: color-mix(in srgb, var(--bg-secondary, #f8f8f8) 55%, transparent);
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--bg-secondary) 55%, transparent);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  border: 1px solid color-mix(in srgb, var(--border-light, #e0e0e0) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border-light) 55%, transparent);
 }
 
 .btn-secondary:hover {
-  background: color-mix(in srgb, var(--bg-tertiary, #f4f4f4) 65%, transparent);
-  border-color: var(--border-hover, #d0d0d0);
+  background: color-mix(in srgb, var(--bg-tertiary) 65%, transparent);
+  border-color: var(--border-hover);
   transform: translateY(-1px);
   box-shadow: var(--shadow-md);
 }
@@ -164,18 +164,18 @@
 .section-title {
   font-size: 42px;
   font-weight: 700;
-  color: var(--text-primary, #000000);
+  color: var(--text-primary);
   margin: 0 0 20px 0;
   letter-spacing: -0.02em;
-  text-shadow: 0 2px 8px color-mix(in srgb, var(--bg-primary, #ffffff) 20%, transparent);
+  text-shadow: 0 2px 8px color-mix(in srgb, var(--bg-primary) 20%, transparent);
 }
 
 .section-description {
   font-size: 18px;
-  color: var(--text-secondary, #333333);
+  color: var(--text-secondary);
   margin: 0;
   line-height: 1.7;
-  text-shadow: 0 1px 4px color-mix(in srgb, var(--bg-primary, #ffffff) 16%, transparent);
+  text-shadow: 0 1px 4px color-mix(in srgb, var(--bg-primary) 16%, transparent);
 }
 
 .features-grid {
@@ -186,10 +186,10 @@
 
 .feature-card {
   padding: 32px;
-  background: color-mix(in srgb, var(--bg-secondary, #fafafa) 78%, transparent);
+  background: color-mix(in srgb, var(--bg-secondary) 78%, transparent);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid color-mix(in srgb, var(--border-light, #e0e0e0) 70%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border-light) 70%, transparent);
   border-radius: var(--radius-sm);
   transition: all var(--transition-base);
   box-shadow: var(--shadow-lg);
@@ -197,7 +197,7 @@
 
 .feature-card:hover {
   border-color: var(--accent-primary);
-  background: color-mix(in srgb, var(--bg-secondary, #fafafa) 90%, transparent);
+  background: color-mix(in srgb, var(--bg-secondary) 90%, transparent);
   box-shadow: var(--shadow-xl);
   transform: translateY(-4px);
 }
@@ -208,7 +208,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--accent-light, rgba(0, 0, 0, 0.03));
+  background: var(--accent-light);
   border-radius: var(--radius-sm);
   color: var(--accent-primary);
   margin-bottom: 20px;
@@ -218,14 +218,14 @@
 .feature-title {
   font-size: 20px;
   font-weight: 600;
-  color: var(--text-primary, #000000);
+  color: var(--text-primary);
   margin: 0 0 8px 0;
 }
 
 .feature-description {
   font-size: 15px;
   line-height: 1.6;
-  color: var(--text-secondary, #333333);
+  color: var(--text-secondary);
   margin: 0;
 }
 
@@ -244,10 +244,10 @@
 
 .use-case-card {
   padding: 40px;
-  background: color-mix(in srgb, var(--bg-secondary, #fafafa) 78%, transparent);
+  background: color-mix(in srgb, var(--bg-secondary) 78%, transparent);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid color-mix(in srgb, var(--border-light, #e0e0e0) 70%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border-light) 70%, transparent);
   border-radius: var(--radius-lg);
   transition: all var(--transition-base);
   box-shadow: var(--shadow-lg);
@@ -255,7 +255,7 @@
 
 .use-case-card:hover {
   border-color: var(--accent-primary);
-  background: color-mix(in srgb, var(--bg-secondary, #fafafa) 90%, transparent);
+  background: color-mix(in srgb, var(--bg-secondary) 90%, transparent);
   box-shadow: var(--shadow-xl);
   transform: translateY(-6px);
 }
@@ -269,7 +269,7 @@
 .use-case-title {
   font-size: 24px;
   font-weight: 600;
-  color: var(--text-primary, #000000);
+  color: var(--text-primary);
   margin: 0 0 20px 0;
 }
 
@@ -287,7 +287,7 @@
   align-items: center;
   gap: 8px;
   font-size: 15px;
-  color: var(--text-secondary, #333333);
+  color: var(--text-secondary);
 }
 
 .use-case-list svg {

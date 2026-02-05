@@ -41,8 +41,8 @@
 
 .custom-select-trigger:focus {
   outline: none;
-  border-color: var(--accent-primary, #666666);
-  box-shadow: 0 0 0 3px rgba(102, 102, 102, 0.1);
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px var(--accent-light);
 }
 
 .custom-select-trigger:disabled {
@@ -81,7 +81,7 @@
   background: var(--bg-primary, #ffffff);
   border: 1px solid var(--border-light, #e0e0e0);
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-md);
   z-index: 9999;
   overflow: hidden;
   animation: slideDown 0.2s ease-out;
@@ -131,13 +131,13 @@
 }
 
 .custom-select-option.selected {
-  background: var(--accent-light, rgba(102, 102, 102, 0.1));
-  color: var(--accent-primary, #666666);
+  background: var(--accent-light);
+  color: var(--accent-primary);
   font-weight: 500;
 }
 
 .custom-select-option.selected:hover:not(:disabled) {
-  background: var(--accent-light, rgba(102, 102, 102, 0.15));
+  background: var(--accent-light);
 }
 
 .custom-select-option.disabled {
@@ -194,4 +194,3 @@
     max-height: 50vh;
   }
 }
-

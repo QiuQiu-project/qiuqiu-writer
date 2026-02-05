@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Trash2, Sparkles, Info, Menu, X, MessageSquare, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { ArrowLeft, Trash2, Info, Menu, X, MessageSquare, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import UnderlineExtension from '@tiptap/extension-underline';
@@ -57,8 +57,6 @@ export default function NovelEditorPage(){
   const [showWordCountTooltip, setShowWordCountTooltip] = useState(false);
   // 章节名编辑状态
   const chapterNameInputRef = useRef<HTMLDivElement>(null);
-  // 分析本书状态
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   
   // 存储所有章节数据（用于计算章节号）
   const [allChapters, setAllChapters] = useState<Chapter[]>([]);
@@ -80,6 +78,9 @@ export default function NovelEditorPage(){
   
   // 数据更新触发器
   const [updateTrigger, setUpdateTrigger] = useState(0);
+  
+  // 分析本书状态（仅用于触发渲染，不读取值）
+  const [, setIsAnalyzing] = useState(false);
 
   // 消息提示状态
   const [messageState, setMessageState] = useState<{

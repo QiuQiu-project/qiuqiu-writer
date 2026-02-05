@@ -149,6 +149,7 @@ export default function MainLayout() {
 
   const isHomePage = location.pathname === '/';
   const isMyProfilePage = userInfo && location.pathname === `/users/${userInfo.id}`;
+  const isUserWorksPage = location.pathname.startsWith('/users/');
   const needLoginPrompt = !isAuthenticated && (location.state as { needLogin?: boolean })?.needLogin;
 
   return (
@@ -193,13 +194,15 @@ export default function MainLayout() {
           <div className="header-right">
             {isAuthenticated ? (
               <>
-                <button
-                  className="header-btn icon-only"
-                  onClick={handleCreateWork}
-                  title="创建新作品"
-                >
-                  <Plus size={18} />
-                </button>
+                {!isUserWorksPage && (
+                  <button
+                    className="header-btn icon-only"
+                    onClick={handleCreateWork}
+                    title="创建新作品"
+                  >
+                    <Plus size={18} />
+                  </button>
+                )}
                 <div className="user-menu-wrapper" ref={userMenuRef}>
                   <button
                     className="user-avatar-btn"

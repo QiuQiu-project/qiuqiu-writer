@@ -6,7 +6,7 @@
   flex-direction: column;
   height: 100%;
   border-radius: 12px;
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  box-shadow: var(--shadow-md);
 }
 
 /* 移动端样式 */
@@ -91,7 +91,7 @@
 
 .chat-clear-btn:hover {
   background: var(--bg-secondary);
-  color: #666666;
+  color: var(--text-secondary);
 }
 
 .planet-avatar {
@@ -240,7 +240,7 @@
 }
 
 .user-avatar {
-  background: linear-gradient(135deg, #666666 0%, #444444 100%);
+  background: linear-gradient(135deg, var(--text-tertiary) 0%, var(--text-secondary) 100%);
 }
 
 .user-icon {
@@ -265,7 +265,7 @@
 
 .user-bubble {
   background: var(--accent-primary);
-  color: white;
+  color: var(--text-inverse);
   border-bottom-right-radius: 4px;
 }
 
@@ -350,7 +350,7 @@
 }
 
 .markdown-content code {
-  background: rgba(0, 0, 0, 0.1);
+  background: var(--bg-tertiary);
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 0.9em;
@@ -358,7 +358,7 @@
 }
 
 .markdown-content pre {
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--bg-tertiary);
   padding: 12px;
   border-radius: 8px;
   overflow-x: auto;
@@ -605,15 +605,15 @@
 }
 
 .mention-chapter {
-  background: rgba(153, 153, 153, 0.15);
-  color: #999999;
-  border: 1px solid rgba(153, 153, 153, 0.3);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
 }
 
 .mention-character {
-  background: rgba(139, 92, 246, 0.15);
-  color: #999999;
-  border: 1px solid rgba(139, 92, 246, 0.3);
+  background: var(--accent-light);
+  color: var(--accent-primary);
+  border: 1px solid var(--accent-light);
 }
 
 .chat-input:focus {
@@ -643,7 +643,7 @@
   gap: 6px;
   padding: 8px 16px;
   background: var(--accent-primary);
-  color: white;
+  color: var(--text-inverse);
   border: 1px solid var(--accent-primary);
   border-radius: var(--radius-sm);
   font-size: 14px;
@@ -682,10 +682,10 @@
 
 .chat-error {
   padding: 10px 12px;
-  background: rgba(102, 102, 102, 0.1);
-  border: 1px solid rgba(102, 102, 102, 0.3);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
-  color: #666666;
+  color: var(--text-secondary);
   font-size: 13px;
   margin-top: 8px;
   animation: shake 0.3s ease-in-out;
@@ -771,4 +771,3 @@
   background: var(--bg-primary);
   color: var(--accent-primary);
 }
-

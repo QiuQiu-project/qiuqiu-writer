@@ -309,13 +309,13 @@
 }
 
 .save-status.saved {
-  background: #dcfce7;
-  color: #16a34a;
+  background: var(--success-light);
+  color: var(--success);
 }
 
 .save-status.unsaved {
-  background: #fef3c7;
-  color: #d97706;
+  background: var(--warning-light);
+  color: var(--warning);
 }
 
 .save-btn {
@@ -330,10 +330,10 @@
   max-height: 36px !important;
   padding: 0 !important;
   margin: 0;
-  background: #000000;
+  background: var(--accent-primary);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
-  color: #ffffff;
+  color: var(--text-inverse);
   cursor: pointer;
   transition: all var(--transition-base);
   flex-shrink: 0 !important;
@@ -915,10 +915,10 @@
   align-items: center;
   gap: 5px;
   padding: 6px 12px;
-  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-  border: 1px solid #fcd34d;
+  background: var(--warning-light);
+  border: 1px solid var(--warning);
   border-radius: 8px;
-  color: #92400e;
+  color: var(--warning);
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
@@ -926,13 +926,14 @@
 }
 
 .comp-generate-btn:hover {
-  background: linear-gradient(135deg, #fde68a 0%, #fcd34d 100%);
+  background: var(--warning-light);
   transform: translateY(-1px);
-  box-shadow: 0 3px 10px rgba(252, 211, 77, 0.4);
+  box-shadow: var(--shadow-sm);
+  opacity: 0.9;
 }
 
 .comp-generate-btn svg {
-  color: #d97706;
+  color: var(--warning);
 }
 
 .comp-delete-btn {
@@ -951,8 +952,8 @@
 }
 
 .comp-delete-btn:hover {
-  background: #fef2f2;
-  color: #666666;
+  background: var(--error-light);
+  color: var(--text-secondary);
 }
 
 .comp-actions {
@@ -985,15 +986,15 @@
 }
 
 .comp-del:hover {
-  background: #fef2f2;
-  color: #666666;
+  background: var(--error-light);
+  color: var(--text-secondary);
 }
 
 /* 文本输入包装容器 */
 .comp-input-wrapper {
   width: 100%;
   max-width: 100%;
-  background: #ffffff;
+  background: var(--bg-primary);
   border-radius: 6px;
   overflow: hidden;
   box-sizing: border-box;
@@ -1003,7 +1004,7 @@
 .comp-textarea-wrapper {
   width: 100%;
   max-width: 100%;
-  background: #ffffff;
+  background: var(--bg-primary);
   border-radius: 6px;
   overflow: hidden;
   box-sizing: border-box;
@@ -1322,9 +1323,9 @@
 }
 
 .list-del:hover {
-  background: #fef2f2;
-  color: #ef4444;
-  border-color: #fca5a5;
+  background: var(--error-light);
+  color: var(--error);
+  border-color: var(--error);
 }
 
 .list-add {
@@ -1409,8 +1410,8 @@
 }
 
 .kv-header button:hover {
-  background: #fef2f2;
-  color: #ef4444;
+  background: var(--error-light);
+  color: var(--error);
 }
 
 .kv-value {
@@ -1881,7 +1882,7 @@
 }
 
 .timeline-character-tag-remove:hover {
-  background: var(--bg-hover);
+  background: var(--bg-tertiary);
   color: var(--text-secondary);
 }
 
@@ -2098,8 +2099,8 @@
 
 .delete-btn:hover {
   opacity: 1;
-  color: #ef4444 !important;
-  background: #fef2f2 !important;
+  color: var(--error) !important;
+  background: var(--error-light) !important;
 }
 
 .add-field-section {

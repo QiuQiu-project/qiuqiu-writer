@@ -4,6 +4,7 @@
   display: flex;
   flex-direction: column;
   background: var(--bg-primary);
+  color: var(--text-primary);
   overflow: hidden;
   position: fixed;
   top: 0;
@@ -355,9 +356,9 @@
   align-items: center;
   gap: 4px;
   padding: 6px 12px;
-  background: #fef3c7;
+  background: var(--warning-light);
   border-radius: 6px;
-  color: #92400e;
+  color: var(--warning);
   font-size: 14px;
   font-weight: 600;
 }
@@ -365,7 +366,7 @@
 .member-btn {
   padding: 6px 12px;
   border: none;
-  background: #444444;
+  background: var(--accent-primary);
   color: white;
   font-size: 13px;
   border-radius: 6px;
@@ -374,7 +375,7 @@
 }
 
 .member-btn:hover {
-  background: #333333;
+  background: var(--accent-hover);
 }
 
 /* 第二行工具栏 - 编辑器工具 */
@@ -513,14 +514,14 @@
 }
 
 .sidebar-toggle-btn-header.collapsed {
-  background: var(--primary-color, #444444);
+  background: var(--accent-primary);
   color: white;
-  border-color: var(--primary-color, #444444);
+  border-color: var(--accent-primary);
   box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
 }
 
 .sidebar-toggle-btn-header.collapsed:hover {
-  background: var(--primary-hover, #1d4ed8);
+  background: var(--accent-hover);
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
   transform: translateY(-1px);
 }
@@ -562,7 +563,7 @@
   display: flex;
   flex-direction: column;
   overflow: visible;
-  background: white;
+  background: var(--bg-primary);
   min-height: 0; /* 允许 flex 子元素缩小 */
   min-width: 0; /* 允许 flex 子元素缩小 */
   width: 100%;
@@ -626,7 +627,7 @@
 }
 
 .toolbar-btn.active {
-  background: var(--primary-color, #444444);
+  background: var(--accent-primary);
   color: white;
 }
 
@@ -654,8 +655,8 @@
   top: calc(100% + 4px);
   left: 0;
   min-width: 160px;
-  background: white;
-  border: 1px solid #e5e7eb;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   z-index: 10001;
@@ -681,8 +682,8 @@
   width: 100%;
   padding: 8px 12px;
   border: none;
-  background: white;
-  color: #444444;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
   font-size: 13px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -690,34 +691,34 @@
 }
 
 .toolbar-dropdown-item:hover {
-  background: #f3f4f6;
-  color: #222222;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 .toolbar-dropdown-item.active {
-  background: #eff6ff;
-  color: #1e40af;
+  background: var(--accent-light);
+  color: var(--accent-primary);
 }
 
 .toolbar-dropdown-item.active .heading-label {
-  color: #1e40af;
+  color: var(--accent-primary);
   font-weight: 700;
 }
 
 .toolbar-dropdown-item.active .heading-preview {
-  color: #1e40af;
+  color: var(--accent-primary);
   font-weight: 500;
 }
 
 .toolbar-dropdown-item .heading-label {
   font-weight: 600;
-  color: #666666;
+  color: var(--text-secondary);
   min-width: 32px;
 }
 
 .toolbar-dropdown-item .heading-preview {
   flex: 1;
-  color: #444444;
+  color: var(--text-secondary);
 }
 
 .toolbar-dropdown-divider {
@@ -730,22 +731,22 @@
 .ai-writing-prompt {
   margin: 20px 24px;
   padding: 16px;
-  background: linear-gradient(135deg, #ecfdf5 0%, #e0e0e0 100%);
+  background: var(--success-light);
   border-radius: 12px;
-  border: 1px solid #a7f3d0;
+  border: 1px solid var(--success);
 }
 
 .ai-writing-prompt p {
   margin: 0;
   font-size: 14px;
-  color: #065f46;
+  color: var(--success);
   font-weight: 500;
 }
 
 .ai-writing-prompt .sub-text {
   margin-top: 4px;
   font-size: 12px;
-  color: #047857;
+  color: var(--success);
 }
 
 /* AI写作按钮 */
@@ -761,9 +762,9 @@
   align-items: center;
   gap: 8px;
   padding: 10px 20px;
-  border: 1px solid #444444;
-  background: white;
-  color: #444444;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
   border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
@@ -772,17 +773,17 @@
 }
 
 .ai-btn.primary {
-  background: #444444;
+  background: var(--accent-primary);
   color: white;
 }
 
 .ai-btn:hover {
-  background: #ecfdf5;
+  background: var(--bg-secondary);
   transform: translateY(-1px);
 }
 
 .ai-btn.primary:hover {
-  background: #333333;
+  background: var(--accent-hover);
 }
 
 /* 设置栏 */
@@ -804,15 +805,15 @@
   border: none;
   background: transparent;
   cursor: pointer;
-  color: #444444;
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
 }
 
 .beta-tag {
   padding: 2px 6px;
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--warning-light);
+  color: var(--warning);
   border-radius: 4px;
   font-size: 11px;
   font-weight: 600;
@@ -867,7 +868,7 @@
   display: block;
   font-size: clamp(16px, 1rem + 0.2vw, 20px);
   line-height: 1.8;
-  color: #222222;
+  color: var(--text-primary);
 }
 
 .novel-editor-content p {
@@ -951,7 +952,7 @@
 /* 顶部导航栏中的保存和设置按钮 */
 .header-right .primary-btn {
   padding: 8px 16px;
-  background: var(--primary-color, #444444);
+  background: var(--accent-primary);
   color: white;
   border: none;
   border-radius: 6px;
@@ -965,7 +966,7 @@
 }
 
 .header-right .primary-btn:hover {
-  background: var(--primary-hover, #1d4ed8);
+  background: var(--accent-hover);
 }
 
 .chapter-settings-btn-header {
@@ -1934,4 +1935,3 @@
     }
   }
 }
-

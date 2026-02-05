@@ -3,7 +3,7 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: white;
+  background: var(--bg-primary);
   overflow: hidden;
   min-height: 0;
 }
@@ -113,22 +113,22 @@
 }
 
 .toolbar-btn.active {
-  background: var(--primary-color, #444444);
-  color: white;
-  border-color: var(--primary-color, #444444);
+  background: var(--accent-primary);
+  color: var(--text-inverse);
+  border-color: var(--accent-primary);
 }
 
 .toolbar-btn.active svg {
-  color: white;
+  color: var(--text-inverse);
 }
 
 .toolbar-btn.active span {
-  color: white;
+  color: var(--text-inverse);
 }
 
 .toolbar-btn.active:hover {
-  background: var(--primary-color-hover, #1d4ed8);
-  border-color: var(--primary-color-hover, #1d4ed8);
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 .toolbar-btn:disabled {
@@ -141,23 +141,24 @@
 .ai-writing-prompt {
   margin: 20px 24px;
   padding: 16px;
-  background: linear-gradient(135deg, #ecfdf5 0%, #e0e0e0 100%);
+  background: var(--success-light);
   border-radius: 12px;
-  border: 1px solid #a7f3d0;
+  border: 1px solid var(--success);
   flex-shrink: 0;
 }
 
 .ai-writing-prompt p {
   margin: 0;
   font-size: 14px;
-  color: #065f46;
+  color: var(--success);
   font-weight: 500;
 }
 
 .ai-writing-prompt .sub-text {
   margin-top: 4px;
   font-size: 12px;
-  color: #047857;
+  color: var(--success);
+  opacity: 0.8;
 }
 
 /* AI写作按钮 */
@@ -174,9 +175,9 @@
   align-items: center;
   gap: 8px;
   padding: 10px 20px;
-  border: 1px solid #444444;
-  background: white;
-  color: #444444;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-primary);
   border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
@@ -185,17 +186,19 @@
 }
 
 .ai-btn.primary {
-  background: #444444;
-  color: white;
+  background: var(--accent-primary);
+  color: var(--text-inverse);
+  border-color: var(--accent-primary);
 }
 
 .ai-btn:hover {
-  background: #ecfdf5;
+  background: var(--bg-secondary);
   transform: translateY(-1px);
 }
 
 .ai-btn.primary:hover {
-  background: #333333;
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 /* 设置栏 */
@@ -266,9 +269,10 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #ffffff;
+  background: var(--bg-primary);
   box-sizing: border-box;
 }
+
 
 /* EditorContent 生成的容器样式 */
 .novel-editor-wrapper > div {

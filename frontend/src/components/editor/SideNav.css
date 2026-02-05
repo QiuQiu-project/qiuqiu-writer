@@ -7,7 +7,7 @@
   padding: 12px 0;
   overflow-y: auto;
   border-radius: 12px;
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  box-shadow: var(--shadow-md);
 }
 
 .nav-section {
@@ -249,7 +249,7 @@
 
 .nav-sort-btn.reversed:hover {
   background: var(--accent-primary);
-  color: white;
+  color: var(--text-inverse);
 }
 
 .nav-toggle-btn {
@@ -503,8 +503,8 @@
 }
 
 .nav-chapter-analyze-btn:hover {
-  background: rgba(139, 92, 246, 0.1);
-  color: #999999;
+  background: var(--accent-light);
+  color: var(--accent-primary);
   transform: scale(1.1);
 }
 
@@ -515,8 +515,8 @@
 }
 
 .nav-chapter-delete-btn:hover {
-  background: rgba(102, 102, 102, 0.1);
-  color: #666666;
+  background: var(--error-light);
+  color: var(--error);
   transform: scale(1.1);
 }
 
@@ -536,7 +536,7 @@
   flex: 1;
   padding: 6px 10px;
   border: 1px solid var(--accent-primary);
-  background: white;
+  background: var(--bg-primary);
   color: var(--text-primary);
   font-size: 13px;
   border-radius: 4px;
