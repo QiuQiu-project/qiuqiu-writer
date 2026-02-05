@@ -326,14 +326,16 @@ export default function UserWorksPage() {
 
               <div className="edit-profile-actions">
                 <button
-                  className="action-btn"
+                  type="button"
+                  className="edit-profile-save-btn"
                   onClick={handleSaveProfile}
                   disabled={saving}
                 >
                   {saving ? '保存中...' : '保存'}
                 </button>
                 <button
-                  className="action-btn"
+                  type="button"
+                  className="edit-profile-cancel-btn"
                   onClick={handleCancelEdit}
                   disabled={saving}
                 >

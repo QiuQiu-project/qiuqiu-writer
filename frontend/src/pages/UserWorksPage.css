@@ -247,8 +247,52 @@
   border-top: 1px solid var(--border-color);
 }
 
-.edit-profile-actions .action-btn {
+.edit-profile-save-btn,
+.edit-profile-cancel-btn {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.edit-profile-save-btn {
+  color: var(--text-inverse);
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.edit-profile-save-btn:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.edit-profile-save-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.edit-profile-cancel-btn {
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+.edit-profile-cancel-btn:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+}
+
+.edit-profile-cancel-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 /* 右侧作品列表 */
@@ -745,7 +789,8 @@
     flex-direction: column;
   }
 
-  .edit-profile-actions .action-btn {
+  .edit-profile-save-btn,
+  .edit-profile-cancel-btn {
     width: 100%;
   }
 }
