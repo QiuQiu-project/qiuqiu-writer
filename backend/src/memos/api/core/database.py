@@ -90,7 +90,7 @@ async def init_db():
         from memos.api.models import (
             user, work, chapter, template, volume,
             characters, writing, system, document, prompt_template,
-            admin  # Register Admin model
+            admin, yjs_document  # Register all models
         )
 
         # 创建所有表

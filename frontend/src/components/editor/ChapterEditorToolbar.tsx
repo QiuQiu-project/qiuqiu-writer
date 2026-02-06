@@ -92,17 +92,25 @@ export default function ChapterEditorToolbar({
     };
   }, [editor]);
 
+  // Collaboration extension replaces built-in History, so undo/redo may not exist.
+  // Safely check capabilities to avoid runtime errors.
+  const canUndo = (() => {
+    try { return editor?.can().undo() ?? false; } catch { return false; }
+  })();
+  const canRedo = (() => {
+    try { return editor?.can().redo() ?? false; } catch { return false; }
+  })();
+
   return (
     <div className="novel-editor-toolbar">
       <div className="toolbar-group">
         <button
           className="toolbar-btn"
           onClick={() => {
-            // 关键修复：每个章节有独立的编辑器实例，直接执行撤销即可
             if (!editor) return;
-            editor.chain().focus().undo().run();
+            try { editor.chain().focus().undo().run(); } catch { /* no history */ }
           }}
-          disabled={!editor?.can().undo()}
+          disabled={!canUndo}
           title="撤销"
         >
           <Undo2 size={16} />
@@ -110,11 +118,10 @@ export default function ChapterEditorToolbar({
         <button
           className="toolbar-btn"
           onClick={() => {
-            // 关键修复：每个章节有独立的编辑器实例，直接执行重做即可
             if (!editor) return;
-            editor.chain().focus().redo().run();
+            try { editor.chain().focus().redo().run(); } catch { /* no history */ }
           }}
-          disabled={!editor?.can().redo()}
+          disabled={!canRedo}
           title="重做"
         >
           <Redo2 size={16} />

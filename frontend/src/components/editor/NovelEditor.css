@@ -429,3 +429,48 @@
   line-height: 1.8;
 }
 
+/* ===== 协作光标样式 ===== */
+
+/* 远程用户的光标 */
+.collaboration-cursor__caret {
+  border-left: 2px solid;
+  border-right: none;
+  margin-left: -1px;
+  margin-right: -1px;
+  pointer-events: none;
+  position: relative;
+  word-break: normal;
+  animation: cursorBlink 1.2s ease-in-out infinite;
+}
+
+@keyframes cursorBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* 光标上方的用户名标签 */
+.collaboration-cursor__label {
+  border-radius: 4px 4px 4px 0;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  font-style: normal;
+  line-height: 1;
+  padding: 2px 6px;
+  position: absolute;
+  top: -1.6em;
+  left: -1px;
+  user-select: none;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0.9;
+  transition: opacity 0.2s ease;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+  z-index: 10;
+}
+
+/* 远程用户的文本选择高亮 */
+.collaboration-cursor__selection {
+  opacity: 0.15;
+}
+

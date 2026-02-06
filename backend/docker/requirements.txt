@@ -161,3 +161,4 @@ xlsxwriter==3.2.5
 asyncpg>=0.29.0
 python-jose[cryptography]>=3.3.0
 bcrypt>=4.0.0
+pycrdt>=0.12.0

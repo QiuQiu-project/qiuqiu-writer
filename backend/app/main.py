@@ -16,8 +16,10 @@ from contextlib import asynccontextmanager
 from memos.api.core.config import get_settings
 from memos.api.core.database import init_db, close_db
 from memos.api.routers import auth_router, chapters_router, templates_router, works_router, volumes_router, admin_router
+from memos.api.routers import yjs_router
 from memos.api.core.redis import get_redis
 from memos.api.services.sharedb_service import ShareDBService
+from memos.api.services.yjs_ws_handler import yjs_ws_manager
 
 sharedb_service = ShareDBService()
 
@@ -66,6 +68,10 @@ async def lifespan(app: FastAPI):
     logger.info("WriterAI应用关闭中...")
 
     try:
+        # 持久化所有 Yjs 文档
+        await yjs_ws_manager.shutdown()
+        logger.info("Yjs文档已保存")
+
         await close_db()
         logger.info("数据库连接已关闭")
 
@@ -301,6 +307,8 @@ api_router.include_router(templates_router.router)
 api_router.include_router(volumes_router.router)
 api_router.include_router(works_router.router)
 app.include_router(api_router)
+# Yjs router already has /api/v1/yjs prefix, add directly to app
+app.include_router(yjs_router.router)
 
 
 async def warmup_system_data():

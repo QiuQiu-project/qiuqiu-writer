@@ -12,6 +12,7 @@ from memos.api.models.writing import WritingPrompt, AIAnalysis
 from memos.api.models.system import SystemSetting, AuditLog
 from memos.api.models.document import DocumentSyncHistory
 from memos.api.models.prompt_template import PromptTemplate
+from memos.api.models.yjs_document import YjsDocument
 
 __all__ = [
     "User", "UserProfile",
@@ -23,5 +24,6 @@ __all__ = [
     "WritingPrompt", "AIAnalysis",
     "SystemSetting", "AuditLog",
     "DocumentSyncHistory",
-    "PromptTemplate"
+    "PromptTemplate",
+    "YjsDocument",
 ]

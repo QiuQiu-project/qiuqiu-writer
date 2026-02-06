@@ -1,0 +1,50 @@
+"""
+Y-WebSocket Router
+
+Provides WebSocket endpoints for Yjs real-time collaborative editing.
+Compatible with the y-websocket npm package's WebsocketProvider.
+
+Usage from frontend:
+  new WebsocketProvider('ws://server/api/v1/yjs', roomName, ydoc)
+  → connects to ws://server/api/v1/yjs/{roomName}
+"""
+
+import logging
+from typing import Optional
+
+from fastapi import APIRouter, WebSocket
+
+from memos.api.services.yjs_ws_handler import yjs_ws_manager
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/api/v1/yjs", tags=["yjs"])
+
+
+@router.websocket("/{room_name}")
+async def yjs_websocket(
+    websocket: WebSocket,
+    room_name: str,
+    token: Optional[str] = None,
+):
+    """
+    Y-WebSocket endpoint for real-time collaboration.
+
+    Room name format: "work_{id}_chapter_{id}"
+    Optional query param: ?token=xxx for authentication
+
+    The endpoint speaks the standard y-websocket binary protocol:
+    - Sync messages (type 0): document state synchronization
+    - Awareness messages (type 1): cursor position relay
+    """
+    await websocket.accept()
+
+    # TODO: Add token-based authentication here
+    # if token:
+    #     user = await verify_token(token)
+    #     if not user:
+    #         await websocket.close(code=1008, reason="Invalid token")
+    #         return
+
+    logger.info(f"[YjsRouter] New connection for room: {room_name}")
+    await yjs_ws_manager.handle_connection(websocket, room_name)

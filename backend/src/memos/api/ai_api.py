@@ -117,6 +117,36 @@ try:
 except Exception as e:
     logger.warning(f"⚠️  ShareDB router not available: {e}", exc_info=True)
 
+# 注册 Yjs WebSocket 路由（实时协作编辑）
+try:
+    from memos.api.routers.yjs_router import router as yjs_router
+    app.include_router(yjs_router)
+    logger.info("✅ Yjs WebSocket router registered successfully")
+except Exception as e:
+    logger.warning(f"⚠️  Yjs WebSocket router not available: {e}", exc_info=True)
+
+# Yjs 数据表初始化：启动时确保 yjs_documents 表存在
+@app.on_event("startup")
+async def startup_yjs_table():
+    try:
+        from memos.api.core.database import engine, Base
+        from memos.api.models.yjs_document import YjsDocument  # noqa: F401 - register model
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("✅ Database tables ensured (including yjs_documents)")
+    except Exception as e:
+        logger.error(f"❌ Failed to ensure database tables: {e}")
+
+# Yjs 文档持久化：应用关闭时保存所有活跃房间
+@app.on_event("shutdown")
+async def shutdown_yjs():
+    try:
+        from memos.api.services.yjs_ws_handler import yjs_ws_manager
+        await yjs_ws_manager.shutdown()
+        logger.info("✅ Yjs documents persisted on shutdown")
+    except Exception as e:
+        logger.error(f"❌ Failed to persist Yjs documents: {e}")
+
 # 异常处理
 app.exception_handler(ValueError)(APIExceptionHandler.value_error_handler)
 app.exception_handler(Exception)(APIExceptionHandler.global_exception_handler)

@@ -40,3 +40,7 @@ def get_admin_router():
     from memos.api.routers.admin_router import router
     return router
 
+def get_yjs_router():
+    from memos.api.routers.yjs_router import router
+    return router
+
