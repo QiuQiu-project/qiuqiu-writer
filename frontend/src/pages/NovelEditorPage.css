@@ -82,6 +82,29 @@
   position: relative;
 }
 
+/* tooltip：桌面端一行，移动端两行避免看不完 */
+.word-count-tooltip .word-count-tooltip-line {
+  display: inline;
+}
+.word-count-tooltip .word-count-tooltip-sep {
+  margin: 0 4px;
+}
+@media (max-width: 768px) {
+  .word-count-tooltip {
+    white-space: normal;
+    max-width: min(280px, 85vw);
+  }
+  .word-count-tooltip .word-count-tooltip-line {
+    display: block;
+  }
+  .word-count-tooltip .word-count-tooltip-line:not(:first-child) {
+    margin-top: 4px;
+  }
+  .word-count-tooltip .word-count-tooltip-sep {
+    display: none;
+  }
+}
+
 .work-title {
   font-size: 16px;
   font-weight: 600;
@@ -1267,6 +1290,13 @@
   font-size: 13px;
   color: var(--text-secondary, #666666);
   gap: 0;
+}
+
+/* 移动端：字数已显示在 header，编辑器内章节头下方字数隐藏 */
+@media (max-width: 768px) {
+  .chapter-meta-word-count-hidden-on-mobile .word-count {
+    display: none;
+  }
 }
 
 .chapter-name {

@@ -566,7 +566,11 @@ export default function NovelEditorPage() {
                     className="word-count-tooltip"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    总字数: {work?.word_count || 0}
+                    {selectedChapter != null && (
+                      <span className="word-count-tooltip-line">本章字数：{currentChapterWordCount} 字</span>
+                    )}
+                    {selectedChapter != null && <span className="word-count-tooltip-sep">　</span>}
+                    <span className="word-count-tooltip-line">总字数：{work?.word_count ?? 0} 字</span>
                   </div>
                 )}
               </span>
@@ -811,7 +815,7 @@ export default function NovelEditorPage() {
                         >
                           {chaptersData[selectedChapter].title || '未命名章节'}
                         </h2>
-                        <div className="chapter-meta">
+                        <div className="chapter-meta chapter-meta-word-count-hidden-on-mobile">
                           <span className="word-count">
                             {currentChapterWordCount} 字
                           </span>
