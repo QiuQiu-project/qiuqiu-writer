@@ -62,6 +62,8 @@ export interface UseYjsEditorOptions {
   documentId: string;
   /** 初始内容（HTML） */
   initialContent?: string;
+  /** 当 Yjs 片段为空时从后端拉取内容（如导入作品后的章节），返回 HTML 或 null */
+  fetchInitialContent?: (documentId: string) => Promise<string | null>;
   /** 占位符文本 */
   placeholder?: string;
   /** 是否可编辑 */
@@ -94,6 +96,7 @@ export function useYjsEditor(options: UseYjsEditorOptions): UseYjsEditorReturn {
   const {
     documentId,
     initialContent,
+    fetchInitialContent,
     placeholder = '开始写作...支持 Markdown 格式，如 **粗体**、*斜体*、`代码`、# 标题等',
     editable = true,
     onUpdate,
@@ -119,6 +122,8 @@ export function useYjsEditor(options: UseYjsEditorOptions): UseYjsEditorReturn {
   // 保留一个 ref 给 syncToServer/loadFromServer 回调使用
   const wsProviderRef = useRef<WebsocketProvider | null>(null);
   const isInitialized = useRef(false);
+  const documentIdRef = useRef<string>(documentId);
+  documentIdRef.current = documentId;
 
   // ===== 初始化：同一作品共用一个 WebSocket，按章节使用不同 field =====
   useEffect(() => {
@@ -235,14 +240,39 @@ export function useYjsEditor(options: UseYjsEditorOptions): UseYjsEditorReturn {
     onCreate: ({ editor: ed }) => {
       console.log('✨ [useYjsEditor] 编辑器已创建');
 
-      // 如果有初始内容且当前章节 fragment 为空，设置初始内容
-      if (initialContent && !isInitialized.current && collabState) {
-        const xmlFragment = collabState.ydoc.getXmlFragment(collabState.field);
-        if (xmlFragment.length === 0) {
-          console.log('📝 [useYjsEditor] 设置初始内容');
-          ed.commands.setContent(initialContent);
-          isInitialized.current = true;
-        }
+      if (!collabState) return;
+      const xmlFragment = collabState.ydoc.getXmlFragment(collabState.field);
+      if (xmlFragment.length > 0) return; // 已有内容（IndexedDB/WebSocket），不覆盖
+      if (isInitialized.current) return;
+
+      const loadingField = collabState.field;
+
+      const applyContent = (html: string) => {
+        if (!html || isInitialized.current) return;
+        // 仍为同一章节且 fragment 仍为空时再写入（避免切换章节后旧请求覆盖新章节）
+        const frag = collabState?.ydoc.getXmlFragment(loadingField);
+        if (collabState?.field !== loadingField || (frag && frag.length > 0)) return;
+        ed.commands.setContent(html);
+        isInitialized.current = true;
+        console.log('📝 [useYjsEditor] 已从后端注入初始内容');
+      };
+
+      if (initialContent) {
+        applyContent(initialContent);
+        isInitialized.current = true;
+        return;
+      }
+
+      if (fetchInitialContent) {
+        const docIdFetchedFor = documentId;
+        fetchInitialContent(docIdFetchedFor)
+          .then((html) => {
+            if (documentIdRef.current !== docIdFetchedFor) return;
+            applyContent(html || '');
+          })
+          .catch((err) => {
+            console.warn('⚠️ [useYjsEditor] 从后端拉取初始内容失败:', err);
+          });
       }
     },
     onUpdate: ({ editor: ed }) => {

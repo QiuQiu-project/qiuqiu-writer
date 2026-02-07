@@ -145,6 +145,22 @@ export default function NovelEditorPage() {
   
   const { editor, syncToServer } = useYjsEditor({
     documentId,
+    fetchInitialContent: async (docId) => {
+      const m = docId.match(/^work_(.+?)_chapter_(.+)$/);
+      if (!m) return null;
+      const chapterId = parseInt(m[2], 10);
+      if (Number.isNaN(chapterId)) return null;
+      try {
+        const res = await chaptersApi.getChapterDocument(chapterId);
+        const content = res?.content;
+        if (content && typeof content === 'string') {
+          return content;
+        }
+        return null;
+      } catch {
+        return null;
+      }
+    },
     placeholder: '开始写作...支持 Markdown 格式，如 **粗体**、*斜体*、`代码`、# 标题等',
     editable: true,
     onUpdate: (content) => {
@@ -569,7 +585,7 @@ export default function NovelEditorPage() {
                     {selectedChapter != null && (
                       <span className="word-count-tooltip-line">本章字数：{currentChapterWordCount} 字</span>
                     )}
-                    {selectedChapter != null && <span className="word-count-tooltip-sep">　</span>}
+                    {selectedChapter != null && <span className="word-count-tooltip-sep"> </span>}
                     <span className="word-count-tooltip-line">总字数：{work?.word_count ?? 0} 字</span>
                   </div>
                 )}
