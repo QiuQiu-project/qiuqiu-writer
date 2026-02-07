@@ -606,13 +606,9 @@ export default function NovelEditorPage() {
                 >
                   <Trash2 size={16} />
                 </button>
-                <button 
-                  className="action-btn" 
-                  onClick={() => setMobileMenuOpen(false)}
-                  title="主题"
-                >
-                  <ThemeSelector />
-                </button>
+                <div className="action-btn theme-selector-header-wrap" title="主题">
+                  <ThemeSelector onClose={() => setMobileMenuOpen(false)} />
+                </div>
               </div>
               <div className="sidebar-toggle-buttons">
                 <button

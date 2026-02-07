@@ -325,6 +325,36 @@
   white-space: nowrap;
 }
 
+/* header 内操作按钮统一尺寸与风格（删除、主题等保持一致） */
+.header-actions .theme-selector-header-wrap {
+  padding: 0;
+  border-radius: 8px;
+  height: 36px;
+  display: inline-flex;
+  align-items: stretch;
+}
+.header-actions .theme-selector-header-wrap .theme-selector-trigger,
+.header-actions .action-btn {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 12px;
+  gap: 6px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+.header-actions .theme-selector-header-wrap .theme-selector-trigger {
+  padding: 0 12px;
+}
+.header-actions .theme-selector-header-wrap .theme-selector-trigger:hover {
+  background: var(--bg-secondary, #f8f8f8);
+  color: var(--text-primary, #000000);
+}
+
 .action-btn {
   padding: 8px 12px;
   border: none;
@@ -1309,16 +1339,19 @@
   animation: spin 1s linear infinite;
 }
 
-/* 删除作品按钮 */
-.delete-work-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--error, #666666);
+/* 删除作品按钮：与主题按钮风格一致，仅图标为红色 */
+.header-actions .delete-work-btn {
+  color: var(--text-secondary, #666666);
 }
-
-.delete-work-btn:hover {
-  background: var(--error-light, rgba(102, 102, 102, 0.1));
+.header-actions .delete-work-btn svg {
+  color: var(--error, #dc2626);
+}
+.header-actions .delete-work-btn:hover {
+  background: var(--error-light, rgba(220, 38, 38, 0.1));
+  color: var(--text-primary, #000000);
+}
+.header-actions .delete-work-btn:hover svg {
+  color: var(--error, #dc2626);
 }
 
 /* 分析进度覆盖层 */
