@@ -1209,6 +1209,45 @@
   line-height: 1.4;
 }
 
+/* 章节标题编辑框：与作品名编辑框样式一致 */
+.editor-with-header .chapter-title {
+  font-size: 32px;
+  font-weight: 600;
+  color: var(--text-primary, #000000);
+  margin: 0 0 4px 0;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: text;
+  outline: none;
+  transition: all 0.2s ease;
+  min-width: 100px;
+  min-height: 1.4em;
+  display: inline-block;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.editor-with-header .chapter-title:focus {
+  border: none;
+  box-shadow: none;
+  padding: 4px 8px;
+}
+.editor-with-header .chapter-title:empty::before {
+  content: '未命名章节';
+  color: var(--text-tertiary, #999999);
+  font-style: italic;
+}
+
+/* 字数位置：紧贴章节标题下方，弱化展示 */
+.editor-with-header .chapter-meta {
+  margin-top: 4px;
+}
+.editor-with-header .chapter-meta .word-count {
+  font-size: 13px;
+  color: var(--text-secondary, #666666);
+  gap: 0;
+}
+
 .chapter-name {
   font-size: 20px;
   font-weight: 600;
