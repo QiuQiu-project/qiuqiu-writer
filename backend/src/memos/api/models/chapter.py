@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 
 from sqlalchemy import (
-    Column, Integer, String, Boolean, DateTime, Text, JSON,
+    Column, Integer, String, Boolean, DateTime, Text, JSON, LargeBinary,
     Index, ForeignKey
 )
 from sqlalchemy.orm import relationship
@@ -167,6 +167,30 @@ Index("idx_chapter_versions_chapter", ChapterVersion.chapter_id)
 Index("idx_chapter_versions_version", ChapterVersion.version_number)
 Index("idx_chapter_versions_created_by", ChapterVersion.created_by)
 Index("idx_chapter_versions_chapter_version", ChapterVersion.chapter_id, ChapterVersion.version_number)
+
+
+class ChapterYjsSnapshot(Base):
+    """章节 Yjs 原生快照表（Git 式版本历史，存 Y.encodeStateAsUpdate 的二进制）"""
+
+    __tablename__ = "chapter_yjs_snapshots"
+
+    id = Column(Integer, primary_key=True, index=True)
+    chapter_id = Column(Integer, ForeignKey("chapters.id", ondelete="CASCADE"), nullable=False, index=True)
+    label = Column(String(200), nullable=True)
+    snapshot = Column(LargeBinary, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+    def to_meta_dict(self) -> Dict[str, Any]:
+        """仅元数据，不含二进制"""
+        return {
+            "id": self.id,
+            "chapter_id": self.chapter_id,
+            "label": self.label,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+Index("idx_chapter_yjs_snapshots_chapter", ChapterYjsSnapshot.chapter_id)
 
 
 # 复合索引

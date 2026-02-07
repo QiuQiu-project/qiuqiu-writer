@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import and_, or_
 import json
 import asyncio
+import base64
 from datetime import datetime
 from memos.api.core.database import get_async_db
 from memos.api.core.security import get_current_user_id
@@ -474,6 +475,81 @@ async def restore_chapter(
     )
     restored = await chapter_service.get_chapter_by_id(chapter_id)
     return restored.to_dict()
+
+
+# Yjs 原生快照（Git 式版本历史）
+@router.get("/{chapter_id}/yjs-snapshots")
+async def list_yjs_snapshots(
+    chapter_id: int,
+    page: int = Query(1, ge=1),
+    size: int = Query(50, ge=1, le=100),
+    db: AsyncSession = Depends(get_db_session),
+    current_user_id: str = Depends(get_current_user_id),
+) -> Dict[str, Any]:
+    """列出章节的 Yjs 快照（仅元数据）"""
+    chapter_service = ChapterService(db)
+    chapter = await chapter_service.get_chapter_by_id(chapter_id)
+    if not chapter:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="章节不存在")
+    if not await chapter_service.can_access_work(user_id=current_user_id, work_id=chapter.work_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权限")
+    snapshots, total = await chapter_service.list_yjs_snapshots(chapter_id, page=page, size=size)
+    return {
+        "snapshots": [s.to_meta_dict() for s in snapshots],
+        "total": total,
+        "page": page,
+        "size": size,
+    }
+
+
+@router.post("/{chapter_id}/yjs-snapshots")
+async def create_yjs_snapshot(
+    chapter_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db_session),
+    current_user_id: str = Depends(get_current_user_id),
+) -> Dict[str, Any]:
+    """创建 Yjs 快照，body: { snapshot: base64, label?: string }"""
+    body = await request.json()
+    snapshot_b64 = body.get("snapshot")
+    if not snapshot_b64:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="缺少 snapshot (base64)")
+    try:
+        snapshot_bytes = base64.b64decode(snapshot_b64)
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="snapshot 需为合法 base64")
+    chapter_service = ChapterService(db)
+    chapter = await chapter_service.get_chapter_by_id(chapter_id)
+    if not chapter:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="章节不存在")
+    if not await chapter_service.can_edit_work(user_id=current_user_id, work_id=chapter.work_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权限")
+    label = body.get("label")
+    row = await chapter_service.create_yjs_snapshot(chapter_id, snapshot_bytes, label=label)
+    return row.to_meta_dict()
+
+
+@router.get("/{chapter_id}/yjs-snapshots/{snapshot_id}")
+async def get_yjs_snapshot(
+    chapter_id: int,
+    snapshot_id: int,
+    db: AsyncSession = Depends(get_db_session),
+    current_user_id: str = Depends(get_current_user_id),
+) -> Dict[str, Any]:
+    """获取单个 Yjs 快照（含 base64 二进制，用于恢复）"""
+    chapter_service = ChapterService(db)
+    chapter = await chapter_service.get_chapter_by_id(chapter_id)
+    if not chapter:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="章节不存在")
+    if not await chapter_service.can_access_work(user_id=current_user_id, work_id=chapter.work_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权限")
+    row = await chapter_service.get_yjs_snapshot(chapter_id, snapshot_id)
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="快照不存在")
+    return {
+        **row.to_meta_dict(),
+        "snapshot": base64.b64encode(row.snapshot).decode("ascii"),
+    }
 
 
 # 版本管理

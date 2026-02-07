@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "diff": "^8.0.0",
     "@antv/g6": "^5.0.50",
     "@antv/g6-extension-react": "^0.2.6",
     "@tiptap/extension-collaboration": "^3.0.0",

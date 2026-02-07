@@ -42,6 +42,10 @@
   flex-wrap: nowrap;
 }
 
+.toolbar-group-end {
+  margin-left: auto;
+}
+
 .toolbar-divider {
   width: 1px;
   height: 20px;

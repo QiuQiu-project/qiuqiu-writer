@@ -43,6 +43,7 @@ import { syncManager } from '../utils/syncManager';
 import { countCharacters } from '../utils/textUtils';
 import { generateChapterContent } from '../utils/bookAnalysisApi';
 import { chaptersApi } from '../utils/chaptersApi';
+import { createYjsSnapshotFromEditor, restoreYjsSnapshotToEditor, getTextFromProsemirrorJSON } from '../utils/yjsSnapshot';
 
 // 样式
 import '../components/editor/NovelEditor.css';
@@ -822,6 +823,7 @@ export default function NovelEditorPage() {
                         editor={editor}
                         onManualSave={handleManualSave}
                         onEditChapter={handleEditCurrentChapter}
+                        onOpenHistory={() => setIsHistoryModalOpen(true)}
                         headingMenuOpen={headingMenuOpen}
                         setHeadingMenuOpen={setHeadingMenuOpen}
                       />
@@ -830,38 +832,28 @@ export default function NovelEditorPage() {
                     {/* 章节头部 */}
                     {selectedChapter && chaptersData[selectedChapter] && (
                       <div className="chapter-header-info">
-                        <div className="chapter-header-title-row">
-                          <div
-                            ref={chapterNumberInputRef}
-                            className="chapter-number chapter-number-editable"
-                            contentEditable
-                            suppressContentEditableWarning
-                            onBlur={handleSaveChapterNumber}
-                            onKeyDown={handleChapterNumberKeyDown}
-                            title="点击编辑章节号"
-                            data-placeholder={chaptersData[selectedChapter].volumeTitle || '第1章'}
-                          >
-                            {getChapterNumberDisplayText(chaptersData[selectedChapter])}
-                          </div>
-                          <h2
-                            ref={chapterNameInputRef}
-                            className="chapter-title"
-                            contentEditable
-                            suppressContentEditableWarning
-                            onBlur={handleSaveChapterName}
-                            onKeyDown={handleChapterNameKeyDown}
-                          >
-                            {chaptersData[selectedChapter].title || '未命名章节'}
-                          </h2>
-                          <button
-                            type="button"
-                            className="chapter-history-btn"
-                            onClick={() => setIsHistoryModalOpen(true)}
-                            title="历史记录"
-                          >
-                            历史
-                          </button>
+                        <div
+                          ref={chapterNumberInputRef}
+                          className="chapter-number chapter-number-editable"
+                          contentEditable
+                          suppressContentEditableWarning
+                          onBlur={handleSaveChapterNumber}
+                          onKeyDown={handleChapterNumberKeyDown}
+                          title="点击编辑章节号"
+                          data-placeholder={chaptersData[selectedChapter].volumeTitle || '第1章'}
+                        >
+                          {getChapterNumberDisplayText(chaptersData[selectedChapter])}
                         </div>
+                        <h2
+                          ref={chapterNameInputRef}
+                          className="chapter-title"
+                          contentEditable
+                          suppressContentEditableWarning
+                          onBlur={handleSaveChapterName}
+                          onKeyDown={handleChapterNameKeyDown}
+                        >
+                          {chaptersData[selectedChapter].title || '未命名章节'}
+                        </h2>
                       </div>
                     )}
                     
@@ -1046,6 +1038,21 @@ export default function NovelEditorPage() {
         chapterId={selectedChapter}
         chapterTitle={selectedChapter && chaptersData[selectedChapter] ? chaptersData[selectedChapter].title : undefined}
         onClose={() => setIsHistoryModalOpen(false)}
+        getCurrentContent={editor ? () => getTextFromProsemirrorJSON(editor.getJSON()) : undefined}
+        onCreateVersion={editor && selectedChapter ? async () => {
+          const chapterIdNum = parseInt(selectedChapter!, 10);
+          if (Number.isNaN(chapterIdNum)) return;
+          const base64 = createYjsSnapshotFromEditor(editor!);
+          await chaptersApi.createYjsSnapshot(chapterIdNum, base64);
+          showMessage('版本已创建', 'success');
+        } : undefined}
+        onRestore={editor && selectedChapter ? async (snapshotId) => {
+          const chapterIdNum = parseInt(selectedChapter!, 10);
+          if (Number.isNaN(chapterIdNum)) return;
+          const data = await chaptersApi.getYjsSnapshot(chapterIdNum, snapshotId);
+          restoreYjsSnapshotToEditor(editor!, data.snapshot);
+          showMessage('已恢复到此版本', 'success');
+        } : undefined}
       />
       
       {/* 消息提示 */}

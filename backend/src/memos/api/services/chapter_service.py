@@ -8,7 +8,7 @@ from sqlalchemy import and_, or_, desc, asc, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.future import select
 
-from memos.api.models.chapter import Chapter, ChapterVersion
+from memos.api.models.chapter import Chapter, ChapterVersion, ChapterYjsSnapshot
 from memos.api.models.work import Work, WorkCollaborator
 from memos.api.models.system import AuditLog
 
@@ -275,3 +275,38 @@ class ChapterService:
 
         self.db.add(audit_log)
         await self.db.commit()
+
+    async def create_yjs_snapshot(self, chapter_id: int, snapshot: bytes, label: Optional[str] = None) -> ChapterYjsSnapshot:
+        """创建章节 Yjs 快照（存 Y.encodeStateAsUpdate 的二进制）"""
+        row = ChapterYjsSnapshot(chapter_id=chapter_id, snapshot=snapshot, label=label)
+        self.db.add(row)
+        await self.db.commit()
+        await self.db.refresh(row)
+        return row
+
+    async def list_yjs_snapshots(
+        self, chapter_id: int, page: int = 1, size: int = 50
+    ) -> Tuple[List[ChapterYjsSnapshot], int]:
+        """列出章节的 Yjs 快照（仅元数据，不含二进制）"""
+        conditions = [ChapterYjsSnapshot.chapter_id == chapter_id]
+        count_stmt = select(func.count(ChapterYjsSnapshot.id)).where(and_(*conditions))
+        total = (await self.db.execute(count_stmt)).scalar() or 0
+        stmt = (
+            select(ChapterYjsSnapshot)
+            .where(and_(*conditions))
+            .order_by(ChapterYjsSnapshot.created_at.desc())
+            .offset((page - 1) * size)
+            .limit(size)
+        )
+        result = await self.db.execute(stmt)
+        rows = result.scalars().all()
+        return list(rows), total
+
+    async def get_yjs_snapshot(self, chapter_id: int, snapshot_id: int) -> Optional[ChapterYjsSnapshot]:
+        """获取单个 Yjs 快照（含二进制，用于恢复）"""
+        stmt = select(ChapterYjsSnapshot).where(
+            ChapterYjsSnapshot.id == snapshot_id,
+            ChapterYjsSnapshot.chapter_id == chapter_id,
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()

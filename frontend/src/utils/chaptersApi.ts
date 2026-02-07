@@ -319,6 +319,41 @@ class ChaptersApiClient extends BaseApiClient {
     );
   }
 
+  /** Yjs 原生快照（Git 式版本）列表 */
+  async listYjsSnapshots(
+    chapterId: number,
+    page?: number,
+    size?: number
+  ): Promise<{ snapshots: YjsSnapshotMeta[]; total: number; page: number; size: number }> {
+    return this.get(`/api/v1/chapters/${chapterId}/yjs-snapshots`, { page, size });
+  }
+
+  /** 创建 Yjs 快照，snapshot 为 base64 编码的 Y.encodeStateAsUpdate 结果 */
+  async createYjsSnapshot(
+    chapterId: number,
+    snapshotBase64: string,
+    label?: string
+  ): Promise<YjsSnapshotMeta> {
+    return this.post(`/api/v1/chapters/${chapterId}/yjs-snapshots`, {
+      snapshot: snapshotBase64,
+      label: label || undefined,
+    });
+  }
+
+  /** 获取单个 Yjs 快照（含 snapshot base64，用于恢复） */
+  async getYjsSnapshot(
+    chapterId: number,
+    snapshotId: number
+  ): Promise<YjsSnapshotMeta & { snapshot: string }> {
+    return this.get(`/api/v1/chapters/${chapterId}/yjs-snapshots/${snapshotId}`);
+  }
+}
+
+export interface YjsSnapshotMeta {
+  id: number;
+  chapter_id: number;
+  label: string | null;
+  created_at: string | null;
 }
 
 export const chaptersApi = new ChaptersApiClient();

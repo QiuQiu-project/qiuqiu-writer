@@ -209,6 +209,18 @@ CREATE TABLE chapter_versions (
 CREATE INDEX idx_chapter_versions_chapter ON chapter_versions(chapter_id);
 ```
 
+#### chapter_yjs_snapshots 表（Yjs 原生快照，Git 式版本历史）
+```sql
+CREATE TABLE chapter_yjs_snapshots (
+    id SERIAL PRIMARY KEY,
+    chapter_id INTEGER REFERENCES chapters(id) ON DELETE CASCADE NOT NULL,
+    label VARCHAR(200),
+    snapshot BYTEA NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+CREATE INDEX idx_chapter_yjs_snapshots_chapter ON chapter_yjs_snapshots(chapter_id);
+```
+
 ### 5. 角色和世界观管理
 
 #### characters 表

@@ -1223,40 +1223,6 @@
   position: relative;
 }
 
-.editor-with-header .chapter-header-title-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  position: relative;
-}
-
-.editor-with-header .chapter-header-title-row .chapter-number,
-.editor-with-header .chapter-header-title-row .chapter-title {
-  flex: 0 1 auto;
-}
-
-.chapter-history-btn {
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  padding: 6px 12px;
-  font-size: 13px;
-  color: var(--text-tertiary);
-  background: transparent;
-  border: 1px solid var(--border-light);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.chapter-history-btn:hover {
-  color: var(--accent-primary);
-  border-color: var(--accent-primary);
-  background: var(--accent-light);
-}
 
 .chapter-number {
   font-size: 13px;

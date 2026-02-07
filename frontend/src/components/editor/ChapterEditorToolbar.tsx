@@ -1,11 +1,12 @@
 import { useRef, useEffect, useState } from 'react';
 import { Editor } from '@tiptap/react';
-import { Undo2, Redo2, Save, Heading, Bold, Underline, ChevronDown, Settings } from 'lucide-react';
+import { Undo2, Redo2, Save, Heading, Bold, Underline, ChevronDown, Settings, History } from 'lucide-react';
 
 interface ChapterEditorToolbarProps {
   editor: Editor | null;
   onManualSave: () => void;
   onEditChapter?: () => void;
+  onOpenHistory?: () => void;
   headingMenuOpen: boolean;
   setHeadingMenuOpen: (open: boolean) => void;
 }
@@ -14,6 +15,7 @@ export default function ChapterEditorToolbar({
   editor,
   onManualSave,
   onEditChapter,
+  onOpenHistory,
   headingMenuOpen,
   setHeadingMenuOpen,
 }: ChapterEditorToolbarProps) {
@@ -262,7 +264,7 @@ export default function ChapterEditorToolbar({
         </button>
       </div>
       <div className="toolbar-divider" />
-      <div className="toolbar-group">
+      <div className="toolbar-group toolbar-group-end">
         <button
           className="toolbar-btn"
           onClick={onManualSave}
@@ -277,6 +279,16 @@ export default function ChapterEditorToolbar({
             title="章节设置"
           >
             <Settings size={16} />
+          </button>
+        )}
+        {onOpenHistory && (
+          <button
+            type="button"
+            className="toolbar-btn"
+            onClick={onOpenHistory}
+            title="历史记录"
+          >
+            <History size={16} />
           </button>
         )}
       </div>
