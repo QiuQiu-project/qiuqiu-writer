@@ -4,6 +4,7 @@ import { streamChatMessage } from '../../utils/chatApi';
 import type { ChatMessage, ContinueChapterResult } from '../../utils/chatApi';
 import { formatOutlineSummary } from '../../utils/outlineFormat';
 import { authApi } from '../../utils/authApi';
+import { getAvatarInitial } from '../../utils/avatarUtils';
 import { chaptersApi, type Chapter } from '../../utils/chaptersApi';
 import { worksApi } from '../../utils/worksApi';
 import MarkdownIt from 'markdown-it';
@@ -103,6 +104,9 @@ export default function AIAssistant({
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [characters, setCharacters] = useState<CharacterFromMetadata[]>([]);
   const mentionMenuRef = useRef<HTMLDivElement>(null);
+
+  const user = authApi.getUserInfo();
+  const userInitial = getAvatarInitial(user?.username, user?.display_name);
 
   // 检查登录状态
   useEffect(() => {
@@ -901,7 +905,9 @@ export default function AIAssistant({
       <div className="chat-content">
           <div className="chat-header">
             <div className="planet-avatar">
-              <span className="planet-icon">🌍</span>
+              <span className="planet-icon">
+                <img src="/favicon.png" width={50} height={50} alt="球球" />
+              </span>
             </div>
             <div className="planet-greeting">
               <p className="greeting-text">
@@ -937,7 +943,9 @@ export default function AIAssistant({
                 >
                   {msg.role === 'assistant' && (
                     <div className="chat-message-avatar">
-                      <span className="planet-icon-small">🌍</span>
+                        <span className="planet-icon-small">
+                          <img src="/favicon.png" width={50} height={50} alt="球球" />
+                        </span>
                     </div>
                   )}
                   <div className="chat-message-content">
@@ -1001,7 +1009,7 @@ export default function AIAssistant({
                   </div>
                   {msg.role === 'user' && (
                     <div className="chat-message-avatar user-avatar">
-                      <span className="user-icon">👤</span>
+                      <span className="user-avatar-initial" aria-hidden>{userInitial}</span>
                     </div>
                   )}
                 </div>
@@ -1010,7 +1018,9 @@ export default function AIAssistant({
             {isSending && (
               <div className="chat-message chat-message-assistant">
                 <div className="chat-message-avatar">
-                  <span className="planet-icon-small">🌍</span>
+                  <span className="planet-icon-small">
+                    <img src="/favicon.png" width={50} height={50} alt="球球" />
+                  </span>
                 </div>
                 <div className="chat-message-content">
                   <div className="chat-message-bubble assistant-bubble chat-message-loading">
