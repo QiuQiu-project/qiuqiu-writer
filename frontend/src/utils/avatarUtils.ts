@@ -6,7 +6,7 @@
 /**
  * 生成默认头像URL（基于用户名首字母）
  * @param username 用户名
- * @param displayName 显示名称（可选）
+ * @param displayName 昵称（可选）
  * @returns 默认头像URL（使用UI Avatars服务）
  */
 export function getDefaultAvatarUrl(
@@ -31,7 +31,7 @@ export function getDefaultAvatarUrl(
  * 获取用户头像URL（如果有自定义头像则使用，否则使用默认头像）
  * @param avatarUrl 用户自定义头像URL（可选）
  * @param username 用户名
- * @param displayName 显示名称（可选）
+ * @param displayName 昵称（可选）
  * @returns 头像URL
  */
 export function getUserAvatarUrl(
@@ -54,7 +54,7 @@ export function getUserAvatarUrl(
 /**
  * 获取用户头像的首字母（用于占位符）
  * @param username 用户名
- * @param displayName 显示名称（可选）
+ * @param displayName 昵称（可选）
  * @returns 首字母
  */
 export function getAvatarInitial(

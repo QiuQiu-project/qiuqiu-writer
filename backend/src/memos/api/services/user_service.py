@@ -45,7 +45,7 @@ class UserService:
             username: 用户名
             email: 邮箱
             password: 密码
-            display_name: 显示名称
+            display_name: 昵称
             **kwargs: 其他用户信息
 
         Returns:

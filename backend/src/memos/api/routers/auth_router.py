@@ -31,7 +31,7 @@ security = HTTPBearer()
 settings = get_settings()
 
 
-@router.post("/register", response_model=AuthResponse)
+@router.post("/register", response_model=TokenResponse)
 async def register(
     request: RegisterRequest,
     db: AsyncSession = Depends(get_async_db)
@@ -121,16 +121,22 @@ async def register(
         str(session_data)
     )
 
-    return AuthResponse(
-        success=True,
-        message="注册成功",
-        data={
-            "user": user,
-            "access_token": access_token,
-            "refresh_token": refresh_token,
-            "token_type": "bearer",
-            "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
-        }
+    # 与登录接口返回格式一致，便于前端直接使用 response.access_token / response.user
+    user_info = {
+        "id": user.get("id"),
+        "username": user.get("username"),
+        "email": user.get("email"),
+        "display_name": user.get("display_name"),
+        "status": user.get("status"),
+        "created_at": user.get("created_at"),
+        "updated_at": user.get("updated_at"),
+    }
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_type="bearer",
+        user=user_info,
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
 
 

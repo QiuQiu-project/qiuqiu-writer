@@ -96,7 +96,7 @@ class RegisterRequest(BaseModel):
     def validate_display_name(cls, v):
         if v is not None:
             if len(v) < 1 or len(v) > 100:
-                raise ValueError("显示名称长度必须在1-100个字符之间")
+                raise ValueError("昵称长度必须在1-100个字符之间")
         return v
 
     @validator("bio")
@@ -232,7 +232,7 @@ class UpdateProfileRequest(BaseModel):
     def validate_display_name(cls, v):
         if v is not None:
             if len(v) < 1 or len(v) > 100:
-                raise ValueError("显示名称长度必须在1-100个字符之间")
+                raise ValueError("昵称长度必须在1-100个字符之间")
         return v
 
     @validator("bio")

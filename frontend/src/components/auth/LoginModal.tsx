@@ -173,20 +173,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         ) : (
           <form className="login-form" onSubmit={handleRegister}>
             <div className="form-group">
-              <label>邀请码</label>
-              <input
-                type="text"
-                value={registerForm.invitation_code}
-                onChange={(e) =>
-                  setRegisterForm({ ...registerForm, invitation_code: e.target.value.toUpperCase() })
-                }
-                placeholder="请输入邀请码"
-                required
-                disabled={loading}
-                autoComplete="off"
-              />
-            </div>
-            <div className="form-group">
               <label>用户名</label>
               <input
                 type="text"
@@ -213,14 +199,14 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
               />
             </div>
             <div className="form-group">
-              <label>显示名称（可选）</label>
+              <label>昵称</label>
               <input
                 type="text"
                 value={registerForm.display_name}
                 onChange={(e) =>
                   setRegisterForm({ ...registerForm, display_name: e.target.value })
                 }
-                placeholder="请输入显示名称"
+                placeholder="请输入昵称"
                 disabled={loading}
               />
             </div>
@@ -269,6 +255,20 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
                   {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
+            </div>
+            <div className="form-group">
+              <label>邀请码</label>
+              <input
+                type="text"
+                value={registerForm.invitation_code}
+                onChange={(e) =>
+                  setRegisterForm({ ...registerForm, invitation_code: e.target.value.toUpperCase() })
+                }
+                placeholder="请输入邀请码"
+                required
+                disabled={loading}
+                autoComplete="off"
+              />
             </div>
             <button type="submit" className="login-submit-btn" disabled={loading}>
               {loading ? '注册中...' : '注册'}
