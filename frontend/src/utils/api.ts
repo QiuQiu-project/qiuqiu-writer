@@ -1,5 +1,5 @@
 /**
- * API client for 星球写作 backend (MemOS)
+ * API client for 球球写作 backend (MemOS)
  */
 
 import type { ShareDBDocument, SyncResponse } from '../types/sharedb';

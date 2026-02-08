@@ -168,7 +168,7 @@ export default function MainLayout() {
           <div className="header-left">
             <Link to="/" className="logo-link">
               <span className="logo-icon">🌍</span>
-              <span className="logo-text">星球写作</span>
+              <span className="logo-text">球球写作</span>
             </Link>
             
             {!isHomePage && (

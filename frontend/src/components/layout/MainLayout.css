@@ -84,23 +84,23 @@
   opacity: 0.9;
 }
 
-/* GitHub风格顶部导航栏 */
+/* 顶部导航栏 */
 .github-header {
   position: relative;
   z-index: 1000;
-  background: var(--bg-primary, #ffffff);
-  border-bottom: 1px solid var(--border-light, rgba(0, 0, 0, 0.1));
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-light);
+  box-shadow: var(--shadow-sm);
 }
 
 .header-container {
   max-width: 1280px;
   margin: 0 auto;
-  padding: 0 16px;
+  padding: 0 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 62px;
+  height: 78px;
 }
 
 .header-left {
@@ -115,14 +115,15 @@
   align-items: center;
   gap: 8px;
   text-decoration: none;
-  color: var(--text-primary, #000000);
+  color: var(--text-primary);
   font-weight: 600;
-  font-size: 20px;
-  transition: opacity 0.2s;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+  transition: opacity var(--transition-base);
 }
 
 .logo-link:hover {
-  opacity: 0.8;
+  opacity: 0.85;
 }
 
 .logo-icon {
@@ -141,24 +142,24 @@
 }
 
 .nav-link {
-  padding: 8px 16px;
+  padding: 8px 14px;
   text-decoration: none;
-  color: var(--text-secondary, rgba(0, 0, 0, 0.8));
+  color: var(--text-secondary);
   font-size: 14px;
   font-weight: 500;
-  border-radius: var(--radius-sm);
-  transition: all var(--transition-base);
+  border-radius: var(--radius);
+  transition: background var(--transition-base), color var(--transition-base);
   position: relative;
 }
 
 .nav-link:hover {
-  background: var(--bg-secondary, rgba(0, 0, 0, 0.05));
-  color: var(--text-primary, #000000);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 .nav-link.active {
-  color: var(--text-primary, #000000);
-  background: var(--bg-secondary, rgba(0, 0, 0, 0.1));
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
   font-weight: 600;
 }
 
@@ -172,43 +173,41 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 16px;
+  padding: 8px 14px;
   font-size: 14px;
   font-weight: 500;
-  color: var(--text-primary, #000000);
-  background: var(--bg-secondary, rgba(0, 0, 0, 0.05));
-  border: 1px solid var(--border-light, rgba(0, 0, 0, 0.1));
-  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
   cursor: pointer;
-  transition: all var(--transition-base);
+  transition: background var(--transition-base), border-color var(--transition-base), color var(--transition-base), box-shadow var(--transition-base);
 }
 
 .header-btn:hover {
-  background: var(--bg-tertiary, rgba(0, 0, 0, 0.1));
-  border-color: var(--border-color, rgba(0, 0, 0, 0.2));
-  color: var(--text-primary, #000000);
-  transform: translateY(-1px);
+  background: var(--bg-tertiary);
+  border-color: var(--border-hover);
+  color: var(--text-primary);
 }
 
 .header-btn.primary {
-  color: var(--text-inverse, #ffffff);
-  background: var(--accent-primary, #000000);
-  border-color: transparent;
-  box-shadow: none;
+  color: var(--text-inverse);
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  box-shadow: var(--shadow-sm);
 }
 
 .header-btn.primary:hover {
-  background: var(--accent-hover, #333333);
-  transform: none;
-  box-shadow: none;
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  box-shadow: var(--shadow);
 }
 
-/* 仅图标按钮（桌面端和移动端都保持正方形） */
 .header-btn.icon-only {
   padding: 0;
-  width: 32px;
-  height: 32px;
-  min-width: 32px;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
   justify-content: center;
   flex-shrink: 0;
 }
@@ -228,17 +227,17 @@
 }
 
 .user-avatar-btn {
-  width: 32px;
-  height: 32px;
+  width: 45px;
+  height: 45px;
   border-radius: 50%;
-  border: 2px solid var(--border-color, rgba(0, 0, 0, 0.2));
-  background: var(--bg-secondary, rgba(0, 0, 0, 0.05));
-  color: var(--text-primary, #000000);
+  border: 2px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all var(--transition-base);
+  transition: border-color var(--transition-base), box-shadow var(--transition-base);
   padding: 0;
   box-shadow: var(--shadow-sm);
   overflow: hidden;
@@ -252,9 +251,7 @@
 }
 
 .user-avatar-btn:hover {
-  border-color: var(--border-hover, rgba(0, 0, 0, 0.3));
-  background: var(--bg-tertiary, rgba(0, 0, 0, 0.1));
-  transform: scale(1.05);
+  border-color: var(--border-hover);
   box-shadow: var(--shadow);
 }
 
@@ -266,23 +263,23 @@
 }
 
 .user-menu-toggle {
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  border: 1px solid var(--border-light, #d0d7de);
-  background: var(--bg-primary, #ffffff);
-  color: var(--text-secondary, #57606a);
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background var(--transition-base), border-color var(--transition-base);
   padding: 0;
 }
 
 .user-menu-toggle:hover {
-  background: var(--bg-secondary, #f6f8fa);
-  border-color: var(--border-hover, #d0d7de);
+  background: var(--bg-secondary);
+  border-color: var(--border-hover);
 }
 
 .dropdown-caret {
@@ -295,15 +292,15 @@
   top: calc(100% + 8px);
   right: 0;
   width: 280px;
-  background: var(--bg-primary, #ffffff);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--border-light, rgba(0, 0, 0, 0.1));
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-xl);
+  background: var(--bg-primary);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
   padding: 8px 0;
   z-index: 1000;
-  animation: slideDown 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: slideDown 0.2s var(--transition-bounce);
 }
 
 @keyframes slideDown {
@@ -377,36 +374,36 @@
 
 .menu-item {
   display: block;
-  padding: 8px 16px;
-  color: var(--text-primary, #000000);
+  padding: 10px 16px;
+  color: var(--text-primary);
   text-decoration: none;
   font-size: 14px;
-  transition: all var(--transition-base);
+  transition: background var(--transition-base);
 }
 
 .menu-item:hover {
-  background: var(--bg-secondary, rgba(0, 0, 0, 0.05));
-  color: var(--text-primary, #000000);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 .mobile-menu-btn {
   display: flex;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-light, rgba(0, 0, 0, 0.1));
-  background: var(--bg-secondary, rgba(0, 0, 0, 0.05));
-  color: var(--text-primary, #000000);
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all var(--transition-base);
+  transition: background var(--transition-base), border-color var(--transition-base);
   padding: 0;
 }
 
 .mobile-menu-btn:hover {
-  background: var(--bg-tertiary, rgba(0, 0, 0, 0.1));
-  border-color: var(--border-color, rgba(0, 0, 0, 0.2));
+  background: var(--bg-tertiary);
+  border-color: var(--border-hover);
 }
 
 .mobile-menu {
@@ -415,9 +412,9 @@
   top: 100%;
   left: 0;
   right: 0;
-  background: var(--bg-primary, #ffffff);
-  border-bottom: 1px solid var(--border-light, rgba(0, 0, 0, 0.1));
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-light);
+  box-shadow: var(--shadow-md);
   padding: 8px 0;
   z-index: 999;
 }
@@ -475,17 +472,17 @@
 /* 主内容区域 */
 .github-content {
   width: 100%;
-  min-height: calc(100vh - 62px);
-  background: var(--bg-primary, #ffffff);
+  min-height: calc(100vh - 56px);
+  background: var(--bg-primary);
   overflow-y: auto;
   overflow-x: hidden;
 }
 
-/* 响应式设计 */
+/* 响应式 */
 @media (max-width: 768px) {
   .header-container {
-    padding: 0 12px;
-    height: 56px;
+    padding: 0 14px;
+    height: 52px;
   }
 
   .logo-text {

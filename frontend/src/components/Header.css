@@ -3,9 +3,10 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
-  height: 64px;
+  height: 56px;
   background: var(--bg-primary);
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-light);
+  box-shadow: var(--shadow-sm);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -60,13 +61,13 @@
 }
 
 .nav-link {
-  padding: 8px 16px;
+  padding: 8px 14px;
   text-decoration: none;
   color: var(--text-secondary);
   font-size: 14px;
   font-weight: 500;
-  border-radius: var(--radius-sm);
-  transition: all var(--transition-fast);
+  border-radius: var(--radius);
+  transition: background var(--transition-base), color var(--transition-base);
 }
 
 .nav-link:hover {
@@ -95,14 +96,15 @@
   background: var(--accent-primary);
   color: var(--text-inverse);
   border: 1px solid var(--accent-primary);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: background var(--transition-base), border-color var(--transition-base), box-shadow var(--transition-base);
   display: flex;
   align-items: center;
   gap: 6px;
+  box-shadow: var(--shadow-sm);
 }
 
 .save-button:hover {

@@ -145,12 +145,12 @@ export default function HomePage() {
             <span>AI驱动的智能写作平台</span>
           </div>
           <h1 className="hero-title">
-            星球写作
+            球球写作
             <span className="hero-subtitle">让创作更简单，让故事更精彩</span>
           </h1>
           <p className="hero-description">
             专业的AI写作助手，帮助你从灵感到成稿，轻松完成每一部作品。
-            无论你想写什么，星球写作都是你最好的创作伙伴。
+            无论你想写什么，球球写作都是你最好的创作伙伴。
           </p>
           <div className="hero-actions">
             <button 
@@ -177,7 +177,7 @@ export default function HomePage() {
       <section className="features-section">
         <div className="section-container">
           <div className="section-header">
-            <h2 className="section-title">为什么选择星球写作？</h2>
+            <h2 className="section-title">为什么选择球球写作？</h2>
             <p className="section-description">
               我们提供全方位的创作支持，让你的创作之旅更加顺畅
             </p>
@@ -202,7 +202,7 @@ export default function HomePage() {
           <div className="section-header">
             <h2 className="section-title">适用场景</h2>
             <p className="section-description">
-              无论你是专业作家还是写作爱好者，星球写作都能满足你的需求
+              无论你是专业作家还是写作爱好者，球球写作都能满足你的需求
             </p>
           </div>
           <div className="use-cases-grid">

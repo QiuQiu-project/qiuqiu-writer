@@ -40,7 +40,7 @@ export default function Header({ currentDocId }: HeaderProps) {
     <header className="header">
       <div className="header-left">
         <Link to="/" className="logo-link">
-          <h1 className="logo">星球写作</h1>
+          <h1 className="logo">球球写作</h1>
         </Link>
         <nav className="header-nav">
           <Link

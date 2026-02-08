@@ -1,4 +1,4 @@
-# 星球写作 Frontend
+# 球球写作 Frontend
 
 一个使用 React 和 TipTap 构建的现代化写作应用，后端使用 MemOS。
 
