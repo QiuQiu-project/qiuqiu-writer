@@ -180,7 +180,7 @@ export default function AIAssistant({
       { type: 'command', id: 'gen_chapter', name: '/gen_chapter', subtitle: '根据大纲和细纲生成章节内容', isCommand: true, commandKind: 'slash' },
       { type: 'command', id: 'analysis-chapter', name: '/analysis-chapter', subtitle: '分析指定章节', isCommand: true, commandKind: 'slash' },
       { type: 'command', id: 'analysis-chapter-info', name: '/analysis-chapter-info', subtitle: '分析章节组件信息', isCommand: true, commandKind: 'slash' },
-      { type: 'command', id: 'continue-chapter', name: '/continue-chapter', subtitle: '续写章节：根据前三章大纲细纲与前一章内容生成3个推荐大纲细纲', isCommand: true, commandKind: 'slash' },
+      { type: 'command', id: 'continue-chapter', name: '/continue-chapter', subtitle: '续写章节：可跟章节号与对下一章的语言描述，生成3个推荐大纲细纲', isCommand: true, commandKind: 'slash' },
       { type: 'command', id: 'verification-chapter-info', name: '/verification-chapter-info', subtitle: '校验章节信息', isCommand: true, commandKind: 'slash' },
     ];
     const textBeforeCursor = value.substring(0, cursorPos);

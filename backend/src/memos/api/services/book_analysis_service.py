@@ -721,16 +721,18 @@ class BookAnalysisService:
         work_id: str,
         ai_service,
         previous_chapter_id: Optional[int] = None,
+        user_description: Optional[str] = None,
         settings: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         续写章节：根据「当前（下一章）的前 3 章」的大纲和细纲、以及前一章的章节内容，生成下一章的 3 个推荐大纲和细纲。
-        例如续写第 10 章时，前 3 章指第 7、8、9 章。
+        例如续写第 10 章时，前 3 章指第 7、8、9 章。可选传入用户对下一章的语言描述，会加入 prompt 供模型参考。
 
         Args:
             work_id: 作品ID
             ai_service: AI 服务实例
             previous_chapter_id: 前一章章节 ID（即要续写的「下一章」的上一章）。不传则使用作品最后一章。
+            user_description: 用户对下一章的大致描述（如「主角发现了一个秘密」），会追加到 prompt 中。
             settings: AI 设置（可选）
 
         Returns:
@@ -754,6 +756,10 @@ class BookAnalysisService:
             content_max_len=12000,
             return_ctx=True,
         )
+
+        # 若有用户对下一章的语言描述，追加到 prompt 中
+        if user_description and user_description.strip():
+            user_prompt = user_prompt.rstrip() + "\n\n## 用户对下一章的描述（请在设计方案时参考以下方向）\n" + user_description.strip() + "\n"
 
         full_response = await ai_service.analyze_chapter_stream(
             content=ctx.get("previous_chapter_content") or "",

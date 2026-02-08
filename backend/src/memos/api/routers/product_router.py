@@ -143,6 +143,27 @@ def _parse_chapter_ids_from_command(query: str) -> list[int]:
     return ids
 
 
+def _parse_continue_chapter_user_description(query: str) -> str | None:
+    """
+    从 /continue-chapter 命令中解析用户对下一章的语言描述。
+    格式：/continue-chapter [可选章节号或 @chapter:id] [用户描述]
+    返回用户描述部分，若无则返回 None。
+    """
+    import re
+    prefix = "/continue-chapter"
+    q = query.strip()
+    if not q.lower().startswith(prefix):
+        return None
+    rest = q[len(prefix) :].strip()
+    if not rest:
+        return None
+    # 去掉开头的章节引用（@chapter:123 或纯数字），剩余即为用户描述
+    m = re.match(r"^(@chapter:\d+|\d+)\s*", rest, re.IGNORECASE)
+    if m:
+        rest = rest[m.end() :].strip()
+    return rest if rest else None
+
+
 get_mos_product_instance()
 
 
@@ -497,13 +518,14 @@ async def chat(chat_req: ChatRequest, db: AsyncSession = Depends(get_db_session)
         disable_memory = not chat_req.use_memory or is_command
 
         async def run_continue_chapter_stream():
-            """续写章节：根据前三章大纲细纲与前一章内容，流式返回 3 个推荐大纲细纲。"""
+            """续写章节：根据前三章大纲细纲与前一章内容，流式返回 3 个推荐大纲细纲。支持用户描述下一章大致方向。"""
             work_id = _parse_work_id_from_user_id(chat_req.user_id)
             if not work_id:
                 yield f"data: {json.dumps({'type': 'error', 'content': '未能从 user_id 解析出 work_id，无法执行续写章节'})}\n\n"
                 return
             chapter_ids = _parse_chapter_ids_from_command(chat_req.query)
             previous_chapter_id = chapter_ids[0] if chapter_ids else None
+            user_description = _parse_continue_chapter_user_description(chat_req.query)
 
             async with AsyncSessionLocal() as stream_db:
                 try:
@@ -530,6 +552,7 @@ async def chat(chat_req: ChatRequest, db: AsyncSession = Depends(get_db_session)
                         work_id=work_id,
                         ai_service=ai_service,
                         previous_chapter_id=previous_chapter_id,
+                        user_description=user_description,
                         settings={
                             "model": analysis_settings.model,
                             "temperature": analysis_settings.temperature,
@@ -910,12 +933,13 @@ async def chat_complete(chat_req: ChatCompleteRequest, db: AsyncSession = Depend
 
         query_lower = chat_req.query.strip().lower()
         if disable_memory and query_lower.startswith("/continue-chapter"):
-            # 续写章节：返回 3 个推荐大纲细纲（非流式 complete 接口）
+            # 续写章节：返回 3 个推荐大纲细纲（非流式 complete 接口），支持用户描述下一章方向
             work_id = _parse_work_id_from_user_id(chat_req.user_id)
             if not work_id:
                 raise HTTPException(status_code=400, detail="未能从 user_id 解析 work_id，无法执行续写章节")
             chapter_ids = _parse_chapter_ids_from_command(chat_req.query)
             previous_chapter_id = chapter_ids[0] if chapter_ids else None
+            user_description = _parse_continue_chapter_user_description(chat_req.query)
             work_service = WorkService(db)
             work = await work_service.get_work_by_id(work_id)
             if not work:
@@ -933,6 +957,7 @@ async def chat_complete(chat_req: ChatCompleteRequest, db: AsyncSession = Depend
                     work_id=work_id,
                     ai_service=ai_service,
                     previous_chapter_id=previous_chapter_id,
+                    user_description=user_description,
                     settings={
                         "model": analysis_settings.model,
                         "temperature": analysis_settings.temperature,
