@@ -1,11 +1,11 @@
-# WawaWriter - 蛙蛙写作
+# QiuQiuWriter - 蛙蛙写作
 
 一个现代化的写作应用，前端使用 React + TipTap，后端使用 MemOS 记忆系统。
 
 ## 项目结构
 
 ```
-wawawriter/
+qiuqiuwriter/
 ├── frontend/          # React 前端应用
 │   ├── src/
 │   ├── package.json

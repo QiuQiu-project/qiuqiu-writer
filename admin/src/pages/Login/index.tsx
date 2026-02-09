@@ -38,7 +38,7 @@ const Login: React.FC = () => {
       height: '100vh',
       backgroundColor: '#f0f2f5' 
     }}>
-      <Card title="WawaWriter Admin Login" style={{ width: 350 }}>
+      <Card title="QiuQiuWriter Admin Login" style={{ width: 350 }}>
         <Form
           name="login"
           initialValues={{ remember: true }}

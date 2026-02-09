@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-WawaWriter API服务
+QiuQiuWriter API服务
 包含AI分析、产品API和服务器API等所有接口
 """
 
@@ -27,8 +27,8 @@ logger = logging.getLogger(__name__)
 
 # 创建FastAPI应用
 app = FastAPI(
-    title="WawaWriter API",
-    description="WawaWriter API服务 - 包含AI分析、产品API和服务器API",
+    title="QiuQiuWriter API",
+    description="QiuQiuWriter API服务 - 包含AI分析、产品API和服务器API",
     version="1.0.0",
 )
 
@@ -190,7 +190,7 @@ async def root():
             })
     
     return {
-        "service": "WawaWriter API",
+        "service": "QiuQiuWriter API",
         "version": "1.0.0",
         "status": "running",
         "endpoints": endpoints,

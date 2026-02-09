@@ -106,6 +106,7 @@ export default function NovelEditorPage() {
     setVolumes,
     updateChapterTitle,
     updateChapterNumber,
+    updateChapterLocally,
     removeChapterLocally,
     deletedChapters,
     loadDeletedChapters,
@@ -124,6 +125,9 @@ export default function NovelEditorPage() {
     onSuccess: (msg: string) => showMessage(msg, 'success'),
     onError: (msg: string) => showMessage(msg, 'error'),
     onUpdateTrigger: () => setUpdateTrigger(prev => prev + 1),
+    onSuccessEdit: (data) => {
+      if (data.id) updateChapterLocally(String(data.id), data);
+    },
   });
 
   // ===== 卷管理 =====
@@ -673,6 +677,15 @@ export default function NovelEditorPage() {
                 >
                   <Trash2 size={16} />
                 </button>
+                <button 
+                    className="action-btn" 
+                    onClick={() => {
+                      handleReplace();
+                      setMobileMenuOpen(false);
+                    }}
+                  >
+                    <span>查找替换</span>
+                  </button>
                 <div className="action-btn theme-selector-header-wrap" title="主题">
                   <ThemeSelector onClose={() => setMobileMenuOpen(false)} />
                 </div>

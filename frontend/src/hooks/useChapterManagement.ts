@@ -8,6 +8,7 @@ import { useSearchParams } from 'react-router-dom';
 import { chaptersApi, type Chapter } from '../utils/chaptersApi';
 import { volumesApi, type Volume } from '../utils/volumesApi';
 import type { ChapterFullData } from '../types/document';
+import type { ChapterSaveData } from './useChapterOperations';
 
 export interface VolumeData {
   id: string;
@@ -40,6 +41,8 @@ export interface UseChapterManagementReturn {
   setVolumes: React.Dispatch<React.SetStateAction<VolumeData[]>>;
   updateChapterTitle: (chapterId: string, newTitle: string) => void;
   updateChapterNumber: (chapterId: string, newChapterNumber: number) => void;
+  /** 仅更新本地章节数据（不重新拉列表），用于保存章节设置后保持当前选中 */
+  updateChapterLocally: (chapterId: string, data: ChapterSaveData) => void;
   /** 删除章节后立即从本地状态移除（乐观更新），避免界面仍显示已删章节 */
   removeChapterLocally: (chapterId: string) => void;
   /** 已软删除的章节列表（回收站） */
@@ -69,6 +72,12 @@ export function useChapterManagement(options: UseChapterManagementOptions): UseC
   const chaptersDataRef = useRef<Record<string, ChapterFullData>>({});
   useEffect(() => { chaptersDataRef.current = chaptersData; }, [chaptersData]);
 
+  /** 保存当前选中的章节 ID，用于 refetch 后保持选中（避免保存章节设置后跳到最后一章） */
+  const selectedChapterRef = useRef<string | null>(null);
+  useEffect(() => {
+    selectedChapterRef.current = selectedChapter;
+  }, [selectedChapter]);
+
   /** 更新本地某章节的标题（同步 chaptersData + volumes） */
   const updateChapterTitle = (chapterId: string, newTitle: string) => {
     setChaptersData(prev => ({
@@ -96,6 +105,47 @@ export function useChapterManagement(options: UseChapterManagementOptions): UseC
       ),
     })));
   };
+
+  /** 仅更新本地章节数据（不重新拉列表），用于保存章节设置后保持当前选中且不刷新列表 */
+  const updateChapterLocally = useCallback((chapterId: string, data: ChapterSaveData) => {
+    const idStr = String(chapterId);
+    setChaptersData(prev => {
+      const existing = prev[idStr];
+      if (!existing) return prev;
+      return {
+        ...prev,
+        [idStr]: {
+          ...existing,
+          title: data.title,
+          volumeId: data.volumeId,
+          volumeTitle: data.volumeTitle,
+          volume_number: data.volume_number,
+          chapter_number: data.chapter_number,
+          characters: data.characters ?? existing.characters,
+          locations: data.locations ?? existing.locations,
+          outline: data.outline ?? existing.outline,
+          detailOutline: data.detailOutline ?? existing.detailOutline,
+        },
+      };
+    });
+    setVolumes(prev => prev.map(vol => ({
+      ...vol,
+      chapters: vol.chapters.map(chap =>
+        chap.id === idStr
+          ? {
+              ...chap,
+              title: data.title,
+              volumeId: data.volumeId,
+              chapter_number: data.chapter_number,
+              characters: data.characters ?? chap.characters,
+              locations: data.locations ?? chap.locations,
+              outline: data.outline ?? chap.outline,
+              detailOutline: data.detailOutline ?? chap.detailOutline,
+            }
+          : chap
+      ),
+    })));
+  }, []);
 
   /** 删除章节后立即从本地状态移除（乐观更新），并选中上一个章节 */
   const removeChapterLocally = useCallback((chapterId: string) => {
@@ -138,6 +188,9 @@ export function useChapterManagement(options: UseChapterManagementOptions): UseC
     if (!workId) return;
 
     const loadChapters = async () => {
+      // 使用本次 effect 触发时的选中章节（闭包），避免刷新后误跳到最后一章
+      const preserveChapterId = selectedChapter;
+
       try {
         // 并行获取卷列表和章节列表
         const [dbVolumes, allChapters] = await Promise.all([
@@ -278,24 +331,30 @@ export function useChapterManagement(options: UseChapterManagementOptions): UseC
         });
         setChaptersData(chaptersDataMap);
 
-        // 选择章节
+        // 选择章节：优先 URL → 刷新前选中的章节（仍在列表中）→ 最后一章，避免保存后跳到最后一章
         if (allChapters.length > 0) {
           const urlChapterId = searchParams.get('chapterId');
           let targetChapterId: string | null = null;
 
           if (urlChapterId) {
-            const chapterIdNum = parseInt(urlChapterId);
+            const chapterIdNum = parseInt(urlChapterId, 10);
             if (!isNaN(chapterIdNum) && allChapters.some(c => c.id === chapterIdNum)) {
               targetChapterId = urlChapterId;
             }
           }
-
+          if (!targetChapterId && preserveChapterId && allChapters.some(c => String(c.id) === preserveChapterId)) {
+            targetChapterId = preserveChapterId;
+          }
           if (!targetChapterId) {
             const maxChapter = allChapters.reduce((max, chapter) => {
               return (chapter.chapter_number ?? 0) > (max.chapter_number ?? 0) ? chapter : max;
             }, allChapters[0]);
             targetChapterId = String(maxChapter.id);
+          }
 
+          // 选中项与 URL 不一致时同步 URL，便于下次刷新仍能选中当前章
+          const currentUrlChapterId = searchParams.get('chapterId');
+          if (targetChapterId && targetChapterId !== currentUrlChapterId) {
             setSearchParams(prev => {
               const newParams = new URLSearchParams(prev);
               newParams.set('chapterId', targetChapterId!);
@@ -342,6 +401,7 @@ export function useChapterManagement(options: UseChapterManagementOptions): UseC
     setVolumes,
     updateChapterTitle,
     updateChapterNumber,
+    updateChapterLocally,
     removeChapterLocally,
     deletedChapters,
     loadDeletedChapters,

@@ -1,8 +1,8 @@
 #!/bin/bash
-# WawaWriter 统一启动脚本
+# QiuQiuWriter 统一启动脚本
 
 echo "=========================================="
-echo "启动 WawaWriter 项目"
+echo "启动 QiuQiuWriter 项目"
 echo "=========================================="
 echo ""
 

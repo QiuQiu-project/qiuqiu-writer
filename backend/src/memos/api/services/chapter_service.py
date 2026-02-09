@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import and_, or_, desc, asc, func
 from sqlalchemy.orm import selectinload
+from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.future import select
 
 from memos.api.models.chapter import Chapter, ChapterVersion, ChapterYjsSnapshot
@@ -120,10 +121,12 @@ class ChapterService:
         if not chapter:
             raise ValueError("章节不存在")
 
-        # 更新字段
+        # 更新字段（含 chapter_metadata 时显式标记以持久化空大纲/细纲）
         for key, value in kwargs.items():
             if hasattr(chapter, key):
                 setattr(chapter, key, value)
+                if key == "chapter_metadata":
+                    flag_modified(chapter, "chapter_metadata")
 
         await self.db.commit()
         await self.db.refresh(chapter)

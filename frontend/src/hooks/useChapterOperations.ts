@@ -24,7 +24,10 @@ export interface UseChapterOperationsOptions {
   workId: string | null;
   onSuccess?: (msg: string) => void;
   onError?: (msg: string) => void;
+  /** 列表刷新（会重新拉取章节列表） */
   onUpdateTrigger?: () => void;
+  /** 仅编辑保存时调用，不触发列表刷新，用于只更新本地数据避免跳章 */
+  onSuccessEdit?: (data: ChapterSaveData) => void;
 }
 
 export interface UseChapterOperationsReturn {
@@ -34,7 +37,7 @@ export interface UseChapterOperationsReturn {
 }
 
 export function useChapterOperations(options: UseChapterOperationsOptions): UseChapterOperationsReturn {
-  const { workId, onSuccess, onError, onUpdateTrigger } = options;
+  const { workId, onSuccess, onError, onUpdateTrigger, onSuccessEdit } = options;
 
   /** 保存章节设置（创建或更新）。大纲/细纲按表单原有格式（字符串）写入。 */
   const saveChapterSettings = useCallback(async (data: ChapterSaveData) => {
@@ -72,7 +75,11 @@ export function useChapterOperations(options: UseChapterOperationsOptions): UseC
         updateData.chapter_metadata = metadata as ChapterUpdate['chapter_metadata'];
 
         await chaptersApi.updateChapter(chapterId, updateData);
-        onUpdateTrigger?.();
+        if (onSuccessEdit) {
+          onSuccessEdit(data);
+        } else {
+          onUpdateTrigger?.();
+        }
         onSuccess?.('章节已更新');
       } else {
         // ===== 创建新章节 =====
@@ -114,7 +121,7 @@ export function useChapterOperations(options: UseChapterOperationsOptions): UseC
       console.error('保存章节失败:', err);
       onError?.(err instanceof Error ? err.message : '保存章节失败');
     }
-  }, [workId, onSuccess, onError, onUpdateTrigger]);
+  }, [workId, onSuccess, onError, onUpdateTrigger, onSuccessEdit]);
 
   /** 删除章节；skipRefresh 为 true 时不触发 refetch，由调用方用乐观更新保持 UI */
   const deleteChapter = useCallback(async (chapterId: string, options?: { skipRefresh?: boolean }) => {

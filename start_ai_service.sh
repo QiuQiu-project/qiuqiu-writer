@@ -5,7 +5,7 @@
 set -e
 
 echo "=========================================="
-echo "🚀 启动 WawaWriter AI 服务"
+echo "🚀 启动 QiuQiuWriter AI 服务"
 echo "=========================================="
 
 # 进入backend目录
