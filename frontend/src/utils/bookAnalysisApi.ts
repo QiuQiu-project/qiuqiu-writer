@@ -3,7 +3,7 @@
  * 基于 SmartReads 的分析逻辑，预留从 memos 后端获取模型服务的接口
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
+import { API_BASE_URL } from './apiConfig';
 
 export interface BookAnalysisResult {
   work_id?: string;

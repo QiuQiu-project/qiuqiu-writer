@@ -3,7 +3,7 @@
  * 对接后端认证接口
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
+import { API_BASE_URL } from './apiConfig';
 
 export interface LoginRequest {
   username_or_email: string;

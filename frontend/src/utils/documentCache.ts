@@ -3,6 +3,7 @@
  * 处理文档的本地缓存、服务器同步、版本管理等
  */
 
+import { API_BASE_URL } from './apiConfig';
 import { localCacheManager } from './localCacheManager';
 import { chaptersApi, type ChapterDocumentResponse } from './chaptersApi';
 import type { ShareDBDocument, SyncResponse } from '../types/document';
@@ -494,7 +495,6 @@ export const documentCache = {
         await documentCache.updateDocument(documentId, contentToSave, metadata);
 
         // 关键修复：调用后端 ShareDB 同步接口（使用编辑器内容）
-        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
         const token = localStorage.getItem('access_token');
         
         try {

@@ -3,7 +3,7 @@
  * 所有 API 客户端都应该继承这个类，以统一处理认证、错误处理等
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
+import { API_BASE_URL } from './apiConfig';
 
 export class BaseApiClient {
   protected baseUrl: string;
@@ -79,10 +79,11 @@ export class BaseApiClient {
     } catch (error) {
       // 处理网络错误（Failed to fetch）
       if (error instanceof TypeError && error.message === 'Failed to fetch') {
-        const errorMsg = `无法连接到服务器 (${this.baseUrl})。可能的原因：
-1. 后端服务未运行（检查 http://localhost:8001 是否可访问）
+        const hostDesc = this.baseUrl || '当前域名（相对路径，依赖代理）';
+        const errorMsg = `无法连接到服务器 (${hostDesc})。可能的原因：
+1. 后端服务未运行（开发时检查 Vite 代理目标，如 http://localhost:8001）
 2. 网络连接问题
-3. CORS 配置问题
+3. CORS 或代理配置问题
 4. 防火墙阻止了连接`;
         console.error(`❌ [BaseApiClient] 网络错误:`, errorMsg);
         throw new Error(errorMsg);

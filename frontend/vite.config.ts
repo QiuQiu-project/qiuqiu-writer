@@ -52,9 +52,23 @@ export default defineConfig({
       'y-websocket',
     ],
   },
-  // 开发服务器配置
+  // 开发服务器配置（与 admin 一致：/api、/ai 代理到后端，避免 CORS）
   server: {
     port: 5173,
     open: false,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8001',
+        changeOrigin: true,
+      },
+      '/ai': {
+        target: 'http://localhost:8001',
+        changeOrigin: true,
+      },
+      '/v1': {
+        target: 'http://localhost:8001',
+        changeOrigin: true,
+      },
+    },
   },
 })

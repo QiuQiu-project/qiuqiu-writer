@@ -20,6 +20,7 @@ import CollaborationCursor from '@tiptap/extension-collaboration-cursor';
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 import { authApi } from '../utils/authApi';
+import { getWsBaseUrl } from '../utils/apiConfig';
 import { yjsConnectionManager } from '../utils/yjsConnectionManager';
 
 /** 从 documentId 解析 workId 和 chapterId */
@@ -41,12 +42,9 @@ function getRandomColor(): string {
   return CURSOR_COLORS[Math.floor(Math.random() * CURSOR_COLORS.length)];
 }
 
-/** 构建 WebSocket URL：从 VITE_API_URL 推导 */
+/** 构建 WebSocket URL（与 apiConfig 一致：相对路径时用当前 origin） */
 function getWebSocketUrl(): string {
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001';
-  // http -> ws, https -> wss
-  const wsUrl = apiUrl.replace(/^http/, 'ws');
-  return `${wsUrl}/api/v1/yjs`;
+  return `${getWsBaseUrl()}/api/v1/yjs`;
 }
 
 /** 协作就绪后的状态快照（避免 ref 在 render 中被访问） */
