@@ -553,14 +553,14 @@ async def get_yjs_snapshot(
 
 
 # 版本管理
-@router.get("/{chapter_id}/versions", response_model=List[ChapterVersionResponse])
+@router.get("/{chapter_id}/versions", response_model=Dict[str, Any])
 async def get_chapter_versions(
     chapter_id: int,
     page: int = Query(1, ge=1, description="页码"),
     size: int = Query(20, ge=1, le=100, description="每页数量"),
     db: AsyncSession = Depends(get_db_session),
     current_user_id: str = Depends(get_current_user_id)
-) -> List[Dict[str, Any]]:
+) -> Dict[str, Any]:
     """
     获取章节版本历史
     """
@@ -589,7 +589,12 @@ async def get_chapter_versions(
         size=size
     )
 
-    return [version.to_dict() for version in versions]
+    return {
+        "versions": [version.to_dict() for version in versions],
+        "total": total,
+        "page": page,
+        "size": size
+    }
 
 
 @router.post("/{chapter_id}/versions", response_model=ChapterVersionResponse)
@@ -622,26 +627,35 @@ async def create_chapter_version(
             detail="没有访问该章节的权限"
         )
 
-    # 获取当前ShareDB文档内容
-    # 优先使用新格式，兼容旧格式
-    try:
-        document_id_new = f"work_{chapter.work_id}_chapter_{chapter_id}"
-        document_id_old = f"chapter_{chapter_id}"
-        document = await sharedb_service.get_document(document_id_new)
-        if not document:
-            document = await sharedb_service.get_document(document_id_old)
-        current_content = document.get("content", "") if document else ""
-        current_title = document.get("title", chapter.title) if document else chapter.title
-    except Exception:
-        current_content = chapter.content or ""
-        current_title = chapter.title
+    # 获取当前内容（如果 frontend 提供了 content 则优先使用，否则从 ShareDB 获取）
+    current_content = version_data.content
+    current_title = chapter.title
+
+    if not current_content:
+        # 只有在 frontend 没传内容时，才尝试从 ShareDB 获取最新内容作为快照
+        try:
+            document_id_new = f"work_{chapter.work_id}_chapter_{chapter_id}"
+            document_id_old = f"chapter_{chapter_id}"
+            document = await sharedb_service.get_document(document_id_new)
+            if not document:
+                document = await sharedb_service.get_document(document_id_old)
+            
+            if document:
+                current_content = document.get("content", "")
+                current_title = document.get("title", chapter.title)
+            else:
+                current_content = chapter.content or ""
+        except Exception as e:
+            logger.warning(f"获取 ShareDB 内容失败，使用数据库备份: {e}")
+            current_content = chapter.content or ""
 
     # 创建版本
     version = await chapter_service.create_chapter_version(
         chapter_id=chapter_id,
         title=current_title,
         content=current_content,
-        **version_data.dict()
+        change_description=version_data.change_description,
+        created_by=current_user_id
     )
 
     # 记录审计日志

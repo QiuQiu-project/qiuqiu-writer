@@ -543,7 +543,7 @@ export const documentCache = {
             },
           });
           
-          const result = await sharedbApi.post<SyncResponse>('/v1/sharedb/documents/sync/', requestBody);
+          const result = await sharedbApi.post<SyncResponse>('/v1/sharedb/documents/sync', requestBody);
 
           console.log('📥 [DocumentCache] 同步响应状态:', {
             success: result.success,
@@ -595,7 +595,7 @@ export const documentCache = {
                 // 根据用户选择处理冲突
                 if (resolution === 'keep_local') {
                   // 保留本地版本：重新同步本地内容，强制覆盖服务器
-                  const forceSyncResult = await sharedbApi.post<SyncResponse>('/v1/sharedb/documents/sync/', {
+                  const forceSyncResult = await sharedbApi.post<SyncResponse>('/v1/sharedb/documents/sync', {
                     ...requestBody,
                     version: result.version, // 使用服务器版本号
                     force: true, // 强制覆盖标志（如果后端支持）
@@ -739,7 +739,7 @@ export const documentCache = {
                   // 根据用户选择重新尝试同步
                   if (resolution === 'keep_local') {
                     // 保留本地版本：使用更高的版本号重试
-                    const retryResult = await sharedbApi.post<SyncResponse>('/v1/sharedb/documents/sync/', {
+                    const retryResult = await sharedbApi.post<SyncResponse>('/v1/sharedb/documents/sync', {
                       ...requestBody,
                       version: Math.max(localVersion, (remoteDoc.version || 0) + 1),
                     });

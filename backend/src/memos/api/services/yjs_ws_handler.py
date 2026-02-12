@@ -397,10 +397,10 @@ class YjsRoom:
             self.connections.discard(conn)
 
     async def _periodic_persist(self):
-        """Background task: save document to DB every 30 seconds."""
+        """Background task: save document to DB every 5 seconds."""
         try:
             while True:
-                await asyncio.sleep(30)
+                await asyncio.sleep(5)
                 if self._dirty and self.connections:
                     await self.save_to_db()
         except asyncio.CancelledError:
@@ -448,6 +448,17 @@ class YjsWebSocketManager:
             # Clean up empty rooms to free memory
             if not room.connections and room_name in self.rooms:
                 del self.rooms[room_name]
+
+    async def force_sync(self, room_name: str):
+        """Force a database sync for a specific room."""
+        if room_name in self.rooms:
+            room = self.rooms[room_name]
+            # Set dirty to True to ensure it saves even if no recent changes
+            # (though normally we'd only sync if dirty)
+            room._dirty = True
+            await room.save_to_db()
+            return True
+        return False
 
     async def shutdown(self):
         """Persist all room states on server shutdown."""

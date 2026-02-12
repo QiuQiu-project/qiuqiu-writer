@@ -3,7 +3,7 @@
  * 模块化重构版本 - 控制在1000行以内
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Trash2, Info, Menu, X, MessageSquare, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { EditorContent } from '@tiptap/react';
@@ -40,10 +40,11 @@ import type { ChapterFullData } from '../types/document';
 // API和工具
 import { worksApi, type Work } from '../utils/worksApi';
 import { authApi } from '../utils/authApi';
+import { documentCache } from '../utils/documentCache';
 import { syncManager } from '../utils/syncManager';
 import { countCharacters } from '../utils/textUtils';
 import { generateChapterContent } from '../utils/bookAnalysisApi';
-import { chaptersApi } from '../utils/chaptersApi';
+import { chaptersApi, type ChapterVersion } from '../utils/chaptersApi';
 import { createYjsSnapshotFromEditor, restoreYjsSnapshotToEditor, getTextFromProsemirrorJSON } from '../utils/yjsSnapshot';
 
 // 样式
@@ -155,7 +156,9 @@ export default function NovelEditorPage() {
     ? `work_${workId}_chapter_${selectedChapter}` 
     : '';
   
-  const { editor, syncToServer } = useYjsEditor({
+  const hasUserEdited = useRef(false);
+
+  const { editor, provider, syncToServer } = useYjsEditor({
     documentId,
     fetchInitialContent: async (docId) => {
       const m = docId.match(/^work_(.+?)_chapter_(.+)$/);
@@ -164,20 +167,25 @@ export default function NovelEditorPage() {
       if (Number.isNaN(chapterId)) return null;
       try {
         const res = await chaptersApi.getChapterDocument(chapterId);
-        const content = res?.content;
-        if (content && typeof content === 'string') {
-          return content;
-        }
-        return null;
-      } catch {
+        return res?.content || null;
+      } catch (err) {
+        console.error('❌ [NovelEditorPage] 获取初始内容失败:', err);
         return null;
       }
     },
     placeholder: '开始写作...支持 Markdown 格式，如 **粗体**、*斜体*、`代码`、# 标题等',
     editable: true,
     onUpdate: (content) => {
+      hasUserEdited.current = true;
       const wordCount = countCharacters(content);
       setCurrentChapterWordCount(wordCount);
+      
+      // 更新本地缓存，避免产生虚假冲突
+      if (documentId) {
+        documentCache.updateDocument(documentId, content).catch(err => {
+          console.warn('⚠️ [NovelEditorPage] 更新本地缓存失败:', err);
+        });
+      }
     },
     onSyncSuccess: (version) => {
       console.log('✅ 同步成功，版本:', version);
@@ -187,6 +195,81 @@ export default function NovelEditorPage() {
       console.error('❌ 同步失败:', error);
     },
   });
+
+  // ===== 冲突检测与版本控制 =====
+   // 当编辑器加载完成并同步后，检查本地缓存与线上是否存在冲突
+   useEffect(() => {
+     if (!editor || !documentId || !selectedChapter) return;
+ 
+     // 延迟 2 秒检查，确保 Yjs 完成初始同步且用户尚未开始大量编辑
+     const checkConflict = async () => {
+       if (hasUserEdited.current) {
+         console.log('ℹ️ [NovelEditorPage] 用户已开始编辑，跳过自动冲突检测');
+         return;
+       }
+
+       try {
+         const m = documentId.match(/^work_(.+?)_chapter_(.+)$/);
+         if (!m) return;
+         const chapterId = parseInt(m[2], 10);
+ 
+         // 1. 并行获取线上最新内容和本地缓存
+         const [onlineRes, cached] = await Promise.all([
+           chaptersApi.getChapterDocument(chapterId),
+           documentCache.getDocument(documentId)
+         ]);
+ 
+         const onlineContent = onlineRes?.content;
+         const localContent = cached?.content;
+ 
+         // 2. 如果本地有缓存且与线上不一致
+         if (localContent && onlineContent && localContent !== onlineContent) {
+           // 获取当前编辑器内容
+           const currentEditorContent = editor.getHTML();
+           
+           // 如果当前编辑器内容不等于线上最新内容（说明 Yjs 还没同步到线上新内容，或者同步后本地旧内容占了上风）
+           if (currentEditorContent !== onlineContent) {
+             // 额外检查：如果房间里还有其他用户，我们不应该强行 setContent，因为会破坏他们的编辑
+             // 如果 provider 还没准备好，我们也跳过
+             const awareness = provider?.awareness;
+             const otherUsers = awareness ? awareness.getStates().size - 1 : 0;
+             
+             if (otherUsers > 0) {
+               console.log(`ℹ️ [NovelEditorPage] 发现 ${otherUsers} 位其他用户正在协作，由 Yjs 自动处理合并，跳过强行覆盖`);
+               return;
+             }
+
+             console.log('⚠️ [NovelEditorPage] 发现版本冲突且本地落后。执行修复...');
+             
+             // A. 保存本地版本为历史记录
+             try {
+               await chaptersApi.createChapterVersion(chapterId, {
+                 content: localContent,
+                 change_description: '打开章节时检测到冲突，自动保存本地版本并拉取线上最新',
+               });
+               console.log('✅ [NovelEditorPage] 本地冲突版本已保存为历史记录');
+             } catch (historyErr) {
+               console.error('❌ [NovelEditorPage] 保存历史版本失败:', historyErr);
+             }
+ 
+             // B. 强制覆盖为线上最新版本 (仅在没有其他用户时安全)
+             editor.commands.setContent(onlineContent);
+             
+             // C. 更新本地缓存
+             await documentCache.updateDocument(documentId, onlineContent);
+             
+             showMessage('检测到本地版本与线上不一致，已将本地保存为历史记录并拉取最新版本', 'info');
+           }
+         }
+       } catch (err) {
+         console.error('❌ [NovelEditorPage] 冲突检测失败:', err);
+       }
+     };
+ 
+     // 增加延迟到 2 秒
+     const timer = setTimeout(checkConflict, 2000);
+     return () => clearTimeout(timer);
+   }, [editor, documentId, selectedChapter]); // eslint-disable-line react-hooks/exhaustive-deps
   
   // ===== 标题编辑 =====
   const {
@@ -869,9 +952,24 @@ export default function NovelEditorPage() {
                         onCreateVersion={editor && selectedChapter ? async () => {
                           const chapterIdNum = parseInt(selectedChapter!, 10);
                           if (Number.isNaN(chapterIdNum)) return;
+                          
+                          // 同时创建 Yjs 快照 and 手动版本记录
                           const base64 = createYjsSnapshotFromEditor(editor!);
-                          await chaptersApi.createYjsSnapshot(chapterIdNum, base64);
-                          showMessage('版本已创建', 'success');
+                          const htmlContent = editor!.getHTML();
+                          
+                          try {
+                            await Promise.all([
+                              chaptersApi.createYjsSnapshot(chapterIdNum, base64),
+                              chaptersApi.createChapterVersion(chapterIdNum, {
+                                content: htmlContent,
+                                change_description: '手动保存版本'
+                              })
+                            ]);
+                            showMessage('版本已创建', 'success');
+                          } catch (err) {
+                            console.error('创建版本失败:', err);
+                            showMessage('创建版本失败', 'error');
+                          }
                         } : undefined}
                         onManualSave={handleManualSave}
                         onEditChapter={handleEditCurrentChapter}
@@ -1100,15 +1198,38 @@ export default function NovelEditorPage() {
         onCreateVersion={editor && selectedChapter ? async () => {
           const chapterIdNum = parseInt(selectedChapter!, 10);
           if (Number.isNaN(chapterIdNum)) return;
+          
           const base64 = createYjsSnapshotFromEditor(editor!);
-          await chaptersApi.createYjsSnapshot(chapterIdNum, base64);
-          showMessage('版本已创建', 'success');
+          const htmlContent = editor!.getHTML();
+          
+          try {
+            await Promise.all([
+              chaptersApi.createYjsSnapshot(chapterIdNum, base64),
+              chaptersApi.createChapterVersion(chapterIdNum, {
+                content: htmlContent,
+                change_description: '手动保存版本'
+              })
+            ]);
+            showMessage('版本已创建', 'success');
+          } catch (err) {
+            console.error('创建版本失败:', err);
+            showMessage('创建版本失败', 'error');
+          }
         } : undefined}
-        onRestore={editor && selectedChapter ? async (snapshotId) => {
+        onRestore={editor && selectedChapter ? async (id, type) => {
           const chapterIdNum = parseInt(selectedChapter!, 10);
           if (Number.isNaN(chapterIdNum)) return;
-          const data = await chaptersApi.getYjsSnapshot(chapterIdNum, snapshotId);
-          restoreYjsSnapshotToEditor(editor!, data.snapshot);
+          
+          if (type === 'snapshot') {
+            const data = await chaptersApi.getYjsSnapshot(chapterIdNum, id);
+            restoreYjsSnapshotToEditor(editor!, data.snapshot);
+          } else {
+            // ChapterVersion 类型
+            const res = await chaptersApi.get<ChapterVersion>(`/api/v1/chapters/${chapterIdNum}/versions/${id}`);
+            if (res.content) {
+              editor!.commands.setContent(res.content);
+            }
+          }
           showMessage('已恢复到此版本', 'success');
         } : undefined}
       />

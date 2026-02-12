@@ -85,6 +85,8 @@ export interface UseYjsEditorReturn {
   isSyncing: boolean;
   /** WebSocket 连接状态 */
   connectionStatus: 'connecting' | 'connected' | 'disconnected';
+  /** WebSocket Provider 实例，用于获取协作状态（如在线人数） */
+  provider: WebsocketProvider | null;
 }
 
 /**
@@ -239,43 +241,8 @@ export function useYjsEditor(options: UseYjsEditorOptions): UseYjsEditorReturn {
         class: 'novel-editor-content',
       },
     },
-    onCreate: ({ editor: ed }) => {
+    onCreate: () => {
       console.log('✨ [useYjsEditor] 编辑器已创建');
-
-      if (!collabState) return;
-      const xmlFragment = collabState.ydoc.getXmlFragment(collabState.field);
-      if (xmlFragment.length > 0) return; // 已有内容（IndexedDB/WebSocket），不覆盖
-      if (isInitialized.current) return;
-
-      const loadingField = collabState.field;
-
-      const applyContent = (html: string) => {
-        if (!html || isInitialized.current) return;
-        // 仍为同一章节且 fragment 仍为空时再写入（避免切换章节后旧请求覆盖新章节）
-        const frag = collabState?.ydoc.getXmlFragment(loadingField);
-        if (collabState?.field !== loadingField || (frag && frag.length > 0)) return;
-        ed.commands.setContent(html);
-        isInitialized.current = true;
-        console.log('📝 [useYjsEditor] 已从后端注入初始内容');
-      };
-
-      if (initialContent) {
-        applyContent(initialContent);
-        isInitialized.current = true;
-        return;
-      }
-
-      if (fetchInitialContent) {
-        const docIdFetchedFor = documentId;
-        fetchInitialContent(docIdFetchedFor)
-          .then((html) => {
-            if (documentIdRef.current !== docIdFetchedFor) return;
-            applyContent(html || '');
-          })
-          .catch((err) => {
-            console.warn('⚠️ [useYjsEditor] 从后端拉取初始内容失败:', err);
-          });
-      }
     },
     onUpdate: ({ editor: ed }) => {
       if (onUpdate) {
@@ -284,6 +251,71 @@ export function useYjsEditor(options: UseYjsEditorOptions): UseYjsEditorReturn {
       }
     },
   }, [collabState]); // 当 collabState 改变时重新创建编辑器
+
+  // ===== 初始内容应用逻辑 =====
+  // 确保在 Yjs 状态完全同步（本地 IndexedDB + 远程 WebSocket）后再决定是否注入初始内容
+  useEffect(() => {
+    if (!editor || !collabState || isInitialized.current) return;
+
+    const tryApplyInitialContent = () => {
+      if (isInitialized.current) return;
+
+      const xmlFragment = collabState.ydoc.getXmlFragment(collabState.field);
+      // 1. 如果 Yjs 已经有内容（来自 IndexedDB 或已同步的 WebSocket），则不需要注入初始内容
+      if (xmlFragment.length > 0) {
+        console.log('📚 [useYjsEditor] Yjs 已有内容，跳过初始内容注入');
+        isInitialized.current = true;
+        return;
+      }
+
+      // 2. 如果正在连接中且尚未同步，则继续等待 sync 事件，避免覆盖正在同步的线上内容
+      if (collabState.wsProvider.shouldConnect && !collabState.wsProvider.synced) {
+        console.log('⏳ [useYjsEditor] 等待服务器同步后再判断是否注入初始内容...');
+        return;
+      }
+
+      // 3. 到这里说明 Yjs 确实是空的，且已经完成了（本地+服务器）同步尝试
+      const loadingField = collabState.field;
+      const docIdAtStart = documentId;
+
+      const apply = (html: string) => {
+        if (isInitialized.current || documentIdRef.current !== docIdAtStart) return;
+        const frag = collabState.ydoc.getXmlFragment(loadingField);
+        if (frag.length > 0) return;
+
+        console.log('📝 [useYjsEditor] Yjs 为空，注入初始内容');
+        editor.commands.setContent(html);
+        isInitialized.current = true;
+      };
+
+      if (initialContent) {
+        apply(initialContent);
+      } else if (fetchInitialContent) {
+        fetchInitialContent(docIdAtStart)
+          .then((html) => {
+            if (html !== null) apply(html);
+          })
+          .catch((err) => {
+            console.warn('⚠️ [useYjsEditor] 拉取初始内容失败:', err);
+          });
+      }
+    };
+
+    // 尝试应用
+    tryApplyInitialContent();
+
+    // 监听同步事件
+    const onSync = (isSynced: boolean) => {
+      if (isSynced) {
+        tryApplyInitialContent();
+      }
+    };
+
+    collabState.wsProvider.on('sync', onSync);
+    return () => {
+      collabState.wsProvider.off('sync', onSync);
+    };
+  }, [editor, collabState, initialContent, fetchInitialContent, documentId]);
 
   // ===== 手动保存（兼容旧接口） =====
   const syncToServer = useCallback(async () => {
@@ -320,5 +352,6 @@ export function useYjsEditor(options: UseYjsEditorOptions): UseYjsEditorReturn {
     loadFromServer,
     isSyncing: connectionStatus === 'connecting',
     connectionStatus,
+    provider: collabState?.wsProvider || null,
   };
 }

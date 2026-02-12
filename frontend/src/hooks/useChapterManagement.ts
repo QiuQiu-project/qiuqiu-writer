@@ -7,6 +7,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { chaptersApi, type Chapter } from '../utils/chaptersApi';
 import { volumesApi, type Volume } from '../utils/volumesApi';
+import { yjsApi } from '../utils/yjsApi';
 import type { ChapterFullData } from '../types/document';
 import type { ChapterSaveData } from './useChapterOperations';
 
@@ -76,6 +77,8 @@ export function useChapterManagement(options: UseChapterManagementOptions): UseC
 
   // 包装 setSelectedChapter，使其在更新状态的同时更新 URL
   const setSelectedChapter = useCallback((id: string | null) => {
+    // 切换章节时，不再需要手动触发 HTTP 同步，y-websocket 会在断开连接时自动持久化
+    
     // 优先更新 URL，useEffect 会同步状态
     setSearchParams(prev => {
       const p = new URLSearchParams(prev);
@@ -86,7 +89,7 @@ export function useChapterManagement(options: UseChapterManagementOptions): UseC
       }
       return p;
     });
-  }, [setSearchParams]);
+  }, [setSearchParams, workId]);
   const [chaptersData, setChaptersData] = useState<Record<string, ChapterFullData>>({});
   const [volumes, setVolumes] = useState<VolumeData[]>([]);
   const [deletedChapters, setDeletedChapters] = useState<Chapter[]>([]);

@@ -21,6 +21,16 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/yjs", tags=["yjs"])
 
 
+@router.post("/{room_name}/sync")
+async def force_sync(room_name: str):
+    """
+    Force a database sync for a room.
+    Useful when switching chapters to ensure immediate persistence to MongoDB.
+    """
+    success = await yjs_ws_manager.force_sync(room_name)
+    return {"success": success, "room": room_name}
+
+
 @router.websocket("/{room_name}")
 async def yjs_websocket(
     websocket: WebSocket,

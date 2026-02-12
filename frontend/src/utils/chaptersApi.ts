@@ -296,6 +296,29 @@ class ChaptersApiClient extends BaseApiClient {
     return this.post<Chapter>(`/api/v1/chapters/${chapterId}/restore`, {});
   }
 
+  /**
+   * 创建章节版本（保存为历史记录）
+   */
+  async createChapterVersion(
+    chapterId: number,
+    versionData: {
+      content: string;
+      change_description?: string;
+    }
+  ): Promise<ChapterVersion> {
+    return this.post<ChapterVersion>(`/api/v1/chapters/${chapterId}/versions`, versionData);
+  }
+
+  /**
+   * 获取章节版本列表
+   */
+  async listChapterVersions(
+    chapterId: number,
+    page?: number,
+    size?: number
+  ): Promise<{ versions: ChapterVersion[]; total: number; page: number; size: number }> {
+    return this.get(`/api/v1/chapters/${chapterId}/versions`, { page, size });
+  }
 
   /** Yjs 原生快照（Git 式版本）列表 */
   async listYjsSnapshots(

@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ArrowLeft, Plus, ChevronLeft, ChevronRight, Info } from 'lucide-react';
-import { chaptersApi, type YjsSnapshotMeta } from '../../utils/chaptersApi';
+import { chaptersApi, type YjsSnapshotMeta, type ChapterVersion } from '../../utils/chaptersApi';
 import { getContentJSONFromYjsSnapshotBase64, getTextFromProsemirrorJSON } from '../../utils/yjsSnapshot';
 import { diffLines, type DiffLine } from '../../utils/simpleDiff';
 import LoadingSpinner from '../common/LoadingSpinner';
@@ -18,7 +18,7 @@ interface ChapterHistoryModalProps {
   onClose: () => void;
   getCurrentContent?: () => string;
   onCreateVersion?: () => Promise<void>;
-  onRestore?: (snapshotId: number) => Promise<void>;
+  onRestore?: (id: number, type: 'version' | 'snapshot') => Promise<void>;
 }
 
 /** 格式：1月7日 19:45 */
@@ -63,6 +63,14 @@ function DiffView({ lines }: { lines: DiffLine[] }) {
   );
 }
 
+interface UnifiedHistoryItem {
+  id: number;
+  type: 'version' | 'snapshot';
+  created_at: string | null;
+  label: string;
+  meta: string;
+}
+
 export default function ChapterHistoryModal({
   isOpen,
   chapterId,
@@ -71,11 +79,12 @@ export default function ChapterHistoryModal({
   onCreateVersion,
   onRestore,
 }: ChapterHistoryModalProps) {
-  const [snapshots, setSnapshots] = useState<YjsSnapshotMeta[]>([]);
+  const [items, setItems] = useState<UnifiedHistoryItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [restoringId, setRestoringId] = useState<number | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedType, setSelectedType] = useState<'version' | 'snapshot' | null>(null);
   const [diffLinesState, setDiffLinesState] = useState<DiffLine[] | null>(null);
   const [versionTextState, setVersionTextState] = useState<string | null>(null);
   const [diffLoading, setDiffLoading] = useState(false);
@@ -83,89 +92,148 @@ export default function ChapterHistoryModal({
 
   const getCurrentContentRef = useRef(getCurrentContent);
   getCurrentContentRef.current = getCurrentContent;
-  const loadingSnapshotIdRef = useRef<number | null>(null);
+  const loadingIdRef = useRef<string | null>(null);
 
-  const loadSnapshots = useCallback(() => {
+  const loadHistory = useCallback(async () => {
     if (!chapterId) return;
     const id = parseInt(chapterId, 10);
     if (Number.isNaN(id)) return;
     setLoading(true);
-    chaptersApi
-      .listYjsSnapshots(id, 1, 50)
-      .then((res) => setSnapshots(res.snapshots || []))
-      .catch(() => setSnapshots([]))
-      .finally(() => setLoading(false));
+    try {
+      console.log('🔍 [ChapterHistoryModal] 开始加载历史记录, chapterId:', id);
+      const [vRes, sRes] = await Promise.all([
+        chaptersApi.listChapterVersions(id, 1, 50),
+        chaptersApi.listYjsSnapshots(id, 1, 50)
+      ]);
+      
+      console.log('📦 [ChapterHistoryModal] 接口返回:', { vRes, sRes });
+
+      const unifiedVersions: UnifiedHistoryItem[] = (vRes.versions || []).map(v => ({
+        id: v.id,
+        type: 'version',
+        created_at: v.created_at,
+        label: v.change_description || '手动保存版本',
+        meta: `版本 ${v.version_number}`
+      }));
+
+      const unifiedSnapshots: UnifiedHistoryItem[] = (sRes.snapshots || []).map(s => ({
+        id: s.id,
+        type: 'snapshot',
+        created_at: s.created_at,
+        label: s.label || '自动同步快照',
+        meta: 'Yjs 快照'
+      }));
+
+      const combined = [...unifiedVersions, ...unifiedSnapshots].sort((a, b) => {
+        const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return timeB - timeA;
+      });
+
+      console.log('📋 [ChapterHistoryModal] 合并后的历史记录:', combined);
+      setItems(combined);
+    } catch (err) {
+      console.error('❌ [ChapterHistoryModal] 加载历史失败:', err);
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
   }, [chapterId]);
 
   useEffect(() => {
     if (!isOpen || !chapterId) {
-      setSnapshots([]);
+      setItems([]);
       setSelectedId(null);
+      setSelectedType(null);
       setDiffLinesState(null);
       return;
     }
-    loadSnapshots();
-  }, [isOpen, chapterId, loadSnapshots]);
+    loadHistory();
+  }, [isOpen, chapterId, loadHistory]);
 
-  const selectedIndex = selectedId != null ? snapshots.findIndex((s) => s.id === selectedId) : -1;
+  const selectedIndex = selectedId != null ? items.findIndex((item) => item.id === selectedId && item.type === selectedType) : -1;
   const currentPosition = selectedIndex >= 0 ? selectedIndex + 1 : 0;
-  const totalCount = snapshots.length;
+  const totalCount = items.length;
 
-  const loadDiffFor = useCallback(async (snapshotId: number) => {
-    const id = chapterId ? parseInt(chapterId, 10) : NaN;
-    if (!chapterId || Number.isNaN(id)) return;
+  const loadDiffFor = useCallback(async (id: number, type: 'version' | 'snapshot') => {
+    const chapterIdNum = chapterId ? parseInt(chapterId, 10) : NaN;
+    if (!chapterId || Number.isNaN(chapterIdNum)) return;
     const getCurrent = getCurrentContentRef.current;
     if (!getCurrent) return;
-    loadingSnapshotIdRef.current = snapshotId;
+    
+    const loadingKey = `${type}-${id}`;
+    loadingIdRef.current = loadingKey;
     setDiffLoading(true);
     setDiffLinesState(null);
     setVersionTextState(null);
+    
     try {
-      const data = await chaptersApi.getYjsSnapshot(id, snapshotId);
-      if (loadingSnapshotIdRef.current !== snapshotId) return;
-      const versionJson = getContentJSONFromYjsSnapshotBase64(data.snapshot);
-      const versionText = getTextFromProsemirrorJSON(versionJson);
+      let versionText = '';
+      if (type === 'snapshot') {
+        const data = await chaptersApi.getYjsSnapshot(chapterIdNum, id);
+        if (loadingIdRef.current !== loadingKey) return;
+        const versionJson = getContentJSONFromYjsSnapshotBase64(data.snapshot);
+        versionText = getTextFromProsemirrorJSON(versionJson);
+      } else {
+        // 对于 ChapterVersion，我们可能需要一个获取单个版本的接口，或者从列表中找（如果列表含 content）
+        // 目前 listChapterVersions 可能不含 content 以节省带宽
+        // 我们假设后端返回的列表不含 content，所以需要获取详情
+        const res = await chaptersApi.get<ChapterVersion>(`/api/v1/chapters/${chapterIdNum}/versions/${id}`);
+        if (loadingIdRef.current !== loadingKey) return;
+        versionText = res.content || '';
+      }
+      
       setVersionTextState(versionText);
       const currentText = getCurrent();
       setDiffLinesState(diffLines(versionText, currentText));
-    } catch {
-      if (loadingSnapshotIdRef.current !== snapshotId) return;
+    } catch (err) {
+      console.error('❌ [ChapterHistoryModal] 加载差异失败:', err);
+      if (loadingIdRef.current !== loadingKey) return;
       setDiffLinesState([]);
       setVersionTextState(null);
     } finally {
-      if (loadingSnapshotIdRef.current === snapshotId) {
-        loadingSnapshotIdRef.current = null;
+      if (loadingIdRef.current === loadingKey) {
+        loadingIdRef.current = null;
         setDiffLoading(false);
       }
     }
   }, [chapterId]);
 
   useEffect(() => {
-    if (selectedId != null) loadDiffFor(selectedId);
-    else {
+    if (selectedId != null && selectedType != null) {
+      loadDiffFor(selectedId, selectedType);
+    } else {
       setDiffLinesState(null);
       setVersionTextState(null);
-      loadingSnapshotIdRef.current = null;
+      loadingIdRef.current = null;
     }
-  }, [selectedId, loadDiffFor]);
+  }, [selectedId, selectedType, loadDiffFor]);
 
   const handleCreateVersion = async () => {
     if (!onCreateVersion) return;
     setCreating(true);
     try {
       await onCreateVersion();
-      loadSnapshots();
+      loadHistory();
     } finally {
       setCreating(false);
     }
   };
 
   const handleRestore = async () => {
-    if (selectedId == null || !onRestore) return;
+    if (selectedId == null || selectedType == null || !onRestore) return;
+    
     setRestoringId(selectedId);
     try {
-      await onRestore(selectedId);
+      if (selectedType === 'version') {
+        await onRestore(selectedId, 'version');
+      } else {
+        await onRestore(selectedId, 'snapshot');
+      }
       onClose();
+    } catch (err) {
+      console.error('❌ [ChapterHistoryModal] 恢复失败:', err);
+      alert('恢复失败，请重试');
     } finally {
       setRestoringId(null);
     }
@@ -173,17 +241,21 @@ export default function ChapterHistoryModal({
 
   const goPrev = () => {
     if (selectedIndex <= 0) return;
-    setSelectedId(snapshots[selectedIndex - 1].id);
+    const prev = items[selectedIndex - 1];
+    setSelectedId(prev.id);
+    setSelectedType(prev.type);
   };
 
   const goNext = () => {
-    if (selectedIndex < 0 || selectedIndex >= snapshots.length - 1) return;
-    setSelectedId(snapshots[selectedIndex + 1].id);
+    if (selectedIndex < 0 || selectedIndex >= items.length - 1) return;
+    const next = items[selectedIndex + 1];
+    setSelectedId(next.id);
+    setSelectedType(next.type);
   };
 
   const groupedByMonth = (() => {
-    const map = new Map<string, YjsSnapshotMeta[]>();
-    snapshots.forEach((s) => {
+    const map = new Map<string, UnifiedHistoryItem[]>();
+    items.forEach((s) => {
       const key = formatMonth(s.created_at) || '—';
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(s);
@@ -305,28 +377,28 @@ export default function ChapterHistoryModal({
                     <div className="chapter-history-group-label">{monthLabel}</div>
                     <ul className="chapter-history-list">
                       {items.map((s) => {
-                        const globalIndex = snapshots.findIndex((x) => x.id === s.id);
-                        const isFirst = globalIndex === 0;
-                        const isLast = globalIndex === snapshots.length - 1;
-                        const desc = s.label || (isFirst ? '最近更新' : isLast ? '创建了文档' : '');
-                        const isSelected = s.id === selectedId;
+                        const isSelected = s.id === selectedId && s.type === selectedType;
                         return (
                           <li
-                            key={s.id}
+                            key={`${s.type}-${s.id}`}
                             className={`chapter-history-item ${isSelected ? 'selected' : ''}`}
-                            onClick={() => setSelectedId(s.id)}
+                            onClick={() => {
+                              setSelectedId(s.id);
+                              setSelectedType(s.type);
+                            }}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' || e.key === ' ') {
                                 e.preventDefault();
                                 setSelectedId(s.id);
+                                setSelectedType(s.type);
                               }
                             }}
                             role="button"
                             tabIndex={0}
                           >
                             <span className="chapter-history-item-time">{formatDateShort(s.created_at)}</span>
-                            {desc && <span className="chapter-history-item-desc">{desc}</span>}
-                            <span className="chapter-history-item-meta">· 本章</span>
+                            {s.label && <span className="chapter-history-item-desc">{s.label}</span>}
+                            <span className="chapter-history-item-meta">· {s.meta}</span>
                           </li>
                         );
                       })}

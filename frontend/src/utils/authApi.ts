@@ -50,7 +50,7 @@ class AuthApiClient extends BaseApiClient {
    * 登录
    */
   async login(credentials: LoginRequest): Promise<TokenResponse> {
-    const data = await this.post<TokenResponse>('/api/v1/auth/login/', credentials);
+    const data = await this.post<TokenResponse>('/api/v1/auth/login', credentials);
     return data;
   }
 
@@ -58,7 +58,7 @@ class AuthApiClient extends BaseApiClient {
    * 注册
    */
   async register(data: RegisterRequest): Promise<TokenResponse> {
-    return await this.post<TokenResponse>('/api/v1/auth/register/', data);
+    return await this.post<TokenResponse>('/api/v1/auth/register', data);
   }
 
   /**
@@ -70,7 +70,7 @@ class AuthApiClient extends BaseApiClient {
     }
 
     try {
-      const data = await this.get<UserInfo | { user: UserInfo }>('/api/v1/auth/me/');
+      const data = await this.get<UserInfo | { user: UserInfo }>('/api/v1/auth/me');
       return 'user' in data ? data.user : data;
     } catch (err: unknown) {
       const error = err as Error;
@@ -93,7 +93,7 @@ class AuthApiClient extends BaseApiClient {
     }
 
     try {
-      await this.post('/api/v1/auth/logout/', refreshToken ? { refresh_token: refreshToken } : {});
+      await this.post('/api/v1/auth/logout', refreshToken ? { refresh_token: refreshToken } : {});
     } catch (error) {
       console.error('登出请求失败:', error);
     } finally {
@@ -111,7 +111,7 @@ class AuthApiClient extends BaseApiClient {
     }
 
     try {
-      const data = await this.post<TokenResponse>('/api/v1/auth/refresh/', { refresh_token: refreshToken });
+      const data = await this.post<TokenResponse>('/api/v1/auth/refresh', { refresh_token: refreshToken });
       this.setToken(data.access_token);
       this.setRefreshToken(data.refresh_token);
       return data;
@@ -173,7 +173,7 @@ class AuthApiClient extends BaseApiClient {
     }
 
     try {
-      const result = await this.put<UserInfo | { user: UserInfo }>('/api/v1/auth/me/', data);
+      const result = await this.put<UserInfo | { user: UserInfo }>('/api/v1/auth/me', data);
       const updatedUser = 'user' in result ? result.user : result;
       this.setUserInfo(updatedUser);
       return updatedUser;

@@ -72,7 +72,7 @@ class ChapterListResponse(BaseModel):
 
 class ChapterVersionCreate(BaseModel):
     """创建章节版本模式"""
-    content: str
+    content: Optional[str] = None
     change_description: Optional[str] = None
 
 class ChapterVersionResponse(BaseModel):

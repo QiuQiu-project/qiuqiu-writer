@@ -172,6 +172,16 @@ class ChapterService:
 
     async def create_chapter_version(self, **kwargs) -> ChapterVersion:
         """创建章节版本"""
+        # 自动计算版本号
+        chapter_id = kwargs.get('chapter_id')
+        if chapter_id and 'version_number' not in kwargs:
+            stmt = select(func.max(ChapterVersion.version_number)).where(
+                ChapterVersion.chapter_id == chapter_id
+            )
+            result = await self.db.execute(stmt)
+            max_version = result.scalar()
+            kwargs['version_number'] = (max_version or 0) + 1
+
         version = ChapterVersion(**kwargs)
 
         self.db.add(version)
