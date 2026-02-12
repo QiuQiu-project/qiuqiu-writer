@@ -161,12 +161,25 @@ export default function NovelEditorPage() {
   const { editor, provider, syncToServer } = useYjsEditor({
     documentId,
     fetchInitialContent: async (docId) => {
+      // 优先从本地缓存获取，确保离线编辑的内容不会丢失
+      try {
+        const cached = await documentCache.getDocument(docId);
+        if (cached && cached.content && cached.content.trim().length > 0) {
+          console.log('📦 [NovelEditorPage] 使用本地缓存作为初始内容');
+          return cached.content;
+        }
+      } catch (cacheErr) {
+        console.warn('⚠️ [NovelEditorPage] 读取本地缓存失败:', cacheErr);
+      }
+
+      // 本地没有，再从服务器拉取
       const m = docId.match(/^work_(.+?)_chapter_(.+)$/);
       if (!m) return null;
       const chapterId = parseInt(m[2], 10);
       if (Number.isNaN(chapterId)) return null;
       try {
         const res = await chaptersApi.getChapterDocument(chapterId);
+        // 注意：这里的 res.content 可能是 Yjs 的 XML 字符串
         return res?.content || null;
       } catch (err) {
         console.error('❌ [NovelEditorPage] 获取初始内容失败:', err);
@@ -965,6 +978,12 @@ export default function NovelEditorPage() {
                                 change_description: '手动保存版本'
                               })
                             ]);
+                            
+                            // 更新本地缓存，确保版本创建后内容已同步到本地
+                            if (documentId) {
+                              await documentCache.updateDocument(documentId, htmlContent);
+                            }
+                            
                             showMessage('版本已创建', 'success');
                           } catch (err) {
                             console.error('创建版本失败:', err);
@@ -1210,6 +1229,12 @@ export default function NovelEditorPage() {
                 change_description: '手动保存版本'
               })
             ]);
+            
+            // 更新本地缓存，确保版本创建后内容已同步到本地
+            if (documentId) {
+              await documentCache.updateDocument(documentId, htmlContent);
+            }
+            
             showMessage('版本已创建', 'success');
           } catch (err) {
             console.error('创建版本失败:', err);
@@ -1225,7 +1250,7 @@ export default function NovelEditorPage() {
             restoreYjsSnapshotToEditor(editor!, data.snapshot);
           } else {
             // ChapterVersion 类型
-            const res = await chaptersApi.get<ChapterVersion>(`/api/v1/chapters/${chapterIdNum}/versions/${id}`);
+            const res = await chaptersApi.getChapterVersion(chapterIdNum, id);
             if (res.content) {
               editor!.commands.setContent(res.content);
             }

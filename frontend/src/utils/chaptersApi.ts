@@ -315,18 +315,64 @@ class ChaptersApiClient extends BaseApiClient {
   async listChapterVersions(
     chapterId: number,
     page?: number,
-    size?: number
+    size?: number,
+    skipCache?: boolean
   ): Promise<{ versions: ChapterVersion[]; total: number; page: number; size: number }> {
-    return this.get(`/api/v1/chapters/${chapterId}/versions`, { page, size });
+    const cacheKey = `chapter_versions_${chapterId}_${page || 1}_${size || 20}`;
+    
+    // 优先从缓存获取
+    if (!skipCache) {
+      const cached = await localCacheManager.get<{ versions: ChapterVersion[]; total: number; page: number; size: number }>(cacheKey);
+      if (cached) {
+        console.log('✅ [ChaptersApi] 从缓存加载版本列表:', cacheKey);
+        // 后台刷新
+        this.get<{ versions: ChapterVersion[]; total: number; page: number; size: number }>(`/api/v1/chapters/${chapterId}/versions`, { page, size }).then(res => {
+          localCacheManager.set(cacheKey, res, 1, { synced: true });
+        }).catch(() => {});
+        return cached;
+      }
+    }
+
+    const response = await this.get<{ versions: ChapterVersion[]; total: number; page: number; size: number }>(`/api/v1/chapters/${chapterId}/versions`, { page, size });
+    
+    // 写入缓存
+    if (response && response.versions) {
+      await localCacheManager.set(cacheKey, response, 1, { synced: true });
+    }
+    
+    return response;
   }
 
   /** Yjs 原生快照（Git 式版本）列表 */
   async listYjsSnapshots(
     chapterId: number,
     page?: number,
-    size?: number
+    size?: number,
+    skipCache?: boolean
   ): Promise<{ snapshots: YjsSnapshotMeta[]; total: number; page: number; size: number }> {
-    return this.get(`/api/v1/chapters/${chapterId}/yjs-snapshots`, { page, size });
+    const cacheKey = `chapter_snapshots_${chapterId}_${page || 1}_${size || 20}`;
+    
+    // 优先从缓存获取
+    if (!skipCache) {
+      const cached = await localCacheManager.get<{ snapshots: YjsSnapshotMeta[]; total: number; page: number; size: number }>(cacheKey);
+      if (cached) {
+        console.log('✅ [ChaptersApi] 从缓存加载快照列表:', cacheKey);
+        // 后台刷新
+        this.get<{ snapshots: YjsSnapshotMeta[]; total: number; page: number; size: number }>(`/api/v1/chapters/${chapterId}/yjs-snapshots`, { page, size }).then(res => {
+          localCacheManager.set(cacheKey, res, 1, { synced: true });
+        }).catch(() => {});
+        return cached;
+      }
+    }
+
+    const response = await this.get<{ snapshots: YjsSnapshotMeta[]; total: number; page: number; size: number }>(`/api/v1/chapters/${chapterId}/yjs-snapshots`, { page, size });
+    
+    // 写入缓存
+    if (response && response.snapshots) {
+      await localCacheManager.set(cacheKey, response, 1, { synced: true });
+    }
+    
+    return response;
   }
 
   /** 创建 Yjs 快照，snapshot 为 base64 编码的 Y.encodeStateAsUpdate 结果 */
@@ -341,12 +387,46 @@ class ChaptersApiClient extends BaseApiClient {
     });
   }
 
+  /**
+   * 获取单个章节版本详情
+   */
+  async getChapterVersion(
+    chapterId: number,
+    versionId: number
+  ): Promise<ChapterVersion> {
+    const cacheKey = `chapter_version_detail_${chapterId}_${versionId}`;
+    
+    const cached = await localCacheManager.get<ChapterVersion>(cacheKey);
+    if (cached) {
+      console.log('✅ [ChaptersApi] 从缓存加载版本详情:', cacheKey);
+      return cached;
+    }
+
+    const response = await this.get<ChapterVersion>(`/api/v1/chapters/${chapterId}/versions/${versionId}`);
+    if (response) {
+      await localCacheManager.set(cacheKey, response, 1, { synced: true });
+    }
+    return response;
+  }
+
   /** 获取单个 Yjs 快照（含 snapshot base64，用于恢复） */
   async getYjsSnapshot(
     chapterId: number,
     snapshotId: number
   ): Promise<YjsSnapshotMeta & { snapshot: string }> {
-    return this.get(`/api/v1/chapters/${chapterId}/yjs-snapshots/${snapshotId}`);
+    const cacheKey = `chapter_snapshot_detail_${chapterId}_${snapshotId}`;
+    
+    const cached = await localCacheManager.get<YjsSnapshotMeta & { snapshot: string }>(cacheKey);
+    if (cached) {
+      console.log('✅ [ChaptersApi] 从缓存加载快照详情:', cacheKey);
+      return cached;
+    }
+
+    const response = await this.get<YjsSnapshotMeta & { snapshot: string }>(`/api/v1/chapters/${chapterId}/yjs-snapshots/${snapshotId}`);
+    if (response) {
+      await localCacheManager.set(cacheKey, response, 1, { synced: true });
+    }
+    return response;
   }
 }
 

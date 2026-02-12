@@ -597,6 +597,45 @@ async def get_chapter_versions(
     }
 
 
+@router.get("/{chapter_id}/versions/{version_id}", response_model=Dict[str, Any])
+async def get_chapter_version(
+    chapter_id: int,
+    version_id: int,
+    db: AsyncSession = Depends(get_db_session),
+    current_user_id: str = Depends(get_current_user_id)
+) -> Dict[str, Any]:
+    """
+    获取单个章节版本详情
+    """
+    chapter_service = ChapterService(db)
+
+    # 检查章节访问权限
+    chapter = await chapter_service.get_chapter_by_id(chapter_id)
+    if not chapter:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="章节不存在"
+        )
+
+    if not await chapter_service.can_access_work(
+        user_id=current_user_id,
+        work_id=chapter.work_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="没有访问该章节的权限"
+        )
+
+    version = await chapter_service.get_chapter_version(chapter_id, version_id)
+    if not version:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="版本不存在"
+        )
+
+    return version.to_dict()
+
+
 @router.post("/{chapter_id}/versions", response_model=ChapterVersionResponse)
 async def create_chapter_version(
     chapter_id: int,

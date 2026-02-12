@@ -94,16 +94,16 @@ export default function ChapterHistoryModal({
   getCurrentContentRef.current = getCurrentContent;
   const loadingIdRef = useRef<string | null>(null);
 
-  const loadHistory = useCallback(async () => {
+  const loadHistory = useCallback(async (skipCache = false) => {
     if (!chapterId) return;
     const id = parseInt(chapterId, 10);
     if (Number.isNaN(id)) return;
     setLoading(true);
     try {
-      console.log('🔍 [ChapterHistoryModal] 开始加载历史记录, chapterId:', id);
+      console.log('🔍 [ChapterHistoryModal] 开始加载历史记录, chapterId:', id, 'skipCache:', skipCache);
       const [vRes, sRes] = await Promise.all([
-        chaptersApi.listChapterVersions(id, 1, 50),
-        chaptersApi.listYjsSnapshots(id, 1, 50)
+        chaptersApi.listChapterVersions(id, 1, 50, skipCache),
+        chaptersApi.listYjsSnapshots(id, 1, 50, skipCache)
       ]);
       
       console.log('📦 [ChapterHistoryModal] 接口返回:', { vRes, sRes });
@@ -124,6 +124,9 @@ export default function ChapterHistoryModal({
         meta: 'Yjs 快照'
       }));
 
+      console.log('✅ [ChapterHistoryModal] 统一后的版本:', unifiedVersions);
+      console.log('✅ [ChapterHistoryModal] 统一后的快照:', unifiedSnapshots);
+
       const combined = [...unifiedVersions, ...unifiedSnapshots].sort((a, b) => {
         const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
         const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
@@ -132,6 +135,12 @@ export default function ChapterHistoryModal({
 
       console.log('📋 [ChapterHistoryModal] 合并后的历史记录:', combined);
       setItems(combined);
+      
+      // 如果当前没有选中项，自动选中第一个（最新的）
+      if (combined.length > 0 && selectedId == null) {
+        setSelectedId(combined[0].id);
+        setSelectedType(combined[0].type);
+      }
     } catch (err) {
       console.error('❌ [ChapterHistoryModal] 加载历史失败:', err);
       setItems([]);
@@ -178,7 +187,7 @@ export default function ChapterHistoryModal({
         // 对于 ChapterVersion，我们可能需要一个获取单个版本的接口，或者从列表中找（如果列表含 content）
         // 目前 listChapterVersions 可能不含 content 以节省带宽
         // 我们假设后端返回的列表不含 content，所以需要获取详情
-        const res = await chaptersApi.get<ChapterVersion>(`/api/v1/chapters/${chapterIdNum}/versions/${id}`);
+        const res = await chaptersApi.getChapterVersion(chapterIdNum, id);
         if (loadingIdRef.current !== loadingKey) return;
         versionText = res.content || '';
       }
@@ -214,7 +223,7 @@ export default function ChapterHistoryModal({
     setCreating(true);
     try {
       await onCreateVersion();
-      loadHistory();
+      await loadHistory(true);
     } finally {
       setCreating(false);
     }

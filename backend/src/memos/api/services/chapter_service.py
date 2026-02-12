@@ -217,6 +217,15 @@ class ChapterService:
 
         return list(versions), total
 
+    async def get_chapter_version(self, chapter_id: int, version_id: int) -> Optional[ChapterVersion]:
+        """获取单个章节版本详情"""
+        stmt = select(ChapterVersion).where(
+            ChapterVersion.id == version_id,
+            ChapterVersion.chapter_id == chapter_id,
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+
     # 权限检查方法
     async def can_access_work(self, user_id: str, work_id: str) -> bool:
         """检查用户是否可以访问作品"""

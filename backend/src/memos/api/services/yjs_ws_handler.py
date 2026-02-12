@@ -220,15 +220,20 @@ class YjsRoom:
                                                 content_type = "Text"
                                             
                                             if raw_obj:
-                                                content = str(raw_obj)
+                                                # 使用 pycrdt 的 to_html 或类似方法获取更准确的 HTML
+                                                # 如果 str(raw_obj) 返回的是 <xml_fragment>...</xml_fragment>
+                                                # 我们需要提取其中的内容
+                                                raw_content = str(raw_obj)
+                                                if raw_content.startswith("<xml_fragment>") and raw_content.endswith("</xml_fragment>"):
+                                                    content = raw_content[14:-15]
+                                                else:
+                                                    content = raw_content
                                                 
-                                                # If content is still empty but we have an object, try to see if it has children
-                                                if (content == "" or content == "<xml_fragment></xml_fragment>") and content_type == "XmlFragment":
+                                                # 如果内容仍然为空但有子元素，记录警告
+                                                if (not content or content.strip() == "") and content_type == "XmlFragment":
                                                     try:
                                                         if hasattr(raw_obj, "__len__") and len(raw_obj) > 0:
-                                                            # If it has children, str() might not be enough if it's nested
-                                                            # For now, we'll keep the str() result, but log it
-                                                            logger.debug(f"[YjsSync] Chapter {chapter.id} fragment has {len(raw_obj)} children but str() is empty/minimal")
+                                                            logger.warning(f"[YjsSync] Chapter {chapter.id} fragment has {len(raw_obj)} children but extracted content is empty")
                                                     except:
                                                         pass
                                     except Exception as e:
