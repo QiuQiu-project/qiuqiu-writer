@@ -7,7 +7,6 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { chaptersApi, type Chapter } from '../utils/chaptersApi';
 import { volumesApi, type Volume } from '../utils/volumesApi';
-import { yjsApi } from '../utils/yjsApi';
 import type { ChapterFullData } from '../types/document';
 import type { ChapterSaveData } from './useChapterOperations';
 
@@ -89,7 +88,7 @@ export function useChapterManagement(options: UseChapterManagementOptions): UseC
       }
       return p;
     });
-  }, [setSearchParams, workId]);
+  }, [setSearchParams]);
   const [chaptersData, setChaptersData] = useState<Record<string, ChapterFullData>>({});
   const [volumes, setVolumes] = useState<VolumeData[]>([]);
   const [deletedChapters, setDeletedChapters] = useState<Chapter[]>([]);

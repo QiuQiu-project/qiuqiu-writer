@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ArrowLeft, Plus, ChevronLeft, ChevronRight, Info } from 'lucide-react';
-import { chaptersApi, type YjsSnapshotMeta, type ChapterVersion } from '../../utils/chaptersApi';
+import { chaptersApi } from '../../utils/chaptersApi';
 import { getContentJSONFromYjsSnapshotBase64, getTextFromProsemirrorJSON } from '../../utils/yjsSnapshot';
 import { diffLines, type DiffLine } from '../../utils/simpleDiff';
 import LoadingSpinner from '../common/LoadingSpinner';
@@ -137,9 +137,15 @@ export default function ChapterHistoryModal({
       setItems(combined);
       
       // 如果当前没有选中项，自动选中第一个（最新的）
-      if (combined.length > 0 && selectedId == null) {
-        setSelectedId(combined[0].id);
-        setSelectedType(combined[0].type);
+      if (combined.length > 0) {
+        setSelectedId(prev => {
+          if (prev == null) return combined[0].id;
+          return prev;
+        });
+        setSelectedType(prev => {
+          if (prev == null) return combined[0].type;
+          return prev;
+        });
       }
     } catch (err) {
       console.error('❌ [ChapterHistoryModal] 加载历史失败:', err);

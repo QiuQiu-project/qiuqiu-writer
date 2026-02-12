@@ -3,7 +3,7 @@
  * 当检测到本地版本和线上版本不一致时，允许用户选择如何处理
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { X, Download, Upload, GitMerge, AlertTriangle, Eye, EyeOff } from 'lucide-react';
 import './VersionConflictModal.css';
 
@@ -36,14 +36,15 @@ export default function VersionConflictModal({
   const [showRemotePreview, setShowRemotePreview] = useState(false);
   const [selectedResolution, setSelectedResolution] = useState<ConflictResolution | null>(null);
 
-  useEffect(() => {
-    if (isOpen && conflictInfo) {
-      // 重置状态
-      setShowLocalPreview(false);
-      setShowRemotePreview(false);
-      setSelectedResolution(null);
-    }
-  }, [isOpen, conflictInfo]);
+  // 记录上一次的冲突文档ID，用于在冲突变化时重置状态
+  const [prevDocId, setPrevDocId] = useState<string | null>(null);
+
+  if (conflictInfo?.documentId !== prevDocId) {
+    setPrevDocId(conflictInfo?.documentId || null);
+    setShowLocalPreview(false);
+    setShowRemotePreview(false);
+    setSelectedResolution(null);
+  }
 
   if (!isOpen || !conflictInfo) return null;
 

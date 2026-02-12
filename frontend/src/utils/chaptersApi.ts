@@ -77,6 +77,7 @@ export interface ChapterVersion {
 export interface ChapterDocumentResponse {
   document_id: string;
   content: string;
+  version: number;
   chapter_info: Chapter;
   document_exists: boolean;
 }

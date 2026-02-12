@@ -3,7 +3,7 @@
  * 模块化重构版本 - 控制在1000行以内
  */
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Trash2, Info, Menu, X, MessageSquare, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { EditorContent } from '@tiptap/react';
@@ -44,7 +44,7 @@ import { documentCache } from '../utils/documentCache';
 import { syncManager } from '../utils/syncManager';
 import { countCharacters } from '../utils/textUtils';
 import { generateChapterContent } from '../utils/bookAnalysisApi';
-import { chaptersApi, type ChapterVersion } from '../utils/chaptersApi';
+import { chaptersApi } from '../utils/chaptersApi';
 import { createYjsSnapshotFromEditor, restoreYjsSnapshotToEditor, getTextFromProsemirrorJSON } from '../utils/yjsSnapshot';
 
 // 样式
@@ -193,9 +193,11 @@ export default function NovelEditorPage() {
       const wordCount = countCharacters(content);
       setCurrentChapterWordCount(wordCount);
       
-      // 更新本地缓存，避免产生虚假冲突
+      // 更新本地缓存
+      // 关键修复：既然正在使用 Yjs 进行实时同步，我们将本地缓存标记为“已同步”
+      // 这样可以避免 SyncManager 触发冗余的 ShareDB 同步请求，从而减少冲突
       if (documentId) {
-        documentCache.updateDocument(documentId, content).catch(err => {
+        documentCache.updateDocument(documentId, content, undefined, true).catch(err => {
           console.warn('⚠️ [NovelEditorPage] 更新本地缓存失败:', err);
         });
       }
@@ -344,6 +346,16 @@ export default function NovelEditorPage() {
     [availableCharacters]
   );
   
+  // ===== 切换章节时设置活动文档 ID =====
+  useEffect(() => {
+    if (documentId) {
+      syncManager.setActiveDocumentId(documentId);
+    }
+    return () => {
+      syncManager.setActiveDocumentId(null);
+    };
+  }, [documentId]);
+
   // ===== 加载作品详情 =====
   useEffect(() => {
     if (!workId) {

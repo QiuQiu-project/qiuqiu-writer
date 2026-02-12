@@ -117,7 +117,7 @@ export const documentCache = {
           const doc: ShareDBDocument = {
             document_id: documentId,
             content: content,
-            version: existingResult.chapter_info?.id || 1,
+            version: existingResult.version || existingResult.chapter_info?.id || 1,
             metadata: {
               work_id: existingResult.chapter_info?.work_id,
               chapter_id: existingResult.chapter_info?.id,
@@ -149,6 +149,16 @@ export const documentCache = {
       serverDoc = await Promise.race([fetchPromise, timeoutPromise]) as ShareDBDocument | null;
       
       if (serverDoc) {
+        // 关键修复：清理内容中的 Yjs XML 包装标签
+        if (typeof serverDoc.content === 'string') {
+          let content = serverDoc.content;
+          if (content.startsWith('<xml_fragment>') && content.endsWith('</xml_fragment>')) {
+            content = content.substring(14, content.length - 15);
+            serverDoc.content = content;
+            console.log('🧹 [DocumentCache] 已清理服务器内容中的 xml_fragment 标签');
+          }
+        }
+
         // 根据 document_exists 字段判断是否更新缓存
         // 如果 document_exists 为 false，说明 MongoDB 没有数据，不应该覆盖本地缓存
         const documentExists = serverDoc.document_exists !== false;
@@ -341,7 +351,8 @@ export const documentCache = {
   async updateDocument(
     documentId: string,
     content: string,
-    metadata?: ShareDBDocument['metadata']
+    metadata?: ShareDBDocument['metadata'],
+    synced: boolean = false
   ): Promise<void> {
     
     // 🔍 [调试] 缓存修改操作
@@ -351,6 +362,7 @@ export const documentCache = {
       contentPreview: content.substring(0, 100),
       hasMetadata: !!metadata,
       metadataKeys: metadata ? Object.keys(metadata) : [],
+      synced,
       timestamp: new Date().toISOString(),
       stackTrace: new Error().stack?.split('\n').slice(0, 8).join('\n'),
     });
@@ -367,11 +379,12 @@ export const documentCache = {
         const metadataChanged = JSON.stringify(existing.metadata || {}) !== JSON.stringify(metadata);
         if (metadataChanged) {
           existing.metadata = { ...existing.metadata, ...metadata };
-          await localCacheManager.set(documentId, existing, existing.version || 1);
+          await localCacheManager.set(documentId, existing, existing.version || 1, { synced });
           console.log('📝 [updateDocument-缓存操作] 内容未变化，只更新 metadata:', {
             documentId,
             version: existing.version,
             metadataKeys: Object.keys(metadata),
+            synced,
             timestamp: new Date().toISOString(),
           });
         } else {
@@ -398,7 +411,7 @@ export const documentCache = {
       metadata: metadata || existing?.metadata,
     };
 
-    await localCacheManager.set(documentId, updated, updated.version || 1);
+    await localCacheManager.set(documentId, updated, updated.version || 1, { synced });
     
     documentCache.currentVersion.set(documentId, updated.version || 1);
     documentCache.currentContent.set(documentId, contentToSave);
