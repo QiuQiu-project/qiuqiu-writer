@@ -22,7 +22,6 @@ import { WebsocketProvider } from 'y-websocket';
 import { authApi } from '../utils/authApi';
 import { getWsBaseUrl } from '../utils/apiConfig';
 import { yjsConnectionManager } from '../utils/yjsConnectionManager';
-import { chaptersApi } from '../utils/chaptersApi';
 
 const MSG_SAVE = 2;
 
