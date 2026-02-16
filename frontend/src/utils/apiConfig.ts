@@ -26,7 +26,8 @@ export function getWsBaseUrl(): string {
   
   // 开发环境：直接连接到后端，避免 Vite 代理问题
   if (typeof window !== 'undefined') {
-    const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const hostname = window.location.hostname;
+    const isDev = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
     if (isDev) {
       // 开发环境：直接连接后端，确保所有前端实例连接到同一个后端
       return 'ws://localhost:8001';
