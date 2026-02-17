@@ -9,8 +9,9 @@ export interface ChatMessage {
 
 interface ChatCompleteResponse {
   code: number;
+  status?: 'success' | 'failure';
   message: string;
-  data?: string | null;
+  data?: string | { response: string; references?: unknown[] } | null;
 }
 
 /** 续写章节推荐一项 */
@@ -117,11 +118,19 @@ export async function sendChatMessage(
     throw new Error(err instanceof Error ? err.message : '对话接口调用失败');
   }
 
-  if (data.code !== 200) {
+  // 检查状态码和状态字段
+  if (data.code !== 200 || (data.status && data.status !== 'success')) {
     throw new Error(data.message || '对话接口返回错误');
   }
 
-  const content = typeof data.data === 'string' ? data.data : '';
+  // 支持两种格式：data 为字符串，或 data 为对象 { response: string, references: [] }
+  let content = '';
+  if (typeof data.data === 'string') {
+    content = data.data;
+  } else if (data.data && typeof data.data === 'object' && 'response' in data.data) {
+    content = data.data.response || '';
+  }
+  
   if (!content) {
     throw new Error('AI 没有返回任何内容');
   }

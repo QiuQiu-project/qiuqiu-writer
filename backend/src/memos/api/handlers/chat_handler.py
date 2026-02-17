@@ -170,6 +170,8 @@ class ChatHandler(BaseHandler):
 
             # Return the complete response
             return {
+                "code": 200,
+                "status": "success",
                 "message": "Chat completed successfully",
                 "data": {"response": response, "references": filtered_memories},
             }

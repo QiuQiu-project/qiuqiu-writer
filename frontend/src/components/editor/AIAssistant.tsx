@@ -1,5 +1,5 @@
 import { Send, Copy, Check, Loader2, Trash2, BookOpen, User, FileText } from 'lucide-react';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { streamChatMessage } from '../../utils/chatApi';
 import type { ChatMessage, ContinueChapterResult } from '../../utils/chatApi';
 import { formatOutlineSummary } from '../../utils/outlineFormat';
@@ -8,6 +8,7 @@ import { getAvatarInitial } from '../../utils/avatarUtils';
 import { chaptersApi, type Chapter } from '../../utils/chaptersApi';
 import { worksApi } from '../../utils/worksApi';
 import MarkdownIt from 'markdown-it';
+import ChatInputContentEditable from './ChatInputContentEditable';
 import './AIAssistant.css';
 
 interface ChapterAnalysisCommandResult {
@@ -97,7 +98,9 @@ export default function AIAssistant({
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const chatInputRef = useRef<HTMLDivElement>(null);
+  const cursorOffsetRef = useRef(0);
+  const cursorAfterUpdateRef = useRef<number | null>(null);
 
   // @ 提及相关状态
   const [showMentionMenu, setShowMentionMenu] = useState(false);
@@ -107,6 +110,9 @@ export default function AIAssistant({
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [characters, setCharacters] = useState<CharacterFromMetadata[]>([]);
   const mentionMenuRef = useRef<HTMLDivElement>(null);
+  /** 打开 @/ 菜单时保存的光标与文案，避免焦点移到菜单后 cursorOffsetRef 变为 0 导致重复 @ */
+  const mentionMenuCursorRef = useRef<number | null>(null);
+  const mentionMenuValueRef = useRef<string | null>(null);
 
   const user = authApi.getUserInfo();
   const userInitial = getAvatarInitial(user?.username, user?.display_name);
@@ -161,7 +167,7 @@ export default function AIAssistant({
     const refStr = `@chapter:${initialSelectionRef.chapterId} 第${initialSelectionRef.startChar}-${initialSelectionRef.endChar}字`;
     setMessage(refStr);
     setCharCount(refStr.length);
-    const t = setTimeout(() => textareaRef.current?.focus(), 100);
+    const t = setTimeout(() => chatInputRef.current?.focus(), 100);
     return () => clearTimeout(t);
   }, [initialSelectionRef]);
 
@@ -172,9 +178,11 @@ export default function AIAssistant({
       if (
         mentionMenuRef.current &&
         !mentionMenuRef.current.contains(event.target as Node) &&
-        textareaRef.current &&
-        !textareaRef.current.contains(event.target as Node)
+        chatInputRef.current &&
+        !chatInputRef.current.contains(event.target as Node)
       ) {
+        mentionMenuValueRef.current = null;
+        mentionMenuCursorRef.current = null;
         setShowMentionMenu(false);
       }
     };
@@ -187,13 +195,8 @@ export default function AIAssistant({
     }
   }, [showMentionMenu]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value;
-    const cursorPos = e.target.selectionStart;
-    setMessage(value);
-    setCharCount(value.length);
-    
-    // Slash 命令补全
+  const runMentionMenuLogic = useCallback((value: string, cursorPos: number) => {
+    const textBeforeCursor = value.substring(0, cursorPos);
     const commandOptions: MentionOption[] = [
       { type: 'command', id: 'gen_chapter', name: '/gen_chapter', subtitle: '根据大纲和细纲生成章节内容', isCommand: true, commandKind: 'slash' },
       { type: 'command', id: 'analysis-chapter', name: '/analysis-chapter', subtitle: '分析指定章节', isCommand: true, commandKind: 'slash' },
@@ -201,7 +204,6 @@ export default function AIAssistant({
       { type: 'command', id: 'continue-chapter', name: '/continue-chapter', subtitle: '续写章节：可跟章节号与对下一章的语言描述，生成3个推荐大纲细纲', isCommand: true, commandKind: 'slash' },
       { type: 'command', id: 'verification-chapter-info', name: '/verification-chapter-info', subtitle: '校验章节信息', isCommand: true, commandKind: 'slash' },
     ];
-    const textBeforeCursor = value.substring(0, cursorPos);
     const lastSlashIndex = textBeforeCursor.lastIndexOf('/');
     if (lastSlashIndex !== -1) {
       const textAfterSlash = textBeforeCursor.substring(lastSlashIndex + 1);
@@ -215,9 +217,9 @@ export default function AIAssistant({
           setMentionOptions(filtered);
           setSelectedMentionIndex(0);
 
-          const textarea = textareaRef.current;
-          if (textarea) {
-            const rect = textarea.getBoundingClientRect();
+          const inputEl = chatInputRef.current;
+          if (inputEl) {
+            const rect = inputEl.getBoundingClientRect();
             const lineHeight = 20;
             const lines = textBeforeCursor.split('\n').length;
             const menuHeight = 200;
@@ -232,6 +234,8 @@ export default function AIAssistant({
             }
             setMentionPosition({ top, left });
           }
+          mentionMenuValueRef.current = value;
+          mentionMenuCursorRef.current = cursorPos;
           setShowMentionMenu(true);
           return;
         }
@@ -256,6 +260,8 @@ export default function AIAssistant({
           hasCompleteMention ||
           hasCompleteMentionId) ||
           (textAfterAt.includes(' ') && !isCommandWordWithTrailingSpace)) {
+        mentionMenuValueRef.current = null;
+        mentionMenuCursorRef.current = null;
         setShowMentionMenu(false);
       } else {
         const query = textAfterAt.toLowerCase();
@@ -367,9 +373,9 @@ export default function AIAssistant({
         
         if (options.length > 0) {
           // 计算菜单位置
-          const textarea = textareaRef.current;
-          if (textarea) {
-            const rect = textarea.getBoundingClientRect();
+          const inputEl = chatInputRef.current;
+          if (inputEl) {
+            const rect = inputEl.getBoundingClientRect();
             const lineHeight = 20;
             const lines = textBeforeCursor.split('\n').length;
             const menuHeight = 300; // 预估菜单高度
@@ -391,23 +397,30 @@ export default function AIAssistant({
             
             setMentionPosition({ top, left });
           }
+          mentionMenuValueRef.current = value;
+          mentionMenuCursorRef.current = cursorPos;
           setShowMentionMenu(true);
         } else {
+          mentionMenuValueRef.current = null;
+          mentionMenuCursorRef.current = null;
           setShowMentionMenu(false);
         }
       }
     } else {
+      mentionMenuValueRef.current = null;
+      mentionMenuCursorRef.current = null;
       setShowMentionMenu(false);
     }
-    
-    // 自动调整高度
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
-    }
-  };
+  }, [chapters, characters]);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleCEChange = useCallback((text: string, cursorOffset: number) => {
+    setMessage(text);
+    setCharCount(text.length);
+    cursorOffsetRef.current = cursorOffset;
+    runMentionMenuLogic(text, cursorOffset);
+  }, [runMentionMenuLogic]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (showMentionMenu && mentionOptions.length > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -434,9 +447,8 @@ export default function AIAssistant({
     }
     
     // 即使菜单没有显示，如果输入了 @ 并且有匹配项，Tab 键也能自动补全
-    if (e.key === 'Tab' && !showMentionMenu && textareaRef.current) {
-      const textarea = textareaRef.current;
-      const cursorPos = textarea.selectionStart;
+    if (e.key === 'Tab' && !showMentionMenu && chatInputRef.current) {
+      const cursorPos = cursorOffsetRef.current;
       const textBeforeCursor = message.substring(0, cursorPos);
       const lastAtIndex = textBeforeCursor.lastIndexOf('@');
       
@@ -515,60 +527,47 @@ export default function AIAssistant({
   };
 
   const handleSelectMention = (option: MentionOption) => {
-    if (!textareaRef.current) return;
-    
-    const textarea = textareaRef.current;
-    const cursorPos = textarea.selectionStart;
-    const textBeforeCursor = message.substring(0, cursorPos);
+    if (!chatInputRef.current) return;
+
+    // 菜单打开时焦点可能在菜单上，用保存的文案/光标避免重复 @
+    const msg = mentionMenuValueRef.current ?? message;
+    const cursorPos = mentionMenuCursorRef.current ?? cursorOffsetRef.current;
+    mentionMenuValueRef.current = null;
+    mentionMenuCursorRef.current = null;
+
+    const textBeforeCursor = msg.substring(0, cursorPos);
     const lastAtIndex = textBeforeCursor.lastIndexOf('@');
     const lastSlashIndex = textBeforeCursor.lastIndexOf('/');
     const targetIndex = option.commandKind === 'slash' ? lastSlashIndex : lastAtIndex;
-    
+
     if (targetIndex !== -1) {
-      // 如果选择的是指令，则插入指令名称并继续显示对应的内容列表
       if (option.isCommand) {
         const commandText =
           option.commandKind === 'slash' ? `/${option.id} ` : `@${option.name} `;
         const newMessage = 
-          message.substring(0, targetIndex) + 
+          msg.substring(0, targetIndex) + 
           commandText + 
-          message.substring(cursorPos);
-        
+          msg.substring(cursorPos);
+        const newCursorPos = targetIndex + commandText.length;
         setMessage(newMessage);
-        
-        // 设置光标位置并手动触发输入处理以显示内容列表
-        setTimeout(() => {
-          const newCursorPos = targetIndex + commandText.length;
-          textarea.setSelectionRange(newCursorPos, newCursorPos);
-          textarea.focus();
-          
-          // 手动触发输入处理逻辑
-          const syntheticEvent = {
-            target: textarea,
-            currentTarget: textarea,
-          } as React.ChangeEvent<HTMLTextAreaElement>;
-          handleInputChange(syntheticEvent);
-        }, 0);
+        setCharCount(newMessage.length);
+        cursorAfterUpdateRef.current = newCursorPos;
+        runMentionMenuLogic(newMessage, newCursorPos);
+        chatInputRef.current?.focus();
       } else {
-        // 如果选择的是内容，则插入完整的提及格式
         const mentionText = option.type === 'chapter' 
           ? `@chapter:${option.id}`
-          : `@character:${option.name}`; // 角色使用名称作为标识
-        
+          : `@character:${option.name}`;
         const newMessage = 
-          message.substring(0, targetIndex) + 
+          msg.substring(0, targetIndex) + 
           mentionText + ' ' + 
-          message.substring(cursorPos);
-        
+          msg.substring(cursorPos);
+        const newCursorPos = targetIndex + mentionText.length + 1;
         setMessage(newMessage);
+        setCharCount(newMessage.length);
         setShowMentionMenu(false);
-        
-        // 设置光标位置
-        setTimeout(() => {
-          const newCursorPos = targetIndex + mentionText.length + 1;
-          textarea.setSelectionRange(newCursorPos, newCursorPos);
-          textarea.focus();
-        }, 0);
+        cursorAfterUpdateRef.current = newCursorPos;
+        chatInputRef.current?.focus();
       }
     }
   };
@@ -593,17 +592,18 @@ export default function AIAssistant({
     }
   };
 
-  // 渲染带提及的消息（解析ID格式并显示友好名称）
+  // 匹配章节引用（含字数时整段匹配）：@chapter:123 第5-10字 | @chapter:123 | @character:xxx
+  const MENTION_REGEX = /(@chapter:\d+\s*第\d+-\d+字|@chapter:\d+|@character:[^@\s]+)/g;
+
+  // 渲染带提及的消息（解析ID格式并显示友好名称，含字数时显示「章节名 第n-m字」）
   const renderMessageWithMentions = (text: string, mentions?: Mention[]) => {
     if (!mentions || mentions.length === 0) {
-      // 即使没有mentions，也尝试渲染ID格式的提及
       return renderMentionsFromText(text);
     }
 
     const parts: (string | React.ReactElement)[] = [];
     let lastIndex = 0;
-    // 匹配 @chapter:123 或 @character:角色名称 格式
-    const regex = /(@chapter:\d+|@character:[^@\s]+)/g;
+    const regex = new RegExp(MENTION_REGEX.source, 'g');
     let match;
 
     while ((match = regex.exec(text)) !== null) {
@@ -614,49 +614,48 @@ export default function AIAssistant({
 
       // 添加提及标签
       const mentionText = match[0];
-      const idMatch = mentionText.match(/(chapter|character):(.+)/);
-      
-      if (idMatch) {
-        const type = idMatch[1] === 'chapter' ? 'chapter' : 'character';
-        const identifier = idMatch[2];
-        
-        let mention: Mention | undefined;
-        if (type === 'chapter') {
-          const id = parseInt(identifier, 10);
-          mention = mentions.find(m => m.type === type && m.id === id);
-        } else {
-          // 角色使用名称匹配
-          mention = mentions.find(m => m.type === type && (m.id === identifier || m.name === identifier));
-        }
+      const chapterWithRange = mentionText.match(/@chapter:(\d+)\s*第(\d+)-(\d+)字/);
+      const chapterOnly = mentionText.match(/@chapter:(\d+)/);
+      const characterMatch = mentionText.match(/@character:(.+)/);
 
+      if (chapterWithRange || chapterOnly) {
+        const chapterId = parseInt((chapterWithRange || chapterOnly)![1], 10);
+        const rangeLabel = chapterWithRange ? ` 第${chapterWithRange[2]}-${chapterWithRange[3]}字` : '';
+        const mention = mentions.find(m => m.type === 'chapter' && m.id === chapterId);
+        const chapter = chapters.find(ch => ch.id === chapterId);
+        const title = chapter ? chapter.title : `章节#${chapterId}`;
+        const tooltip = chapter ? `章节：${chapter.title}${rangeLabel || ''}` : '章节信息';
         if (mention) {
-          // 获取角色详细信息用于提示
-          let tooltip = '';
-          if (mention.type === 'character') {
-            const character = characters.find(char => 
-              char.name === identifier || char.display_name === identifier
-            );
-            if (character) {
-              const parts = [];
-              if (character.description) parts.push(`简介：${character.description}`);
-              if (character.gender) parts.push(`性别：${character.gender}`);
-              if (character.type) parts.push(`类型：${character.type}`);
-              tooltip = parts.join('\n') || '角色信息';
-            } else {
-              tooltip = '角色信息';
-            }
-          } else {
-            const chapter = chapters.find(ch => ch.id === parseInt(identifier, 10));
-            tooltip = chapter ? `章节：${chapter.title}` : '章节信息';
-          }
-          
           parts.push(
-            <span 
+            <span
               key={match.index}
-              className={`mention-tag mention-${mention.type}`}
+              className="mention-tag mention-chapter"
               title={tooltip}
             >
-              {mention.type === 'chapter' ? '📖' : '👤'} {mention.name}
+              📖 {mention.name}{rangeLabel}
+            </span>
+          );
+        } else {
+          parts.push(<span key={match.index} className="mention-tag mention-chapter">📖 {title}{rangeLabel}</span>);
+        }
+      } else if (characterMatch) {
+        const identifier = characterMatch[1];
+        const mention = mentions.find(m => m.type === 'character' && (m.id === identifier || m.name === identifier));
+        if (mention) {
+          let tooltip = '';
+          const character = characters.find(char => char.name === identifier || char.display_name === identifier);
+          if (character) {
+            const tipParts = [];
+            if (character.description) tipParts.push(`简介：${character.description}`);
+            if (character.gender) tipParts.push(`性别：${character.gender}`);
+            if (character.type) tipParts.push(`类型：${character.type}`);
+            tooltip = tipParts.join('\n') || '角色信息';
+          } else {
+            tooltip = '角色信息';
+          }
+          parts.push(
+            <span key={match.index} className={`mention-tag mention-character`} title={tooltip}>
+              👤 {mention.name}
             </span>
           );
         } else {
@@ -677,12 +676,11 @@ export default function AIAssistant({
     return <>{parts}</>;
   };
 
-  // 从文本中解析并渲染提及（用于没有mentions的情况）
+  // 从文本中解析并渲染提及（用于没有mentions的情况，含字数时显示「章节名 第n-m字」）
   const renderMentionsFromText = (text: string) => {
     const parts: (string | React.ReactElement)[] = [];
     let lastIndex = 0;
-    // 匹配 @chapter:123 或 @character:角色名称
-    const regex = /(@chapter:\d+|@character:[^@\s]+)/g;
+    const regex = new RegExp(MENTION_REGEX.source, 'g');
     let match;
 
     while ((match = regex.exec(text)) !== null) {
@@ -691,51 +689,37 @@ export default function AIAssistant({
       }
 
       const mentionText = match[0];
-      const idMatch = mentionText.match(/(chapter|character):(.+)/);
-      
-      if (idMatch) {
-        const type = idMatch[1] === 'chapter' ? 'chapter' : 'character';
-        const identifier = idMatch[2];
-        
-        let name = '';
-        if (type === 'chapter') {
-          const id = parseInt(identifier, 10);
-          const chapter = chapters.find(ch => ch.id === id);
-          name = chapter ? chapter.title : `章节#${id}`;
-        } else {
-          // 角色使用名称作为标识
-          const character = characters.find(char => 
-            char.name === identifier || char.display_name === identifier
-          );
-          name = character ? (character.display_name || character.name) : identifier;
-        }
+      const chapterWithRange = mentionText.match(/@chapter:(\d+)\s*第(\d+)-(\d+)字/);
+      const chapterOnly = mentionText.match(/@chapter:(\d+)/);
+      const characterMatch = mentionText.match(/@character:(.+)/);
 
-        // 获取详细信息用于提示
-        let tooltip = '';
-        if (type === 'character') {
-          const character = characters.find(char => 
-            char.name === identifier || char.display_name === identifier
-          );
-          if (character) {
-            const parts = [];
-            if (character.description) parts.push(`简介：${character.description}`);
-            if (character.gender) parts.push(`性别：${character.gender}`);
-            if (character.type) parts.push(`类型：${character.type}`);
-            tooltip = parts.join('\n') || '角色信息';
-          } else {
-            tooltip = '角色信息';
-          }
-        } else {
-          tooltip = name;
-        }
-
+      if (chapterWithRange || chapterOnly) {
+        const chapterId = parseInt((chapterWithRange || chapterOnly)![1], 10);
+        const rangeLabel = chapterWithRange ? ` 第${chapterWithRange[2]}-${chapterWithRange[3]}字` : '';
+        const chapter = chapters.find(ch => ch.id === chapterId);
+        const name = chapter ? chapter.title : `章节#${chapterId}`;
         parts.push(
-          <span 
-            key={match.index}
-            className={`mention-tag mention-${type}`}
-            title={tooltip}
-          >
-            {type === 'chapter' ? '📖' : '👤'} {name}
+          <span key={match.index} className="mention-tag mention-chapter" title={`${name}${rangeLabel}`}>
+            📖 {name}{rangeLabel}
+          </span>
+        );
+      } else if (characterMatch) {
+        const identifier = characterMatch[1];
+        const character = characters.find(char => char.name === identifier || char.display_name === identifier);
+        const name = character ? (character.display_name || character.name) : identifier;
+        let tooltip = '';
+        if (character) {
+          const tipParts = [];
+          if (character.description) tipParts.push(`简介：${character.description}`);
+          if (character.gender) tipParts.push(`性别：${character.gender}`);
+          if (character.type) tipParts.push(`类型：${character.type}`);
+          tooltip = tipParts.join('\n') || '角色信息';
+        } else {
+          tooltip = '角色信息';
+        }
+        parts.push(
+          <span key={match.index} className="mention-tag mention-character" title={tooltip}>
+            👤 {name}
           </span>
         );
       } else {
@@ -1072,18 +1056,16 @@ export default function AIAssistant({
               <button 
                 className="input-action-btn"
                 onClick={() => {
-                  if (textareaRef.current) {
-                    const textarea = textareaRef.current;
-                    const cursorPos = textarea.selectionStart;
+                  if (chatInputRef.current) {
+                    const cursorPos = cursorOffsetRef.current;
                     const newMessage = 
                       message.substring(0, cursorPos) + 
                       '@' + 
                       message.substring(cursorPos);
                     setMessage(newMessage);
-                    setTimeout(() => {
-                      textarea.setSelectionRange(cursorPos + 1, cursorPos + 1);
-                      textarea.focus();
-                    }, 0);
+                    setCharCount(newMessage.length);
+                    cursorAfterUpdateRef.current = cursorPos + 1;
+                    chatInputRef.current?.focus();
                   }
                 }}
                 title="插入 @ 引用章节或角色"
@@ -1103,15 +1085,16 @@ export default function AIAssistant({
             ) : (
               <>
                 <div className="chat-input-wrapper">
-                  <textarea
-                    ref={textareaRef}
-                    className="chat-input"
-                    placeholder="输入你的问题..."
+                  <ChatInputContentEditable
+                    inputRef={chatInputRef}
                     value={message}
-                    onChange={handleInputChange}
+                    onChange={handleCEChange}
                     onKeyDown={handleKeyDown}
-                    rows={3}
+                    placeholder="输入你的问题..."
                     disabled={!isAuthenticated || !workId || isSending}
+                    cursorOffsetRef={cursorOffsetRef}
+                    cursorAfterUpdateRef={cursorAfterUpdateRef}
+                    className="chat-input"
                   />
                   {showMentionMenu && mentionOptions.length > 0 && (
                     <div

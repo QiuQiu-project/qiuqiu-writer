@@ -6,6 +6,7 @@
 import re
 import json
 import asyncio
+import html
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +16,29 @@ from memos.api.services.work_service import WorkService
 from memos.log import get_logger
 
 logger = get_logger(__name__)
+
+
+def _content_to_plain_text(content: str) -> str:
+    """
+    将章节内容转为与前端一致的纯文本，用于按「第n-m字」切片。
+    前端用 ProseMirror doc.textBetween(0, n, '') 得到纯文本（无块间分隔），
+    后端从 ShareDB 拿到的是 HTML，需先剥标签、再按字符位置切才能对齐。
+    """
+    if not content:
+        return ""
+    # 已是纯文本（无标签）则直接返回
+    if "<" not in content or ">" not in content:
+        return content
+    # 去掉 script/style 及其内容
+    text = re.sub(r"<script[^>]*>.*?</script>", "", content, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r"<style[^>]*>.*?</style>", "", text, flags=re.DOTALL | re.IGNORECASE)
+    # 块级换行：与 ProseMirror 用 '' 作 block 分隔一致，这里不插入换行，只剥标签
+    text = re.sub(r"<br\s*/?>", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"</p>|</div>|</h[1-6]>", "", text, flags=re.IGNORECASE)
+    # 去掉所有剩余标签
+    text = re.sub(r"<[^>]+>", "", text)
+    text = html.unescape(text)
+    return text
 
 
 class MentionService:
@@ -62,137 +86,104 @@ class MentionService:
         
         return text
     
+    async def _get_chapter_content(self, chapter) -> str:
+        """获取章节正文（纯文本），失败返回空字符串。"""
+        try:
+            if not self._sharedb_initialized:
+                try:
+                    await self.sharedb_service.initialize()
+                    self._sharedb_initialized = True
+                except Exception as init_err:
+                    logger.warning(f"ShareDB服务初始化失败: {init_err}")
+                    return ""
+            document_id = f"work_{chapter.work_id}_chapter_{chapter.id}"
+            document = await self.sharedb_service.get_document(document_id)
+            if not document:
+                document = await self.sharedb_service.get_document(f"chapter_{chapter.id}")
+            if not document:
+                return ""
+            doc_content = document.get("content", "")
+            if isinstance(doc_content, str):
+                return doc_content or ""
+            if isinstance(doc_content, dict):
+                return (
+                    doc_content.get("text", "")
+                    or doc_content.get("content", "")
+                    or doc_content.get("delta", "")
+                    or ""
+                )
+            return str(doc_content) if doc_content else ""
+        except Exception as e:
+            logger.error(f"获取章节 {chapter.id} 内容时出错: {e}", exc_info=True)
+            return ""
+
     async def _replace_chapter_mentions(self, text: str) -> str:
-        """替换章节提及"""
-        pattern = r'@chapter:(\d+)'
-        
+        """替换章节提及。支持 @chapter:id 与 @chapter:id 第start-end字（按字数范围替换为正文片段）。"""
+        # 先匹配带字数的，再匹配仅 id，避免重复匹配
+        pattern = r'@chapter:(\d+)(?:\s*第(\d+)-(\d+)字)?'
+
         async def replace_match(match):
             chapter_id = int(match.group(1))
+            start_s = match.group(2)
+            end_s = match.group(3)
+            char_range = None
+            if start_s is not None and end_s is not None:
+                try:
+                    start_i = int(start_s)
+                    end_i = int(end_s)
+                    if start_i >= 1 and end_i >= start_i:
+                        char_range = (start_i, end_i)  # 第n字 = 1-based，切片用 (start_i-1, end_i)
+                except ValueError:
+                    pass
+
             try:
                 chapter = await self.chapter_service.get_chapter_by_id(chapter_id)
                 if not chapter:
                     logger.warning(f"章节 {chapter_id} 不存在")
                     return f"\n\n【章节引用：章节#{chapter_id}（不存在）】\n该章节在数据库中不存在，请检查章节ID是否正确。\n"
-                
-                # 获取章节基本信息
+
                 chapter_title = chapter.title or f"章节#{chapter_id}"
                 chapter_number = getattr(chapter, 'chapter_number', None)
                 chapter_info = f"【章节引用：{chapter_title}"
                 if chapter_number:
                     chapter_info += f"（第{chapter_number}章）"
+                if char_range:
+                    chapter_info += f"，第{char_range[0]}-{char_range[1]}字"
                 chapter_info += "】\n"
-                
-                # 尝试获取章节内容
-                content_preview = "（内容为空）"
-                try:
-                    # 确保ShareDB服务已初始化
-                    if not self._sharedb_initialized:
-                        try:
-                            await self.sharedb_service.initialize()
-                            self._sharedb_initialized = True
-                        except Exception as init_err:
-                            logger.warning(f"ShareDB服务初始化失败: {init_err}，将尝试继续获取内容")
-                    
-                    document_id = f"work_{chapter.work_id}_chapter_{chapter_id}"
-                    document = await self.sharedb_service.get_document(document_id)
-                    
-                    if document:
-                        # ShareDB文档格式：{"id": "...", "content": "..."}
-                        # content可能是字符串或字典
-                        doc_content = document.get("content", "")
-                        
-                        # 如果content是字符串，直接使用
-                        if isinstance(doc_content, str):
-                            content = doc_content
-                        # 如果content是字典，尝试提取文本
-                        elif isinstance(doc_content, dict):
-                            # 尝试从不同字段提取内容
-                            content = (
-                                doc_content.get("text", "") or 
-                                doc_content.get("content", "") or 
-                                doc_content.get("delta", "") or
-                                json.dumps(doc_content, ensure_ascii=False)
-                            )
-                        # 其他类型，转换为字符串
-                        else:
-                            try:
-                                import json
-                                content = json.dumps(doc_content, ensure_ascii=False) if doc_content else ""
-                            except:
-                                content = str(doc_content) if doc_content else ""
-                        
-                        if content and content.strip():
-                            # 截取前1000字符作为预览
-                            content_preview = content[:1000] if len(content) > 1000 else content
-                            if len(content) > 1000:
-                                content_preview += "..."
-                        else:
-                            content_preview = "（内容为空）"
-                    else:
-                        # 尝试旧格式的文档ID
-                        old_document_id = f"chapter_{chapter_id}"
-                        document = await self.sharedb_service.get_document(old_document_id)
-                        if document:
-                            doc_content = document.get("content", "")
-                            if isinstance(doc_content, str):
-                                content = doc_content
-                            elif isinstance(doc_content, dict):
-                                content = (
-                                    doc_content.get("text", "") or 
-                                    doc_content.get("content", "") or 
-                                    doc_content.get("delta", "") or
-                                    json.dumps(doc_content, ensure_ascii=False)
-                                )
-                            else:
-                                try:
-                                    content = json.dumps(doc_content, ensure_ascii=False) if doc_content else ""
-                                except:
-                                    content = str(doc_content) if doc_content else ""
-                            
-                            if content and content.strip():
-                                content_preview = content[:1000] if len(content) > 1000 else content
-                                if len(content) > 1000:
-                                    content_preview += "..."
-                            else:
-                                content_preview = "（内容为空）"
-                        else:
-                            logger.warning(f"无法从ShareDB获取章节 {chapter_id} 的内容，文档ID: {document_id} 和 {old_document_id} 都不存在")
-                            content_preview = "（无法从ShareDB获取内容，可能该章节尚未保存内容）"
-                            
-                except Exception as e:
-                    logger.error(f"获取章节 {chapter_id} 内容时出错: {e}", exc_info=True)
-                    content_preview = f"（获取内容失败：{str(e)[:100]}）"
-                
-                # 添加章节元数据
+
+                content = await self._get_chapter_content(chapter)
+                if not content or not content.strip():
+                    content_preview = "（内容为空）"
+                elif char_range:
+                    # 前端按纯文本（doc.textBetween）计字数，后端存的是 HTML，需先转纯文再按位置切
+                    plain = _content_to_plain_text(content)
+                    start_0 = max(0, char_range[0] - 1)
+                    end_0 = min(len(plain), char_range[1])
+                    content_preview = plain[start_0:end_0] if end_0 > start_0 else "（指定范围无内容）"
+                else:
+                    content_preview = content[:1000] if len(content) > 1000 else content
+                    if len(content) > 1000:
+                        content_preview += "..."
+
                 metadata_parts = []
                 if hasattr(chapter, 'word_count') and chapter.word_count:
                     metadata_parts.append(f"字数：{chapter.word_count}")
                 if hasattr(chapter, 'status') and chapter.status:
                     metadata_parts.append(f"状态：{chapter.status}")
-                
                 metadata_text = f"\n元数据：{', '.join(metadata_parts)}\n" if metadata_parts else ""
-                
-                # 构建替换文本
-                replacement = f"\n\n{chapter_info}{metadata_text}内容预览：\n{content_preview}\n"
-                return replacement
-                
+                return f"\n\n{chapter_info}{metadata_text}内容预览：\n{content_preview}\n"
             except Exception as e:
                 logger.error(f"替换章节提及失败 {chapter_id}: {e}", exc_info=True)
                 return f"\n\n【章节引用：章节#{chapter_id}（获取失败）】\n错误信息：{str(e)[:200]}\n"
-        
-        # 使用异步替换
+
         matches = list(re.finditer(pattern, text))
         if not matches:
             return text
-        
         replacements = await asyncio.gather(*[replace_match(m) for m in matches])
-        
-        # 从后往前替换，避免索引变化
         result = text
         for match, replacement in zip(reversed(matches), reversed(replacements)):
             start, end = match.span()
             result = result[:start] + replacement + result[end:]
-        
         return result
     
     async def _replace_character_mentions(self, text: str, user_id: Optional[str] = None) -> str:

@@ -1011,7 +1011,7 @@ async def chat_complete(chat_req: ChatCompleteRequest):
                     "next_chapter_number": result.get("next_chapter_number"),
                     "recommendations": result.get("recommendations", []),
                 }
-                return {"code": 200, "message": "续写推荐生成完成", "data": payload}
+                return {"code": 200, "status": "success", "message": "续写推荐生成完成", "data": payload}
 
         if disable_memory and query_lower.startswith("/verification-chapter-info"):
             work_id = _parse_work_id_from_user_id(chat_req.user_id)
@@ -1075,6 +1075,7 @@ async def chat_complete(chat_req: ChatCompleteRequest):
                     response_text += "\n\n" + "\n\n".join(all_summaries)
                 return {
                     "code": 200,
+                    "status": "success",
                     "message": "校验完成",
                     "data": response_text,
                 }
@@ -1141,6 +1142,7 @@ async def chat_complete(chat_req: ChatCompleteRequest):
                     response_text += "\n\n" + "\n\n".join(all_summaries)
                 return {
                     "code": 200,
+                    "status": "success",
                     "message": "分析完成",
                     "data": response_text,
                 }
@@ -1231,6 +1233,8 @@ async def chat_complete(chat_req: ChatCompleteRequest):
 
         # Return the complete response
         return {
+            "code": 200,
+            "status": "success",
             "message": "Chat completed successfully",
             "data": {"response": content, "references": references},
         }
