@@ -24,6 +24,7 @@ import Factions from '../components/editor/Factions';
 import WorkInfoManager from '../components/editor/WorkInfoManager';
 import ThemeSelector from '../components/ThemeSelector';
 import ChapterEditorToolbar from '../components/editor/ChapterEditorToolbar';
+import EditorSelectionPopup from '../components/editor/EditorSelectionPopup';
 
 // Hooks
 import { useYjsEditor } from '../hooks/useYjsEditor';
@@ -46,6 +47,7 @@ import { countCharacters } from '../utils/textUtils';
 import { generateChapterContent } from '../utils/bookAnalysisApi';
 import { chaptersApi } from '../utils/chaptersApi';
 import { createYjsSnapshotFromEditor, restoreYjsSnapshotToEditor, getTextFromProsemirrorJSON } from '../utils/yjsSnapshot';
+import { sendChatMessage } from '../utils/chatApi';
 
 // 样式
 import '../components/editor/NovelEditor.css';
@@ -65,6 +67,25 @@ export default function NovelEditorPage() {
   const [syncStatus, setSyncStatus] = useState(syncManager.getStatus());
   const [currentChapterWordCount, setCurrentChapterWordCount] = useState(0);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  /** 选中文本浮动菜单（含章节内字数范围：第 X 字到第 Y 字） */
+  const [selectionPopup, setSelectionPopup] = useState<{
+    visible: boolean;
+    top: number;
+    left: number;
+    text: string;
+    startChar: number;
+    endChar: number;
+  }>({
+    visible: false,
+    top: 0,
+    left: 0,
+    text: '',
+    startChar: 0,
+    endChar: 0,
+  });
+  const [selectionOptimizing, setSelectionOptimizing] = useState(false);
+  /** 从编辑器选中发起 AI 对话时，只传章节引用（对话框里显示徽章 @chapter:x第n字-第m字，不显示选中正文） */
+  const [initialSelectionRef, setInitialSelectionRef] = useState<{ chapterId: string; startChar: number; endChar: number } | null>(null);
   
   // ===== UI状态管理 =====
   const {
@@ -479,6 +500,84 @@ export default function NovelEditorPage() {
       document.removeEventListener('touchstart', handleClickOutside);
     };
   }, [isMobile, showWordCountTooltip, setShowWordCountTooltip]);
+
+  // ===== 选中文本浮动菜单（AI 对话 / 在编辑器中优化句子） =====
+  useEffect(() => {
+    if (!editor) return;
+    const onSelectionUpdate = () => {
+      const { from, to } = editor.state.selection;
+      const doc = editor.state.doc;
+      if (from === to) {
+        setSelectionPopup((prev) => (prev.visible ? { ...prev, visible: false } : prev));
+        return;
+      }
+      const text = doc.textBetween(from, to, '\n');
+      if (!text.trim()) {
+        setSelectionPopup((prev) => (prev.visible ? { ...prev, visible: false } : prev));
+        return;
+      }
+      const domSel = window.getSelection();
+      if (!domSel || domSel.rangeCount === 0) return;
+      const range = domSel.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      const textBeforeFrom = doc.textBetween(0, from, '');
+      const textBeforeTo = doc.textBetween(0, to, '');
+      const startChar = textBeforeFrom.length + 1;
+      const endChar = textBeforeTo.length;
+      setSelectionPopup({
+        visible: true,
+        top: rect.bottom,
+        left: rect.left + rect.width / 2,
+        text,
+        startChar,
+        endChar,
+      });
+    };
+    editor.on('selectionUpdate', onSelectionUpdate);
+    return () => {
+      editor.off('selectionUpdate', onSelectionUpdate);
+    };
+  }, [editor]);
+
+  const handleSelectionAIChat = () => {
+    if (selectedChapter) {
+      setInitialSelectionRef({
+        chapterId: selectedChapter,
+        startChar: selectionPopup.startChar,
+        endChar: selectionPopup.endChar,
+      });
+    }
+    if (isMobile) {
+      setMobileChatOpen(true);
+    } else {
+      if (rightSidebarCollapsed) toggleRightSidebar();
+    }
+    setSelectionPopup((prev) => ({ ...prev, visible: false }));
+    setTimeout(() => setInitialSelectionRef(null), 500);
+  };
+
+  const handleSelectionOptimize = async (text: string) => {
+    if (!editor || !workId) return;
+    setSelectionOptimizing(true);
+    try {
+      const res = await sendChatMessage(
+        `请只对以下文本进行润色优化，不要添加任何解释，直接输出优化后的完整文本：\n\n${text}`,
+        [],
+        workId
+      );
+      const optimized = (res?.content ?? '').trim();
+      if (optimized) {
+        const html = '<p>' + optimized.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>') + '</p>';
+        editor.chain().focus().deleteSelection().insertContent(html).run();
+      }
+      setSelectionPopup((prev) => ({ ...prev, visible: false }));
+    } catch (err) {
+      console.error('优化句子失败:', err);
+      showMessage(err instanceof Error ? err.message : '优化失败', 'error');
+    } finally {
+      setSelectionOptimizing(false);
+    }
+  };
   
   // ===== 事件处理函数 =====
   const handleManualSave = async () => {
@@ -1049,6 +1148,19 @@ export default function NovelEditorPage() {
                 </div>
               </div>
               
+              {/* 选中文本浮动菜单：AI 对话 / 在编辑器中优化句子 */}
+              <EditorSelectionPopup
+                visible={selectionPopup.visible}
+                top={selectionPopup.top}
+                left={selectionPopup.left}
+                selectedText={selectionPopup.text}
+                startChar={selectionPopup.startChar}
+                endChar={selectionPopup.endChar}
+                onAIChat={handleSelectionAIChat}
+                onOptimizeInEditor={handleSelectionOptimize}
+                onClose={() => setSelectionPopup((prev) => ({ ...prev, visible: false }))}
+                optimizing={selectionOptimizing}
+              />
               {/* 查找替换面板 */}
               {isReplacePanelOpen && (
                 <div className="find-replace-panel">
@@ -1164,6 +1276,7 @@ export default function NovelEditorPage() {
           <div className={`sidebar-wrapper right-sidebar-wrapper ${rightSidebarCollapsed ? 'collapsed' : ''}`}>
             <AIAssistant 
               workId={workId}
+              initialSelectionRef={initialSelectionRef}
               onGenerateChapterFromOutline={handleGenerateChapterFromOutline}
               onUseContinueRecommendation={handleUseContinueRecommendation}
             />
@@ -1183,6 +1296,7 @@ export default function NovelEditorPage() {
               <div className="mobile-chat-content">
                 <AIAssistant 
                   workId={workId}
+                  initialSelectionRef={initialSelectionRef}
                   onGenerateChapterFromOutline={handleGenerateChapterFromOutline}
                   onUseContinueRecommendation={handleUseContinueRecommendation}
                 />

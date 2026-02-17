@@ -1,0 +1,58 @@
+.editor-selection-popup {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--bg-primary, #fff);
+  border: 1px solid var(--border-light, #e5e7eb);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: editorSelectionPopupIn 0.15s ease-out;
+}
+
+.editor-selection-popup-range {
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+  padding: 2px 4px;
+  border-bottom: 1px solid var(--border-light, #e5e7eb);
+  margin-bottom: 2px;
+}
+
+@keyframes editorSelectionPopupIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.editor-selection-popup-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+  color: var(--text-primary, #1f2937);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.editor-selection-popup-btn:hover:not(:disabled) {
+  background: var(--accent-light, rgba(59, 130, 246, 0.1));
+}
+
+.editor-selection-popup-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.editor-selection-popup-btn span {
+  white-space: nowrap;
+}

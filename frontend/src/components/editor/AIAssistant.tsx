@@ -42,6 +42,8 @@ interface AIAssistantProps {
     detailed_outline: Record<string, unknown> | string;
     next_chapter_number: number;
   }) => void;
+  /** 从编辑器选中发起对话时，只传章节引用（不显示选中正文，只显示徽章 @chapter:x 第n-m字） */
+  initialSelectionRef?: { chapterId: string; startChar: number; endChar: number } | null;
 }
 
 const md = new MarkdownIt({
@@ -86,6 +88,7 @@ export default function AIAssistant({
   // onAnalyzeWorkCommand,
   onGenerateChapterFromOutline,
   onUseContinueRecommendation,
+  initialSelectionRef,
 }: AIAssistantProps) {
   const [message, setMessage] = useState('');
   const [charCount, setCharCount] = useState(0);
@@ -95,7 +98,7 @@ export default function AIAssistant({
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  
+
   // @ 提及相关状态
   const [showMentionMenu, setShowMentionMenu] = useState(false);
   const [mentionPosition, setMentionPosition] = useState({ top: 0, left: 0 });
@@ -151,6 +154,17 @@ export default function AIAssistant({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isSending]);
+
+  // 从编辑器选中发起对话：只预填引用文案 @chapter:x 第n-m字（输入框内会以样式持久显示）
+  useEffect(() => {
+    if (!initialSelectionRef) return;
+    const refStr = `@chapter:${initialSelectionRef.chapterId} 第${initialSelectionRef.startChar}-${initialSelectionRef.endChar}字`;
+    setMessage(refStr);
+    setCharCount(refStr.length);
+    const t = setTimeout(() => textareaRef.current?.focus(), 100);
+    return () => clearTimeout(t);
+  }, [initialSelectionRef]);
+
 
   // 点击外部关闭提及菜单
   useEffect(() => {

@@ -454,7 +454,7 @@
   min-height: 60px;
   max-height: 200px;
   outline: none;
-  transition: all var(--transition-base);
+  transition: border-color var(--transition-base);
   line-height: 1.5;
 }
 
@@ -630,7 +630,7 @@
 
 .chat-input:focus {
   border-color: var(--accent-primary);
-  box-shadow: 0 0 0 4px var(--accent-light);
+  outline: none;
 }
 
 .chat-input:disabled {
