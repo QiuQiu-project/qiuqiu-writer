@@ -1216,11 +1216,17 @@
   text-align: center;
   padding: 24px 80px 16px 80px;
   border-bottom: 1px solid var(--border-light, #e0e0e0);
-  max-height: 100px;
-  overflow: hidden;
   background: var(--bg-primary);
   border-radius: 0;
   position: relative;
+}
+
+@media (max-width: 768px) {
+  .editor-with-header .chapter-header-info {
+    padding: 16px 20px;
+    height: auto;
+    max-height: none;
+  }
 }
 
 
@@ -1810,10 +1816,20 @@
   }
 
   /* 移动端菜单内容 */
+  .mobile-menu-content {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
   .mobile-menu-content .side-nav {
     border-radius: 0;
     box-shadow: none;
     padding-top: 0;
+    height: 100%;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .mobile-menu-actions {
