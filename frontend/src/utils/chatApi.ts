@@ -185,38 +185,67 @@ export async function streamChatMessage(
     throw new Error(`对话流式接口调用失败: ${resp.status} ${resp.statusText} ${text}`);
   }
 
-  const reader = resp.body.getReader();
+    const reader = resp.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop() || '';
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
 
-    for (const line of lines) {
-      if (!line.startsWith('data: ')) continue;
-      const dataStr = line.slice(6).trim();
-      if (!dataStr) continue;
-
-      try {
-        const parsed = JSON.parse(dataStr);
-        const type = parsed.type as ChatStreamEvent['type'];
-        const event: ChatStreamEvent = { type, data: parsed.data ?? parsed.content };
-        
-        // 调试日志：记录 continue_chapter_result 事件
-        if (type === 'continue_chapter_result') {
-          console.log('[chatApi] 收到 continue_chapter_result:', event.data);
-        }
-        
-        onEvent?.(event);
-      } catch (e) {
-        console.warn('解析聊天 SSE 消息失败:', e, dataStr);
+      for (const rawLine of lines) {
+        parseAndDispatch(rawLine, onEvent);
       }
     }
+
+    // 处理剩余的 buffer（最后一行可能没有换行符）
+    if (buffer.trim()) {
+      parseAndDispatch(buffer, onEvent);
+    }
+  } catch (e) {
+    console.error('读取流失败:', e);
+    throw e;
+  }
+}
+
+/**
+ * 解析单行 SSE 消息并分发事件
+ */
+function parseAndDispatch(rawLine: string, onEvent?: (event: ChatStreamEvent) => void) {
+  const line = rawLine.trim();
+  if (!line) return;
+
+  let dataStr = '';
+  if (line.startsWith('data:')) {
+    dataStr = line.slice(5).trim();
+  } else if (line.startsWith('{')) {
+    // 尝试解析纯 JSON 行（容错）
+    dataStr = line;
+  } else {
+    return;
+  }
+
+  if (!dataStr) return;
+
+  try {
+    const parsed = JSON.parse(dataStr);
+    const type = parsed.type;
+    const data = parsed.data !== undefined ? parsed.data : parsed.content;
+
+    const event: ChatStreamEvent = { type, data };
+
+    if (type === 'continue_chapter_result') {
+      console.log('[chatApi] 收到 continue_chapter_result:', event.data);
+    }
+
+    onEvent?.(event);
+  } catch (e) {
+    console.warn('解析聊天 SSE 消息失败:', e, dataStr);
   }
 }
 

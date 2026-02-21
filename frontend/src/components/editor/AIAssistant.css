@@ -460,7 +460,7 @@
 
 .mention-menu {
   position: fixed;
-  z-index: 1000;
+  z-index: 3000;
   background: var(--bg-primary);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);

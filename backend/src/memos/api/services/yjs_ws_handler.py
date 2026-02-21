@@ -401,7 +401,9 @@ class YjsRoom:
     ):
         """Broadcast a binary message to all clients except the sender."""
         disconnected = set()
-        for conn in self.connections:
+        # Iterate over a copy of the connections to avoid "Set changed size during iteration"
+        # errors if a client disconnects during the broadcast (which involves await).
+        for conn in list(self.connections):
             if conn is exclude:
                 continue
             try:

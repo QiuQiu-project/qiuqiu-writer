@@ -30,7 +30,7 @@ export function getWsBaseUrl(): string {
     const isDev = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
     if (isDev) {
       // 开发环境：直接连接后端，确保所有前端实例连接到同一个后端
-      return 'ws://localhost:8001';
+      return 'ws://127.0.0.1:8001';
     }
     // 生产环境：使用当前 origin
     return window.location.origin.replace(/^http/, 'ws');

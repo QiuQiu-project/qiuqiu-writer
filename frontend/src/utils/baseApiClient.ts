@@ -77,14 +77,21 @@ export class BaseApiClient {
       });
       return data;
     } catch (error) {
-      // 处理网络错误（Failed to fetch）
-      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+      // 处理网络错误
+      if (
+         error instanceof TypeError &&
+         (error.message === 'Failed to fetch' ||
+           error.message === 'NetworkError when attempting to fetch resource.' ||
+           error.message.toLowerCase().includes('network error') ||
+           error.message.includes('Network request failed'))
+       ) {
         const hostDesc = this.baseUrl || '当前域名（相对路径，依赖代理）';
         const errorMsg = `无法连接到服务器 (${hostDesc})。可能的原因：
-1. 后端服务未运行（开发时检查 Vite 代理目标，如 http://localhost:8001）
+1. 后端服务未运行（开发时检查 Vite 代理目标，如 http://127.0.0.1:8001）
 2. 网络连接问题
 3. CORS 或代理配置问题
-4. 防火墙阻止了连接`;
+4. 防火墙阻止了连接
+原始错误: ${error.message}`;
         console.error(`❌ [BaseApiClient] 网络错误:`, errorMsg);
         throw new Error(errorMsg);
       }

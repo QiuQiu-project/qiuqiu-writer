@@ -1,5 +1,6 @@
 import { Send, Copy, Check, Loader2, Trash2, BookOpen, User, FileText } from 'lucide-react';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { streamChatMessage } from '../../utils/chatApi';
 import type { ChatMessage, ContinueChapterResult } from '../../utils/chatApi';
 import { formatOutlineSummary } from '../../utils/outlineFormat';
@@ -224,14 +225,40 @@ export default function AIAssistant({
             const lines = textBeforeCursor.split('\n').length;
             const menuHeight = 200;
             const menuWidth = 320;
+            
+            // Check if we are on mobile (rough check)
+            const isMobile = window.innerWidth <= 768;
+            
+            // Use visualViewport height if available (better for mobile keyboards)
+            const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+            const viewportTop = window.visualViewport ? window.visualViewport.offsetTop : 0;
+            
             let top = rect.top + lines * lineHeight + 30;
             let left = rect.left + 10;
-            if (top + menuHeight > window.innerHeight) {
-              top = rect.top + lines * lineHeight - menuHeight - 10;
+            
+            if (isMobile) {
+              // On mobile, force menu above the input box to avoid keyboard occlusion
+              // Position relative to the input container top, minus menu height
+              top = rect.top - menuHeight - 10;
+              // Ensure it doesn't go off the top of the viewport
+              if (top < viewportTop + 10) {
+                 top = viewportTop + 10;
+              }
+              // Center horizontally or align left with some padding
+              left = Math.max(10, rect.left);
+              if (left + menuWidth > window.innerWidth) {
+                left = window.innerWidth - menuWidth - 10;
+              }
+            } else {
+              // Desktop logic
+              if (top + menuHeight > viewportHeight) {
+                top = rect.top + lines * lineHeight - menuHeight - 10;
+              }
+              if (left + menuWidth > window.innerWidth) {
+                left = window.innerWidth - menuWidth - 10;
+              }
             }
-            if (left + menuWidth > window.innerWidth) {
-              left = window.innerWidth - menuWidth - 10;
-            }
+            
             setMentionPosition({ top, left });
           }
           mentionMenuValueRef.current = value;
@@ -381,18 +408,40 @@ export default function AIAssistant({
             const menuHeight = 300; // 预估菜单高度
             const menuWidth = 320; // 预估菜单宽度
             
+            // Check if we are on mobile (rough check)
+            const isMobile = window.innerWidth <= 768;
+            
+            // Use visualViewport height if available (better for mobile keyboards)
+            const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+            const viewportTop = window.visualViewport ? window.visualViewport.offsetTop : 0;
+            
             // 计算位置，确保不超出屏幕
             let top = rect.top + (lines * lineHeight) + 30;
             let left = rect.left + 10;
             
-            // 如果菜单会超出底部，显示在上方
-            if (top + menuHeight > window.innerHeight) {
-              top = rect.top + (lines * lineHeight) - menuHeight - 10;
-            }
-            
-            // 如果菜单会超出右侧，调整位置
-            if (left + menuWidth > window.innerWidth) {
-              left = window.innerWidth - menuWidth - 10;
+            if (isMobile) {
+              // On mobile, force menu above the input box to avoid keyboard occlusion
+              // Position relative to the input container top, minus menu height
+              top = rect.top - menuHeight - 10;
+              // Ensure it doesn't go off the top of the viewport
+              if (top < viewportTop + 10) {
+                 top = viewportTop + 10;
+              }
+              // Center horizontally or align left with some padding
+              left = Math.max(10, rect.left);
+              if (left + menuWidth > window.innerWidth) {
+                left = window.innerWidth - menuWidth - 10;
+              }
+            } else {
+              // 如果菜单会超出底部，显示在上方
+              if (top + menuHeight > viewportHeight) {
+                top = rect.top + (lines * lineHeight) - menuHeight - 10;
+              }
+              
+              // 如果菜单会超出右侧，调整位置
+              if (left + menuWidth > window.innerWidth) {
+                left = window.innerWidth - menuWidth - 10;
+              }
             }
             
             setMentionPosition({ top, left });
@@ -923,8 +972,16 @@ export default function AIAssistant({
       // 如果服务端没有显式发送 end 事件，也在结束时确保状态复位
       setIsSending(false);
     } catch (e) {
-      // 只记录到控制台，不显示给用户
+      const errMsg = e instanceof Error ? e.message : '发送失败';
       console.error('[AIAssistant] 对话发送失败:', e);
+      setMessages(prev => [
+        ...prev,
+        { 
+          role: 'assistant', 
+          content: `发送失败: ${errMsg} (请检查后端服务是否启动，或网络连接是否正常)`, 
+          timestamp: new Date() 
+        },
+      ]);
     } finally {
       // 避免重复调用，但确保异常情况下也能复位
       setIsSending(false);
@@ -1117,7 +1174,7 @@ export default function AIAssistant({
                     cursorAfterUpdateRef={cursorAfterUpdateRef}
                     className="chat-input"
                   />
-                  {showMentionMenu && mentionOptions.length > 0 && (
+                  {showMentionMenu && mentionOptions.length > 0 && createPortal(
                     <div
                       ref={mentionMenuRef}
                       className="mention-menu"
@@ -1175,7 +1232,8 @@ export default function AIAssistant({
                           <span>没有找到匹配的内容</span>
                         </div>
                       )}
-                    </div>
+                    </div>,
+                    document.body
                   )}
                 </div>
                 <div className="input-footer">

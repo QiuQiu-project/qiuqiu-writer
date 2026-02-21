@@ -52,25 +52,57 @@ export default defineConfig({
       'y-websocket',
     ],
   },
+  preview: {
+    port: 4173,
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8001',
+        changeOrigin: true,
+        ws: true,
+        secure: false,
+        xfwd: true,
+      },
+      '/ai': {
+        target: 'http://127.0.0.1:8001',
+        changeOrigin: true,
+        ws: true,
+        secure: false,
+        xfwd: true,
+      },
+      '/v1': {
+        target: 'http://127.0.0.1:8001',
+        changeOrigin: true,
+        ws: true,
+        secure: false,
+        xfwd: true,
+      },
+    },
+  },
   // 开发服务器配置（与 admin 一致：/api、/ai 代理到后端，避免 CORS）
   server: {
     port: 5173,
     open: false,
     proxy: {
       '/api': {
-        target: 'http://localhost:8001',
+        target: 'http://127.0.0.1:8001',
         changeOrigin: true,
         ws: true, // 支持 WebSocket 代理
+        secure: false,
+        xfwd: true,
       },
       '/ai': {
-        target: 'http://localhost:8001',
+        target: 'http://127.0.0.1:8001',
         changeOrigin: true,
         ws: true, // 支持 WebSocket 代理
+        secure: false,
+        xfwd: true,
       },
       '/v1': {
-        target: 'http://localhost:8001',
+        target: 'http://127.0.0.1:8001',
         changeOrigin: true,
         ws: true, // 支持 WebSocket 代理
+        secure: false,
+        xfwd: true,
       },
     },
   },
