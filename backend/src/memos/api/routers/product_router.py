@@ -640,7 +640,8 @@ async def chat(chat_req: ChatRequest):
                     success_count = 0
                     error_count = 0
                     total = 0
-                    async for result in book_analysis_service.generate_outlines_for_all_chapters(
+                    
+                    iterator = book_analysis_service.generate_outlines_for_all_chapters(
                         work_id=work_id,
                         ai_service=ai_service,
                         prompt=None,
@@ -650,7 +651,19 @@ async def chat(chat_req: ChatRequest):
                             "max_tokens": analysis_settings.max_tokens,
                         },
                         chapter_ids=chapter_id_list,
-                    ):
+                    )
+
+                    while True:
+                        try:
+                            # 包装迭代器的 __anext__ 方法以支持心跳
+                            task = asyncio.create_task(iterator.__anext__())
+                            while not task.done():
+                                await asyncio.sleep(3)
+                                yield f"data: {json.dumps({'type': 'ping', 'data': 'keep-alive'})}\n\n"
+                            result = await task
+                        except StopAsyncIteration:
+                            break
+                        
                         total += 1
                         if "error" in result:
                             error_count += 1
@@ -723,7 +736,7 @@ async def chat(chat_req: ChatRequest):
                         try:
                             yield f"data: {json.dumps({'type': 'text', 'data': f'正在分析章节 {idx}/{total} (ID: {chapter_id})...'}, ensure_ascii=False)}\n\n"
 
-                            result = await book_analysis_service.component_data_insert_to_work(
+                            task = asyncio.create_task(book_analysis_service.component_data_insert_to_work(
                                 work_id=work_id,
                                 chapter_id=chapter_id,
                                 ai_service=ai_service,
@@ -734,7 +747,13 @@ async def chat(chat_req: ChatRequest):
                                     "max_tokens": analysis_settings.max_tokens,
                                 },
                                 build_text_summary=True,
-                            )
+                            ))
+
+                            while not task.done():
+                                await asyncio.sleep(3)
+                                yield f"data: {json.dumps({'type': 'ping', 'data': 'keep-alive'})}\n\n"
+
+                            result = await task
 
                             summary_text = result.get("summary_text", "")
                             if summary_text:
@@ -815,7 +834,7 @@ async def chat(chat_req: ChatRequest):
                         try:
                             yield f"data: {json.dumps({'type': 'text', 'data': f'正在校验章节 {idx}/{total} (ID: {chapter_id})...'}, ensure_ascii=False)}\n\n"
 
-                            result = await book_analysis_service.verify_chapter_info(
+                            task = asyncio.create_task(book_analysis_service.verify_chapter_info(
                                 work_id=work_id,
                                 chapter_id=chapter_id,
                                 ai_service=ai_service,
@@ -826,7 +845,13 @@ async def chat(chat_req: ChatRequest):
                                     "max_tokens": analysis_settings.max_tokens,
                                 },
                                 build_text_summary=True,
-                            )
+                            ))
+
+                            while not task.done():
+                                await asyncio.sleep(3)
+                                yield f"data: {json.dumps({'type': 'ping', 'data': 'keep-alive'})}\n\n"
+
+                            result = await task
 
                             summary_text = result.get("summary_text", "")
                             if summary_text:
