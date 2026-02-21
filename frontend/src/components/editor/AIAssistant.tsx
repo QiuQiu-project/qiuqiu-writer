@@ -149,8 +149,8 @@ export default function AIAssistant({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const charactersFromComponentData = (componentData as any).characters || [];
         setCharacters(charactersFromComponentData);
-      } catch (err) {
-        
+      } catch {
+        // ignore
       }
     };
 
@@ -643,8 +643,8 @@ export default function AIAssistant({
       await navigator.clipboard.writeText(content);
       setCopiedIndex(index);
       setTimeout(() => setCopiedIndex(null), 2000);
-    } catch (err) {
-      
+    } catch {
+      // ignore
     }
   };
 

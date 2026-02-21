@@ -99,7 +99,7 @@ class PromptTemplateApiClient extends BaseApiClient {
         '/api/v1/prompt-templates/',
         params
       );
-    } catch (error) {
+    } catch {
       
       return [];
     }
@@ -126,7 +126,7 @@ class PromptTemplateApiClient extends BaseApiClient {
         params
       );
       return response && response.length > 0 ? response[0] : null;
-    } catch (error) {
+    } catch {
       
       return null;
     }

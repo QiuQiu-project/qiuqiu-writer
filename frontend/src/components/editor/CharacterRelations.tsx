@@ -728,8 +728,8 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
         return () => {
           window.removeEventListener('resize', handleResize);
         };
-      } catch (error) {
-        
+      } catch {
+        // ignore
       }
     }, 100);
 

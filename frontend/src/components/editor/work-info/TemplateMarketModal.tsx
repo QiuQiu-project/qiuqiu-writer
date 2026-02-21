@@ -63,8 +63,8 @@ export default function TemplateMarketModal({
       try {
         const info = await authApi.getUserInfo();
         setUserInfo(info);
-      } catch (error) {
-        
+      } catch {
+        // ignore
       }
     };
     loadUserInfo();
@@ -92,8 +92,8 @@ export default function TemplateMarketModal({
       }
       
       setTemplates(filteredData);
-    } catch (error) {
-      
+    } catch {
+      // ignore
     } finally {
       setLoading(false);
     }
@@ -124,7 +124,7 @@ export default function TemplateMarketModal({
         setEditingTemplate(null);
         setSaveForm({ name: '', description: '', is_public: false });
         fetchTemplates();
-      } catch (error) {
+      } catch {
         
         showMessage('更新失败，请重试', 'error');
       }
@@ -153,10 +153,10 @@ export default function TemplateMarketModal({
       if (activeTab === 'mine') {
         fetchTemplates();
       }
-    } catch (error) {
-      
-      showMessage('保存失败，请重试', 'error');
-    }
+    } catch {
+        // ignore
+        showMessage('保存失败，请重试', 'error');
+      }
   };
 
   const openSaveForm = (config?: TemplateConfig, fromTemplateId?: number) => {
@@ -184,7 +184,7 @@ export default function TemplateMarketModal({
         await templatesApi.deleteTemplate(templateId);
         showMessage('模板删除成功', 'success');
         fetchTemplates();
-      } catch (error) {
+      } catch {
         
         showMessage('删除失败，请重试', 'error');
       }

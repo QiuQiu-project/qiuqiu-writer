@@ -214,8 +214,8 @@ export const loadFromCache = (workId: string | null, templateId?: string): Cache
         const data = JSON.parse(cached);
         return data;
       }
-    } catch (e) {
-      
+    } catch {
+      // ignore
     }
   }
   
@@ -226,9 +226,9 @@ export const loadFromCache = (workId: string | null, templateId?: string): Cache
     if (cached) {
       return JSON.parse(cached);
     }
-  } catch (e) {
-    
-  }
+  } catch {
+      // ignore
+    }
   return null;
 };
 
@@ -242,7 +242,7 @@ export const saveToCache = (data: CacheData, workId: string | null, templateId?:
       const templateKey = workId ? `planetwriter_workinfo_cache_${workId}_${templateId}` : `planetwriter_workinfo_cache_${templateId}`;
       localStorage.setItem(templateKey, JSON.stringify(data));
     }
-  } catch (e) {
-    
-  }
+  } catch {
+      // ignore
+    }
 };

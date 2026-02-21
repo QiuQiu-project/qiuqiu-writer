@@ -128,30 +128,25 @@ class SyncManager {
       return;
     }
 
-    try {
-      // 检查是否有待同步的更改
-      const pendingKeys = localCacheManager.getPendingSyncKeys();
-      if (!pendingKeys.includes(documentId)) {
-        return;
-      }
-      
-      const cached = await localCacheManager.get<ShareDBDocument>(documentId);
-      if (!cached) {
-        // 如果缓存不存在，也标记为已同步以避免重复尝试
-        localCacheManager.markAsSynced(documentId);
-        return;
-      }
-
-      // 根据文档类型选择同步方式
-      await this.syncChapterDocument(documentId, cached);
-      
-      // 注意：syncChapterDocument 内部可能会调用 markAsSynced
-      // 但为了保险起见，这里也可以调用，markAsSynced 是幂等的
-      // localCacheManager.markAsSynced(documentId);
-    } catch (error) {
-      
-      throw error;
+    // 检查是否有待同步的更改
+    const pendingKeys = localCacheManager.getPendingSyncKeys();
+    if (!pendingKeys.includes(documentId)) {
+      return;
     }
+    
+    const cached = await localCacheManager.get<ShareDBDocument>(documentId);
+    if (!cached) {
+      // 如果缓存不存在，也标记为已同步以避免重复尝试
+      localCacheManager.markAsSynced(documentId);
+      return;
+    }
+
+    // 根据文档类型选择同步方式
+    await this.syncChapterDocument(documentId, cached);
+    
+    // 注意：syncChapterDocument 内部可能会调用 markAsSynced
+    // 但为了保险起见，这里也可以调用，markAsSynced 是幂等的
+    // localCacheManager.markAsSynced(documentId);
   }
 
   /**
@@ -187,8 +182,8 @@ class SyncManager {
       for (const docId of documentIds) {
         try {
           await documentCache.getDocument(docId);
-        } catch (error) {
-          
+        } catch {
+          // Ignore preload error
         }
       }
     }
@@ -258,7 +253,7 @@ class SyncManager {
     // 检查是否有失败
     const failures = results.filter(r => r.status === 'rejected');
     if (failures.length > 0) {
-      
+      // Log failures or handle retry logic here if needed
     }
   }
 

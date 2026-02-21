@@ -144,41 +144,6 @@ function getLastTextNode(node: Node): Text | null {
   return null;
 }
 
-/** 按字符偏移设置选区，供父组件插入 @ 等时使用 */
-export function setSelectionRange(container: Node, startOffset: number, endOffset: number): void {
-  const sel = window.getSelection();
-  if (!sel) return;
-  let current = 0;
-  let startNode: Text | null = null;
-  let startOff = 0;
-  let endNode: Text | null = null;
-  let endOff = 0;
-  function walk(node: Node): void {
-    if (node.nodeType === Node.TEXT_NODE) {
-      const len = (node as Text).length;
-      const textNode = node as Text;
-      if (startNode == null && current + len >= startOffset) {
-        startNode = textNode;
-        startOff = Math.min(startOffset - current, len);
-      }
-      if (endNode == null && current + len >= endOffset) {
-        endNode = textNode;
-        endOff = Math.min(endOffset - current, len);
-      }
-      current += len;
-      return;
-    }
-    for (let i = 0; i < node.childNodes.length; i++) walk(node.childNodes[i]);
-  }
-  walk(container);
-  if (startNode && endNode) {
-    const range = document.createRange();
-    range.setStart(startNode, startOff);
-    range.setEnd(endNode, endOff);
-    sel.removeAllRanges();
-    sel.addRange(range);
-  }
-}
 
 export interface ChatInputContentEditableProps {
   value: string;
@@ -216,6 +181,7 @@ export default function ChatInputContentEditable({
 
   const ref = inputRef ?? editableRef;
 
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const handleInput = useCallback(() => {
     if (isComposingRef.current) return;
     const el = ref.current;
@@ -228,6 +194,7 @@ export default function ChatInputContentEditable({
     onChange(text, offset);
   }, [onChange, cursorOffsetRef, ref]);
 
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const updateCursorInfo = useCallback(() => {
     const el = ref.current;
     if (!el) return;
@@ -254,6 +221,7 @@ export default function ChatInputContentEditable({
     isComposingRef.current = true;
   }, []);
 
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const handleCompositionEnd = useCallback(() => {
     isComposingRef.current = false;
     // 组合结束后同步 DOM 文本并恢复光标，避免中文输入被重渲染打断、新字仍落在 @ 样式里

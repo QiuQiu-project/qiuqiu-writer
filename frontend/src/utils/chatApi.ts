@@ -68,7 +68,7 @@ function getMemosUserId(workId?: number | string | null): string | null {
     const memosUserId = `user_${userId}_work_${workIdStr}`;
     
     return memosUserId;
-  } catch (e) {
+  } catch {
     
     return null;
   }
@@ -189,27 +189,22 @@ export async function streamChatMessage(
   const decoder = new TextDecoder();
   let buffer = '';
 
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
 
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
 
-      for (const rawLine of lines) {
-        parseAndDispatch(rawLine, onEvent);
-      }
+    for (const rawLine of lines) {
+      parseAndDispatch(rawLine, onEvent);
     }
+  }
 
-    // 处理剩余的 buffer（最后一行可能没有换行符）
-    if (buffer.trim()) {
-      parseAndDispatch(buffer, onEvent);
-    }
-  } catch (e) {
-    
-    throw e;
+  // 处理剩余的 buffer（最后一行可能没有换行符）
+  if (buffer.trim()) {
+    parseAndDispatch(buffer, onEvent);
   }
 }
 
@@ -240,12 +235,12 @@ function parseAndDispatch(rawLine: string, onEvent?: (event: ChatStreamEvent) =>
     const event: ChatStreamEvent = { type, data };
 
     if (type === 'continue_chapter_result') {
-      
+      // ignore
     }
 
     onEvent?.(event);
-  } catch (e) {
-    
+  } catch {
+    // ignore
   }
 }
 

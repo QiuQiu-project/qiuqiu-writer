@@ -222,7 +222,7 @@ export default function SideNav({ activeNav, onNavChange, selectedChapter, onCha
                         if (onOpenVolumeModal) {
                           onOpenVolumeModal('edit', volume.id, volume.title, volume.outline, volume.detailOutline);
                         } else {
-                          
+                          // No onOpenVolumeModal handler
                         }
                       }}
                     >

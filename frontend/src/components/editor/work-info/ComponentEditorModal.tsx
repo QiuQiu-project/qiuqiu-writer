@@ -97,8 +97,8 @@ export default function ComponentEditorModal({
                 validatePrompt: val?.prompt_content || prev.validatePrompt,
                 analysisPrompt: ana?.prompt_content || prev.analysisPrompt
               }));
-            } catch (e) {
-              
+            } catch {
+              // ignore
             } finally {
               setLoadingPrompts(false);
             }
@@ -163,8 +163,8 @@ export default function ComponentEditorModal({
           ));
         }
         await Promise.all(promises);
-      } catch (e) {
-        
+      } catch {
+        // ignore
       }
     }
 

@@ -142,8 +142,8 @@ export async function loadChapterContent(params: LoadChapterContentParams): Prom
               // 切换章节时保存前一个章节，不需要验证（因为已经是前一个章节了）
               undefined
             );
-                      } catch (syncErr) {
-            
+          } catch {
+            // Ignore sync error during chapter switch
           }
           
           // 验证保存是否成功
@@ -152,13 +152,14 @@ export async function loadChapterContent(params: LoadChapterContentParams): Prom
             if (savedDoc.content === currentContent) {
               // 保存成功
             } else {
-                          }
+              // Content mismatch, but we proceed
+            }
           }
         } else {
-          
+          // Content is empty or invalid, skipping save
         }
-      } catch (err) {
-        
+      } catch {
+        // Ignore general error during chapter switch save
       }
     }
     
@@ -175,7 +176,7 @@ export async function loadChapterContent(params: LoadChapterContentParams): Prom
         clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = null;
       } else {
-        
+        // No pending save timeout
       }
       
       // 关键修复：等待一小段时间，确保所有待保存的定时器都被清除
@@ -261,8 +262,8 @@ export async function loadChapterContent(params: LoadChapterContentParams): Prom
             };
           }
         }
-      } catch (cacheErr) {
-        
+      } catch {
+        // Ignore cache error
       }
       
       // 验证缓存内容是否属于当前章节
@@ -368,12 +369,13 @@ export async function loadChapterContent(params: LoadChapterContentParams): Prom
             
             // 异步更新缓存
             localCacheManager.set(documentId, newDoc, 1).catch(() => {
-              
+              // Ignore cache update error
             });
           } else {
-                      }
-        } catch (apiErr) {
-          
+            // Invalid response format
+          }
+        } catch {
+          // Ignore API error
         }
       }
       
@@ -381,8 +383,10 @@ export async function loadChapterContent(params: LoadChapterContentParams): Prom
             
       // 🔍 [调试] 检查内容状态
       if (content === null) {
-              } else if (content === '') {
-              }
+        // Content is null
+      } else if (content === '') {
+        // Content is empty string
+      }
       
       // 关键修复：只有在 content 不为 null 且不为空字符串时才设置编辑器
       // 如果是空字符串，检查是否是同一章节重新加载，如果是则保留现有内容
@@ -455,7 +459,8 @@ export async function loadChapterContent(params: LoadChapterContentParams): Prom
             const editorContentAfterSet = editor.getHTML();
                         
             if (editorContentAfterSet.trim() === '<p></p>' || editorContentAfterSet.trim() === '') {
-                          }
+              // Editor content is empty after set
+            }
           }, 100);
           
           // 使用 setTimeout 确保内容设置完成后再更新字数
@@ -474,12 +479,14 @@ export async function loadChapterContent(params: LoadChapterContentParams): Prom
             // 🔍 [调试] 验证设置后的内容
                         
             if (normalizedSet.length === 0 && normalizedExpected.length > 0) {
-                          }
+              // Content mismatch: expected content but got empty
+            }
           }, 0);
           
           lastSetContentRef.current = normalizedContent; // 记录已设置的内容
-                  } else {
-                  }
+        } else {
+          // Content already up to date or no need to set
+        }
       } else {
         // 如果 content 是 null（获取失败），设置空编辑器
         // 🔍 [调试] 记录为什么内容为 null
@@ -511,7 +518,7 @@ export async function loadChapterContent(params: LoadChapterContentParams): Prom
       setChapterLoading(false);
       // 关键修复：确保在加载完成或失败时都清除加载状态标记
       isChapterLoadingRef.current = false;
-    } catch (err) {
+    } catch {
       
       // 即使所有方法都失败，也显示空内容，保证编辑器可用
       editor.commands.setContent('<p></p>');
@@ -520,7 +527,7 @@ export async function loadChapterContent(params: LoadChapterContentParams): Prom
       // 关键修复：确保在加载失败时也清除加载状态标记
       isChapterLoadingRef.current = false;
     }
-  } catch (err) {
+  } catch {
     
     // 即使所有方法都失败，也显示空内容，保证编辑器可用
     editor.commands.setContent('<p></p>');

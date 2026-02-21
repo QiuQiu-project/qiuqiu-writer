@@ -112,8 +112,8 @@ class LocalCacheManager {
     // 从 localStorage 删除
     try {
       localStorage.removeItem(`${STORAGE_PREFIX}${key}`);
-    } catch (e) {
-      
+    } catch {
+      // Ignore localStorage error
     }
 
     // 从同步队列移除
@@ -237,7 +237,7 @@ class LocalCacheManager {
       }
 
       return item;
-    } catch (e) {
+    } catch {
       
       return null;
     }
@@ -290,8 +290,8 @@ class LocalCacheManager {
             pendingChanges: !synced,
           };
           localStorage.setItem(`${STORAGE_PREFIX}${key}`, JSON.stringify(retryItem));
-        } catch (retryErr) {
-          
+        } catch {
+          // Give up if retry fails
         }
       }
     }
@@ -388,8 +388,8 @@ class LocalCacheManager {
         // 可以在这里加载额外的元数据
         JSON.parse(metadataStr);
       }
-    } catch (e) {
-      
+    } catch {
+      // Ignore metadata parse error
     }
   }
 

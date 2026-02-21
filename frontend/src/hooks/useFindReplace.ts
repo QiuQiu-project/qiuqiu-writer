@@ -91,8 +91,8 @@ export function useFindReplace(options: UseFindReplaceOptions): UseFindReplaceRe
         const clamped = Math.max(0, Math.min(targetScrollTop, maxScroll));
 
         scrollContainer.scrollTo({ top: clamped, behavior: 'smooth' });
-      } catch (err) {
-        
+      } catch {
+        // ignore
       }
     };
 
@@ -146,7 +146,7 @@ export function useFindReplace(options: UseFindReplaceOptions): UseFindReplaceRe
       } else {
         setCurrentMatchIndex(-1);
       }
-    } catch (err) {
+    } catch {
       
       setMatches([]);
       setCurrentMatchIndex(-1);
@@ -199,8 +199,8 @@ export function useFindReplace(options: UseFindReplaceOptions): UseFindReplaceRe
       editor.commands.insertContent(replaceText);
       
       setTimeout(() => findMatches(), 50);
-    } catch (err) {
-      
+    } catch {
+      // ignore
     }
   }, [editor, matches, currentMatchIndex, replaceText, findMatches]);
   
@@ -222,7 +222,7 @@ export function useFindReplace(options: UseFindReplaceOptions): UseFindReplaceRe
       setMatches([]);
       setCurrentMatchIndex(-1);
       setFindText('');
-    } catch (err) {
+    } catch {
       
       onMessage?.('替换失败，请重试', 'error');
     }

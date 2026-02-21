@@ -202,8 +202,8 @@ export default function MapView() {
       if (graphRef.current) {
         try {
           graphRef.current.destroy();
-        } catch (e) {
-          
+        } catch {
+          // ignore
         }
         graphRef.current = null;
       }
@@ -301,8 +301,8 @@ export default function MapView() {
       if (graphRef.current) {
         try {
           graphRef.current.destroy();
-        } catch (e) {
-          
+        } catch {
+          // ignore
         }
         graphRef.current = null;
       }

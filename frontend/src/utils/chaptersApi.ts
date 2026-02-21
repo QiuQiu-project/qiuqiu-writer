@@ -177,8 +177,8 @@ class ChaptersApiClient extends BaseApiClient {
           }, 1, { synced: true });
         }
         
-      } catch (error) {
-        
+      } catch {
+        // ignore error
       }
     }
 
@@ -247,8 +247,8 @@ class ChaptersApiClient extends BaseApiClient {
           cached_at: new Date().toISOString(),
         }, 1, { synced: true });
         
-      } catch (error) {
-        
+      } catch {
+        // ignore error
       }
     }
     

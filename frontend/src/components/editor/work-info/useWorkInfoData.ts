@@ -76,8 +76,8 @@ export const useWorkInfoData = (
           };
         }
       }
-    } catch (error) {
-      
+    } catch {
+      // ignore
     }
     return null;
   }, []);
@@ -312,12 +312,9 @@ export const useWorkInfoData = (
         metadata: metadataToSave
       });
       
-    } catch (err) {
-      
-      throw err;
     } finally {
-      setIsSaving(false);
-    }
+        setIsSaving(false);
+      }
   }, [workId, template]);
 
   // 监听模板变化并自动保存到缓存和后端（仅在实际用户编辑后保存，进入作品时由 loadData 设置的 template 不触发后端保存）
@@ -357,8 +354,8 @@ export const useWorkInfoData = (
           metadata: metadataToSave
         });
         
-      } catch (err) {
-        
+      } catch {
+        // ignore
       }
     }, 2000);
 

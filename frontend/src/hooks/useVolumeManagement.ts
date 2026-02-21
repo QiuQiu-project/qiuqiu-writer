@@ -128,7 +128,7 @@ export function useVolumeManagement(options: UseVolumeManagementOptions): UseVol
       });
 
       closeVolumePopup();
-    } catch (err) {
+    } catch {
       
       onError?.('保存卷信息失败');
     }
@@ -156,7 +156,7 @@ export function useVolumeManagement(options: UseVolumeManagementOptions): UseVol
       // 从本地移除
       setVolumes(prev => prev.filter(v => v.id !== volumeId));
       closeVolumePopup();
-    } catch (err) {
+    } catch {
       
       onError?.('删除卷失败');
     }

@@ -99,7 +99,7 @@ export async function exportAsText(work: Work): Promise<void> {
     }
 
     if (chapters.length === 0) {
-      
+      // ignore
     }
 
     // 构建文本内容
@@ -128,15 +128,10 @@ export async function exportAsText(work: Work): Promise<void> {
               chapterContent = '';
             }
           } else {
-            
+            // ignore
           }
-        } catch (docErr) {
-          
-          if (docErr instanceof Error) {
-            
-          } else if (typeof docErr === 'object' && docErr !== null) {
-            
-          }
+        } catch {
+          // ignore
         }
 
         // 如果没有内容，尝试从章节详情获取
@@ -144,8 +139,8 @@ export async function exportAsText(work: Work): Promise<void> {
           try {
             const chapterDetail = await chaptersApi.getChapter(chapter.id);
             chapterContent = chapterDetail.content || '';
-          } catch (detailErr) {
-            
+          } catch {
+            // ignore
           }
         }
 
@@ -168,7 +163,7 @@ export async function exportAsText(work: Work): Promise<void> {
     
     
     if (content.length === 0) {
-      
+      // ignore
     }
     
     try {
@@ -267,7 +262,7 @@ export async function exportAsWord(work: Work): Promise<void> {
     const chapters = await getAllChapters(work.id);
     
     if (chapters.length === 0) {
-      
+      // ignore
     }
 
     // 构建 HTML 内容
@@ -333,8 +328,8 @@ export async function exportAsWord(work: Work): Promise<void> {
               chapterContent = '';
             }
           }
-        } catch (docErr) {
-          
+        } catch {
+          // ignore
         }
 
         // 如果没有内容，尝试从章节详情获取
@@ -342,8 +337,8 @@ export async function exportAsWord(work: Work): Promise<void> {
           try {
             const chapterDetail = await chaptersApi.getChapter(chapter.id);
             chapterContent = chapterDetail.content || '';
-          } catch (detailErr) {
-            
+          } catch {
+            // ignore
           }
         }
 
@@ -403,7 +398,7 @@ export async function exportAsPdf(work: Work): Promise<void> {
     const chapters = await getAllChapters(work.id);
     
     if (chapters.length === 0) {
-      
+      // ignore
     }
 
     // 创建打印窗口
@@ -490,8 +485,8 @@ export async function exportAsPdf(work: Work): Promise<void> {
               chapterContent = '';
             }
           }
-        } catch (docErr) {
-          
+        } catch {
+          // ignore
         }
 
         // 如果没有内容，尝试从章节详情获取
@@ -499,8 +494,8 @@ export async function exportAsPdf(work: Work): Promise<void> {
           try {
             const chapterDetail = await chaptersApi.getChapter(chapter.id);
             chapterContent = chapterDetail.content || '';
-          } catch (detailErr) {
-            
+          } catch {
+            // ignore
           }
         }
 
@@ -542,7 +537,7 @@ export async function exportAsPdf(work: Work): Promise<void> {
         // printWindow.close();
       }, 500);
     };
-  } catch (error) {
+  } catch {
     
     throw new Error('导出失败，请稍后重试');
   }

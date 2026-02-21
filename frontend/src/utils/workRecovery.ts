@@ -417,7 +417,7 @@ export async function recoverWorkFromCache(
             content: chapter.content,
             create_version: true,
           });
-        } catch (syncError) {
+        } catch {
           
           // 继续处理下一个章节
         }
@@ -522,7 +522,7 @@ export async function getRecoverableWorks(): Promise<Array<{
         existsOnline,
         needsRecovery,
       });
-    } catch (error) {
+    } catch {
       
       // 继续处理下一个
     }

@@ -29,8 +29,8 @@ export default function Header({ currentDocId }: HeaderProps) {
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
       }
-    } catch (error) {
-      
+    } catch {
+      // ignore
     } finally {
       setSaving(false);
     }

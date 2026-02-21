@@ -150,9 +150,6 @@ export function useChapterAutoSave({
           // 关键修复：验证内容不为空且确实属于当前章节
           // 注意：即使内容为空（用户删除了所有内容），也应该保存，因为这是用户的意图
           // 但如果是初始空内容，可以跳过
-          if (!editorContent || (editorContent.trim() === '<p></p>' && editorContent.length <= 7)) {
-            // 检查是否是真正的空内容（只有默认的空段落）
-          }
           
           // 关键优化：检查内容是否真的改变了
           const lastSavedContent = documentCache.currentContent.get(documentId);
@@ -218,10 +215,9 @@ export function useChapterAutoSave({
                   
                                   }
               }
-            } else {
-                          }
-          } catch (syncErr) {
-            
+            }
+          } catch {
+            // Ignore sync error
           }
           
           // 关键优化：不再调用 getDocument 验证，避免触发服务器请求
@@ -229,8 +225,8 @@ export function useChapterAutoSave({
           // syncDocumentState 已经确保内容保存到正确的章节，不需要再次验证
                     
           // 字数统计已在 sync 接口中处理，不需要单独更新
-        } catch (err) {
-          
+        } catch {
+          // Ignore general error
         }
       }, 2000); // 2秒后保存到本地
     };

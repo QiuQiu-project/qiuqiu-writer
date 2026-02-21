@@ -101,7 +101,7 @@ export default function MainLayout() {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [userMenuOpen, mobileMenuOpen]);
+  }, [userMenuOpen, mobileMenuOpen, showCreateMenu]);
 
   const handleLoginSuccess = (user: UserInfo) => {
     setUserInfo(user);
@@ -114,8 +114,8 @@ export default function MainLayout() {
   const handleLogout = async () => {
     try {
       await authApi.logout();
-    } catch (error) {
-      
+    } catch {
+      // ignore
     } finally {
       setUserInfo(null);
       setIsAuthenticated(false);

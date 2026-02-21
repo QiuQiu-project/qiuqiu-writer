@@ -62,7 +62,7 @@ export default function UserWorksPage() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载作品失败');
-      
+      // ignore
     } finally {
       setLoading(false);
     }
@@ -81,8 +81,8 @@ export default function UserWorksPage() {
             setUserInfo(currentUser);
             return;
           }
-        } catch (err) {
-          
+        } catch {
+          // ignore
           // 如果API失败，使用本地存储的用户信息
           const storedUser = authApi.getUserInfo();
           
@@ -102,8 +102,8 @@ export default function UserWorksPage() {
         display_name: `用户 ${userId}`,
         status: 'active',
       });
-    } catch (err) {
-      
+    } catch {
+      // ignore
     }
   }, [userId, isCurrentUser]);
 

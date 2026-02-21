@@ -144,8 +144,8 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
           include_fields: false
         });
         setUserTemplates(templates);
-      } catch (error) {
-        
+      } catch {
+        // ignore
       }
     };
     fetchTemplates();

@@ -323,8 +323,8 @@ export default function ChapterSettingsModal({
     if (typeof val === 'object') {
       try {
         return JSON.stringify(val, null, 2);
-      } catch (e) {
-        
+      } catch {
+        // ignore
         return String(val);
       }
     }
@@ -478,8 +478,8 @@ export default function ChapterSettingsModal({
               } else {
                 initFromProps();
               }
-            } catch (error) {
-              
+            } catch {
+              // ignore
               initFromProps();
             } finally {
               setIsLoading(false);

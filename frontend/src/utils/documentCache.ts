@@ -96,8 +96,8 @@ export const documentCache = {
         
         return cached;
       }
-    } catch (error) {
-      
+    } catch {
+      // ignore
     }
     
     // 2. 缓存没有，从服务器获取
@@ -132,8 +132,8 @@ export const documentCache = {
           await localCacheManager.set(documentId, doc, doc.version || 1).catch(console.error);
           return doc;
         }
-      } catch (error) {
-        
+      } catch {
+        // ignore
       }
     }
     
@@ -231,13 +231,14 @@ export const documentCache = {
                   
                   // 打印完整的错误信息
                   if (syncErr instanceof Error) {
-                                      }
+                    // ignore
+                  }
                   // 即使同步失败，也继续使用本地缓存内容
                 }
               }
             }
-          } catch (syncErr) {
-            
+          } catch {
+            // ignore
           }
           
           // 不保存空内容到缓存，继续使用本地缓存
@@ -260,10 +261,10 @@ export const documentCache = {
         
         return serverDoc;
       } else {
-        
+        // ignore
       }
-    } catch (error) {
-      
+    } catch {
+      // ignore
     }
     
     // 如果服务器获取失败，使用本地缓存
@@ -310,8 +311,8 @@ export const documentCache = {
         documentCache.currentContent.set(documentId, cached.content);
         return cached;
       }
-    } catch (error) {
-      
+    } catch {
+      // ignore
     }
 
     return null;
@@ -341,8 +342,10 @@ export const documentCache = {
           existing.metadata = { ...existing.metadata, ...metadata };
           await localCacheManager.set(documentId, existing, existing.version || 1, { synced });
                   } else {
+                    // ignore
                   }
       } else {
+        // ignore
               }
       return; // 内容没有变化，直接返回，避免不必要的更新
     }
@@ -536,7 +539,7 @@ export const documentCache = {
                   };
                 }
                 // 'merge' 或 'cancel': 继续使用服务器返回的合并结果
-              } catch (conflictError) {
+              } catch {
                 
                 // 如果冲突解决失败，继续使用服务器返回的合并结果
               }
@@ -667,14 +670,14 @@ export const documentCache = {
                   }
                   // 'merge' 或 'cancel': 抛出错误，让调用者处理
                 }
-              } catch (conflictError) {
-                
+              } catch {
+                // ignore
               }
             }
             
             throw new Error(errorMsg);
           }
-      } catch (syncError) {
+      } catch {
         
         // 关键修复：即使服务器同步失败，也要确保本地缓存已更新
         // 重新读取本地缓存，确保内容已保存
@@ -788,8 +791,8 @@ export const documentCache = {
             },
           };
         }
-      } catch (error) {
-        
+      } catch {
+        // ignore
       }
     }
 
@@ -887,13 +890,13 @@ export const documentCache = {
           // 更新版本号
           documentCache.currentVersion.set(documentId, serverDoc.version || 1);
           documentCache.currentContent.set(documentId, htmlContent);
-        } catch (error) {
-          
+        } catch {
+          // ignore
         }
       }
       
       return serverDoc;
-    } catch (error) {
+    } catch {
       
       return null;
     }
@@ -926,11 +929,12 @@ export const documentCache = {
             
             await localCacheManager.set(documentId, serverDoc, serverVersion).catch(console.error);
                       } else {
+                        // ignore
                       }
         }
       }
-    } catch (error) {
-      
+    } catch {
+      // ignore
     }
   },
 };

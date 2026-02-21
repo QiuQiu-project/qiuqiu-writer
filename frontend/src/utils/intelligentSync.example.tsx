@@ -40,7 +40,7 @@ export function ExampleEditor({ documentId }: { documentId: string }) {
       },
       onCollaborativeUpdate: (hasUpdates) => {
         if (hasUpdates) {
-          
+          // Handle updates
         }
       },
       onContentChange: (synced) => {
@@ -97,7 +97,7 @@ export function ExampleLexicalEditor({ documentId }: { documentId: string }) {
       try {
         const editorStateJSON = editorRef.current.getEditorState().toJSON();
         content = JSON.stringify(editorStateJSON);
-      } catch (error) {
+      } catch {
         
         const root = editorRef.current.getEditorState().read(() => {
           return editorRef.current.getEditorState().read(() => {

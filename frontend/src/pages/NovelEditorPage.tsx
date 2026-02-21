@@ -148,8 +148,8 @@ export default function NovelEditorPage() {
       
       try {
         await syncToServer();
-      } catch (err) {
-        
+      } catch {
+        // ignore
       }
     }
 
@@ -213,8 +213,8 @@ export default function NovelEditorPage() {
           
           return cached.content;
         }
-      } catch (cacheErr) {
-        
+      } catch {
+        // ignore
       }
 
       // 本地没有，再从服务器拉取
@@ -226,8 +226,8 @@ export default function NovelEditorPage() {
         const res = await chaptersApi.getChapterDocument(chapterId);
         // 注意：这里的 res.content 可能是 Yjs 的 XML 字符串
         return res?.content || null;
-      } catch (err) {
-        
+      } catch {
+        // ignore
         return null;
       }
     },
@@ -243,7 +243,7 @@ export default function NovelEditorPage() {
       // 这样可以避免 SyncManager 触发冗余的 ShareDB 同步请求，从而减少冲突
       if (documentId) {
         documentCache.updateDocument(documentId, content, undefined, true).catch(() => {
-          
+          // ignore
         });
       }
     },
@@ -303,26 +303,26 @@ export default function NovelEditorPage() {
              
              // A. 保存本地版本为历史记录 (使用 Yjs 快照)
              try {
-               const base64 = createYjsSnapshotFromEditor(editor);
-               await chaptersApi.createYjsSnapshot(chapterId, base64, '冲突自动保存');
-               
-             } catch (historyErr) {
-               
-             }
- 
-             // B. 强制覆盖为线上最新版本 (仅在没有其他用户时安全)
+              const base64 = createYjsSnapshotFromEditor(editor);
+              await chaptersApi.createYjsSnapshot(chapterId, base64, '冲突自动保存');
+              
+            } catch {
+              // ignore
+            }
+
+            // B. 强制覆盖为线上最新版本 (仅在没有其他用户时安全)
              editor.commands.setContent(onlineContent);
              
              // C. 更新本地缓存
              await documentCache.updateDocument(documentId, onlineContent);
              
              showMessage('检测到本地版本与线上不一致，已将本地保存为历史记录并拉取最新版本', 'info');
-           }
-         }
-       } catch (err) {
-         
-       }
-     };
+          }
+        }
+      } catch {
+        // ignore
+      }
+    };
  
      // 增加延迟到 2 秒
      const timer = setTimeout(checkConflict, 2000);
@@ -598,7 +598,7 @@ export default function NovelEditorPage() {
       }
       
       showMessage('保存成功', 'success');
-    } catch (err) {
+    } catch {
       
       showMessage('保存失败', 'error');
     }
@@ -613,8 +613,8 @@ export default function NovelEditorPage() {
         try {
           removeChapterLocally(chapterId);
           await deleteChapter(chapterId, { skipRefresh: true });
-        } catch (err) {
-          
+        } catch {
+          // ignore
           setUpdateTrigger(prev => prev + 1);
         }
       }
@@ -687,7 +687,7 @@ export default function NovelEditorPage() {
         .join('');
       editor.commands.setContent(htmlContent || '<p></p>');
       if (isFinal) {
-        
+        // ignore
       }
     }
   };
@@ -720,8 +720,8 @@ export default function NovelEditorPage() {
               : JSON.stringify(meta.detailed_outline);
           }
         }
-      } catch (e) {
-        
+      } catch {
+        // ignore
       }
     }
 
@@ -770,7 +770,7 @@ export default function NovelEditorPage() {
           showMessage('作品已删除', 'success');
           const uid = authApi.getUserInfo()?.id;
           navigate(uid ? `/users/${uid}` : '/');
-        } catch (err) {
+        } catch {
           
           showMessage('删除作品失败', 'error');
         }

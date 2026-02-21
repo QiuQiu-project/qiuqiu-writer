@@ -128,27 +128,16 @@ class WorksApiClient extends BaseApiClient {
       work_type: mapWorkTypeToBackend(workData.work_type),
     };
     
-        
-    try {
-      const response = await this.post<BackendWorkResponse>('/api/v1/works/', backendData);
-      
-      
-      
-      if (!response || !response.id) {
-        
-        throw new Error('创建作品失败：服务器未返回作品ID');
-      }
-      
-      // 将后端类型转换为前端类型
-      const work = this.mapBackendWork(response);
-      
-      
-      
-      return work;
-    } catch (error) {
-      
-      throw error;
+    const response = await this.post<BackendWorkResponse>('/api/v1/works/', backendData);
+    
+    if (!response || !response.id) {
+      throw new Error('创建作品失败：服务器未返回作品ID');
     }
+    
+    // 将后端类型转换为前端类型
+    const work = this.mapBackendWork(response);
+    
+    return work;
   }
 
   /**
@@ -309,8 +298,8 @@ class WorksApiClient extends BaseApiClient {
           cached_at: new Date().toISOString(),
         }, 1, { synced: true });
         
-      } catch (error) {
-        
+      } catch {
+        // Ignore cache error
       }
     }
   }

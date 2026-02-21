@@ -51,8 +51,8 @@ export async function getAnalysisPromptFromBackend(templateType: string = 'chapt
       `/api/v1/prompt-templates/type/${templateType}/default`
     );
     return result.prompt_content || '';
-  } catch (error) {
-    
+  } catch {
+    // ignore
   }
   return getDefaultAnalysisPrompt();
 }
@@ -239,7 +239,7 @@ export async function analyzeChapterContent(
             }
           } catch (e) {
             if (e instanceof Error && e.message !== '分析过程中出错') {
-              
+              // ignore
             } else {
               throw e;
             }
@@ -437,7 +437,7 @@ export async function analyzeBookEnhanced(
             }
           } catch (e) {
             if (e instanceof Error && e.message !== '分析过程中出错') {
-              
+              // ignore
             } else {
               throw e;
             }
@@ -600,7 +600,7 @@ export async function analyzeChaptersIncremental(
             }
           } catch (e) {
             if (e instanceof Error && e.message !== '分析过程中出错') {
-              
+              // ignore
             } else {
               throw e;
             }
@@ -806,7 +806,7 @@ export async function analyzeChapterByFile(
             }
           } catch (e) {
             if (e instanceof Error && e.message !== '分析过程中出错') {
-              
+              // ignore
             } else {
               throw e;
             }
@@ -872,8 +872,7 @@ export async function createWorkFromFile(
     title: string;
   }>;
 }> {
-  try {
-    const result = await bookAnalysisClient.post<{
+    return await bookAnalysisClient.post<{
       work_id: string;
       work_title: string;
       work_created: boolean;
@@ -893,11 +892,6 @@ export async function createWorkFromFile(
         }))
       }
     );
-    return result;
-  } catch (error) {
-    
-    throw error;
-  }
 }
 
 /**
@@ -922,8 +916,7 @@ export async function analyzeChapter(
   outline: Record<string, unknown>;
   detailed_outline: Record<string, unknown>;
 }> {
-  try {
-    onProgress?.({ message: '开始分析章节...', status: 'start' });
+  onProgress?.({ message: '开始分析章节...', status: 'start' });
 
     const data = await bookAnalysisClient.post<{
       success: boolean;
@@ -950,10 +943,6 @@ export async function analyzeChapter(
       outline: (successResult.outline as Record<string, unknown>) || {},
       detailed_outline: (successResult.detailed_outline as Record<string, unknown>) || {},
     };
-  } catch (error) {
-    
-    throw error;
-  }
 }
 
 export async function testAPIConnection(): Promise<{
@@ -1024,7 +1013,6 @@ export async function generateComponentData(
   chapterId?: number,
   settings?: AnalysisSettings
 ): Promise<{ component_id: string; data_key: string; generated_data: string }> {
-  try {
     const body: Record<string, unknown> = {
       work_id: workId,
       component_id: componentId,
@@ -1057,10 +1045,6 @@ export async function generateComponentData(
       generated_data: string;
     }>('/ai/generate-component-data', body);
     return result;
-  } catch (error) {
-    
-    throw error;
-  }
 }
 
 export async function generateChapterContent(
@@ -1072,71 +1056,66 @@ export async function generateChapterContent(
   onProgress?: (progress: { message?: string; text?: string; status?: string }) => void,
   settings?: AnalysisSettings
 ): Promise<string> {
-  try {
-    const response = await bookAnalysisClient.requestRaw('/ai/generate-chapter-content', {
-      method: 'POST',
-      body: JSON.stringify({
-        outline,
-        detailed_outline: detailedOutline,
-        chapter_title: chapterTitle,
-        characters: characters || [],
-        locations: locations || [],
-        settings: settings || {},
-      }),
-    });
+  const response = await bookAnalysisClient.requestRaw('/ai/generate-chapter-content', {
+    method: 'POST',
+    body: JSON.stringify({
+      outline,
+      detailed_outline: detailedOutline,
+      chapter_title: chapterTitle,
+      characters: characters || [],
+      locations: locations || [],
+      settings: settings || {},
+    }),
+  });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`API 调用失败: ${response.status} ${response.statusText} - ${errorText}`);
-    }
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`API 调用失败: ${response.status} ${response.statusText} - ${errorText}`);
+  }
 
-    const reader = response.body?.getReader();
-    if (!reader) {
-      throw new Error('无法获取响应流');
-    }
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error('无法获取响应流');
+  }
 
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let content = '';
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let content = '';
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
 
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
 
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          try {
-            const data = JSON.parse(line.slice(6));
-            if (data.type === 'start') {
-              onProgress?.({ message: '开始生成章节内容...', status: 'start' });
-            } else if (data.type === 'chunk') {
-              const chunkContent = data.content || '';
-              content += chunkContent;
-              onProgress?.({ text: chunkContent, status: 'generating' });
-            } else if (data.type === 'done') {
-              onProgress?.({ message: '章节内容生成完成', status: 'done' });
-            } else if (data.type === 'error') {
-              throw new Error(data.message || '生成失败');
-            }
-          } catch (e) {
-            
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        try {
+          const data = JSON.parse(line.slice(6));
+          if (data.type === 'start') {
+            onProgress?.({ message: '开始生成章节内容...', status: 'start' });
+          } else if (data.type === 'chunk') {
+            const chunkContent = data.content || '';
+            content += chunkContent;
+            onProgress?.({ text: chunkContent, status: 'generating' });
+          } else if (data.type === 'done') {
+            onProgress?.({ message: '章节内容生成完成', status: 'done' });
+          } else if (data.type === 'error') {
+            throw new Error(data.message || '生成失败');
           }
+        } catch {
+          // ignore
         }
       }
     }
-
-    if (!content) {
-      throw new Error('未能生成章节内容');
-    }
-
-    return content;
-  } catch (error) {
-    
-    throw error;
   }
+
+  if (!content) {
+    throw new Error('未能生成章节内容');
+  }
+
+  return content;
 }
 

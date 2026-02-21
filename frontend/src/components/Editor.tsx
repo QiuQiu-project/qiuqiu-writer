@@ -41,16 +41,16 @@ export default function Editor({ docId }: EditorProps) {
       if (editor && doc.content) {
         editor.commands.setContent(doc.content);
       }
-    } catch (error) {
-      
+    } catch {
+      // ignore
     }
   };
 
   const saveDocument = async (id: string, content: string) => {
     try {
       await apiClient.updateDocument(id, DEFAULT_USER_ID, { content });
-    } catch (error) {
-      
+    } catch {
+      // ignore
     }
   };
 

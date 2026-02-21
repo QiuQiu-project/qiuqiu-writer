@@ -202,7 +202,7 @@ export default function WorksPage() {
               await navigator.clipboard.writeText(workLink);
               // 显示成功提示
               showMessage('链接已复制到剪贴板', 'success');
-            } catch (clipboardErr) {
+            } catch {
               // 如果 Clipboard API 不可用，使用备用方法
               
               

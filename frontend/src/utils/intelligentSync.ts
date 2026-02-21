@@ -305,7 +305,7 @@ export function useIntelligentSync(
 
         onContentChange?.(true);
       } 
-    } catch (error) {
+    } catch {
       
       onContentChange?.(false);
     }

@@ -130,8 +130,8 @@ export default function ChapterHistoryModal({
           return prev;
         });
       }
-    } catch (err) {
-      
+    } catch {
+      // ignore
       setItems([]);
     } finally {
       setLoading(false);
@@ -177,8 +177,8 @@ export default function ChapterHistoryModal({
       setVersionTextState(versionText);
       const currentText = getCurrent();
       setDiffLinesState(diffLines(versionText, currentText));
-    } catch (err) {
-      
+    } catch {
+      // ignore
       if (loadingIdRef.current !== loadingKey) return;
       setDiffLinesState([]);
       setVersionTextState(null);
@@ -207,8 +207,8 @@ export default function ChapterHistoryModal({
     try {
       await onRestore(selectedId, 'snapshot');
       onClose();
-    } catch (err) {
-      
+    } catch {
+      // ignore
       alert('恢复失败，请重试');
     } finally {
       setRestoringId(null);

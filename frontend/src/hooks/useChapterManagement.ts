@@ -371,8 +371,8 @@ export function useChapterManagement(options: UseChapterManagementOptions): UseC
           // 统一通过 setSelectedChapter 更新，确保 URL 和状态同步
           setSelectedChapter(targetChapterId);
         }
-      } catch (err) {
-        
+      } catch {
+        // ignore
       }
     };
 
@@ -394,7 +394,7 @@ export function useChapterManagement(options: UseChapterManagementOptions): UseC
         skipCache: true,
       });
       setDeletedChapters(res.chapters || []);
-    } catch (err) {
+    } catch {
       
       setDeletedChapters([]);
     }

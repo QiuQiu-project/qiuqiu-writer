@@ -67,8 +67,8 @@ export function useAutoSave(
             onChapterUpdate(syncResult.chapter);
           }
 
-        } catch (err) {
-          
+        } catch {
+          // ignore
         }
       }, 2000);
     };
