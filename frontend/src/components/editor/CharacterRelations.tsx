@@ -6,7 +6,12 @@ import type { GraphData } from '@antv/g6';
 import './CharacterRelations.css';
 
 // 注册 React 节点扩展
-register(ExtensionCategory.NODE, 'react', ReactNode);
+try {
+  register(ExtensionCategory.NODE, 'react', ReactNode);
+} catch (error) {
+  // 忽略重复注册的错误
+  console.debug('G6 React Node extension registration skipped:', error);
+}
 
 function getCssVar(name: string, fallback: string): string {
   try {

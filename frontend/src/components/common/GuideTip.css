@@ -1,0 +1,126 @@
+.guide-tip-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.guide-tip-popover {
+  position: absolute;
+  z-index: 1000;
+  width: 240px;
+  background-color: var(--bg-primary, #ffffff);
+  border: 1px solid var(--border-color, #e0e0e0);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  padding: 12px;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.guide-tip-popover.top {
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+}
+
+.guide-tip-popover.bottom {
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(8px);
+}
+
+.guide-tip-popover.left {
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%) translateX(-8px);
+}
+
+.guide-tip-popover.right {
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%) translateX(8px);
+}
+
+/* Arrow */
+.guide-tip-popover::after {
+  content: '';
+  position: absolute;
+  border-width: 6px;
+  border-style: solid;
+}
+
+.guide-tip-popover.top::after {
+  top: 100%;
+  left: 50%;
+  margin-left: -6px;
+  border-color: var(--bg-primary, #ffffff) transparent transparent transparent;
+}
+
+.guide-tip-popover.bottom::after {
+  bottom: 100%;
+  left: 50%;
+  margin-left: -6px;
+  border-color: transparent transparent var(--bg-primary, #ffffff) transparent;
+}
+
+.guide-tip-popover.left::after {
+  left: 100%;
+  top: 50%;
+  margin-top: -6px;
+  border-color: transparent transparent transparent var(--bg-primary, #ffffff);
+}
+
+.guide-tip-popover.right::after {
+  right: 100%;
+  top: 50%;
+  margin-top: -6px;
+  border-color: transparent var(--bg-primary, #ffffff) transparent transparent;
+}
+
+.guide-tip-content {
+  font-size: 14px;
+  color: var(--text-primary, #333333);
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.guide-tip-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid var(--border-light, #f0f0f0);
+  padding-top: 8px;
+  margin-top: 8px;
+}
+
+.guide-tip-close {
+  font-size: 12px;
+  color: var(--primary-color, #1890ff);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.guide-tip-close:hover {
+  background-color: var(--bg-hover, #f5f5f5);
+}
+
+.guide-tip-disable-all {
+  font-size: 12px;
+  color: var(--text-tertiary, #999999);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.guide-tip-disable-all:hover {
+  color: var(--text-secondary, #666666);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translate(-50%, -10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}

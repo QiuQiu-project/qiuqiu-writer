@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Settings, Sparkles } from 'lucide-react';
 import type { ComponentConfig } from './types';
+import GuideTip from '../../common/GuideTip';
 
 export interface TabsComponentProps {
   tabs: { id: string; label: string; components: ComponentConfig[] }[];
@@ -14,6 +15,7 @@ export interface TabsComponentProps {
   isEditMode?: boolean;  // 是否处于编辑模式
   activeTabId?: string;
   onActiveTabChange?: (tabId: string) => void;
+  targetGuideId?: string; // The ID of the component that needs a guide tip
 }
 
 export function TabsComponent({ 
@@ -27,7 +29,8 @@ export function TabsComponent({
   generatingComponents = {}, 
   isEditMode = false, 
   activeTabId, 
-  onActiveTabChange 
+  onActiveTabChange,
+  targetGuideId
 }: TabsComponentProps) {
   const [internalActiveTab, setInternalActiveTab] = useState(tabs[0]?.id || '');
   
@@ -75,11 +78,27 @@ export function TabsComponent({
         {activeTabData && (
           <>
             {activeTabData.components.map(subComp => {
-              const showGenerateBtn = ['text', 'textarea', 'list', 'character-card', 'rank-system'].includes(subComp.type);
+              const showGenerateBtn = ['text', 'textarea', 'list', 'character-card', 'rank-system', 'keyvalue'].includes(subComp.type);
               return (
                 <div key={subComp.id} className="comp-wrapper">
                   <div className="comp-header">
-                    <label className="comp-label">{subComp.label}</label>
+                    {subComp.id === targetGuideId ? (
+                      <GuideTip
+                        id={`guide-fill-${subComp.id}`}
+                        forceVisible={true}
+                        content={
+                          <div>
+                            <h4>请填写{subComp.label}</h4>
+                            <p>为了完善作品设定，请填写这一项内容。</p>
+                          </div>
+                        }
+                        placement="right"
+                      >
+                        <label className="comp-label">{subComp.label}</label>
+                      </GuideTip>
+                    ) : (
+                      <label className="comp-label">{subComp.label}</label>
+                    )}
                     <div className="comp-header-actions">
                       {showGenerateBtn && onGenerateComponent && (
                         <button 

@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Trash2, Info, Menu, X, MessageSquare, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { ArrowLeft, Trash2, Info, Menu, X, MessageSquare, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Lightbulb, LightbulbOff } from 'lucide-react';
 import { EditorContent } from '@tiptap/react';
 
 // 组件
@@ -25,6 +25,7 @@ import WorkInfoManager from '../components/editor/WorkInfoManager';
 import ThemeSelector from '../components/ThemeSelector';
 import ChapterEditorToolbar from '../components/editor/ChapterEditorToolbar';
 import EditorSelectionPopup from '../components/editor/EditorSelectionPopup';
+import OnboardingGuide from '../components/common/OnboardingGuide';
 
 // Hooks
 import { useYjsEditor } from '../hooks/useYjsEditor';
@@ -86,6 +87,46 @@ export default function NovelEditorPage() {
   const [selectionOptimizing, setSelectionOptimizing] = useState(false);
   /** 从编辑器选中发起 AI 对话时，只传章节引用（对话框里显示徽章 @chapter:x第n字-第m字，不显示选中正文） */
   const [initialSelectionRef, setInitialSelectionRef] = useState<{ chapterId: string; startChar: number; endChar: number } | null>(null);
+  
+  // ===== 功能引导状态 =====
+  const [tipsEnabled, setTipsEnabled] = useState(true);
+
+  useEffect(() => {
+    const checkTipsEnabled = () => {
+      const enabled = localStorage.getItem('wawawriter_guide_tips_enabled');
+      setTipsEnabled(enabled === null || enabled === 'true');
+    };
+    checkTipsEnabled();
+    
+    const handleUpdate = () => checkTipsEnabled();
+    window.addEventListener('wawawriter_guide_tips_updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    return () => {
+      window.removeEventListener('wawawriter_guide_tips_updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, []);
+
+  const toggleTips = () => {
+    const newState = !tipsEnabled;
+    localStorage.setItem('wawawriter_guide_tips_enabled', String(newState));
+    
+    // 如果是开启功能引导，重置所有已看过的提示状态，确保用户能重新看到引导
+    if (newState) {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('wawawriter_guide_tip_seen_')) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+    }
+
+    setTipsEnabled(newState);
+    window.dispatchEvent(new Event('wawawriter_guide_tips_updated'));
+    showMessage(newState ? '已开启功能引导（已重置提示状态）' : '已关闭功能引导', 'info');
+  };
   
   // ===== UI状态管理 =====
   const {
@@ -925,6 +966,14 @@ export default function NovelEditorPage() {
                   >
                     <span>查找替换</span>
                   </button>
+                <button 
+                  className="action-btn" 
+                  onClick={toggleTips}
+                  title={tipsEnabled ? "关闭功能引导" : "开启功能引导"}
+                  style={tipsEnabled ? { color: '#eab308' } : { opacity: 0.5 }}
+                >
+                  {tipsEnabled ? <Lightbulb size={16} /> : <LightbulbOff size={16} />}
+                </button>
                 <div className="action-btn theme-selector-header-wrap" title="主题">
                   <ThemeSelector onClose={() => setMobileMenuOpen(false)} />
                 </div>
@@ -1010,6 +1059,16 @@ export default function NovelEditorPage() {
                 </div>
                 <div className="mobile-menu-section">
                   <h3>设置</h3>
+                  <button 
+                    className="mobile-menu-item" 
+                    onClick={() => {
+                      toggleTips();
+                      setMobileMenuOpen(false);
+                    }}
+                  >
+                    {tipsEnabled ? <Lightbulb size={20} color="#eab308" /> : <LightbulbOff size={20} />}
+                    <span>{tipsEnabled ? '关闭功能引导' : '开启功能引导'}</span>
+                  </button>
                   <div className="mobile-menu-item">
                     <ThemeSelector />
                   </div>
@@ -1369,6 +1428,18 @@ export default function NovelEditorPage() {
           if (messageState.onConfirm) messageState.onConfirm();
         }}
       />
+
+      {/* 新手引导 */}
+      {workId && (
+        <OnboardingGuide
+          workId={workId}
+          onStart={() => {
+            setActiveNav('work-info');
+            setSelectedChapter(null);
+          }}
+          onSkip={() => {}}
+        />
+      )}
     </div>
   );
 }

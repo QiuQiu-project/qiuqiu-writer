@@ -16,6 +16,7 @@ interface CustomSelectProps {
   className?: string;
   disabled?: boolean;
   fullWidth?: boolean;
+  id?: string;
 }
 
 export default function CustomSelect({
@@ -26,6 +27,7 @@ export default function CustomSelect({
   className = '',
   disabled = false,
   fullWidth = false,
+  id,
 }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const selectRef = useRef<HTMLDivElement>(null);
@@ -107,6 +109,7 @@ export default function CustomSelect({
   return (
     <div
       ref={selectRef}
+      id={id}
       className={`custom-select ${isOpen ? 'open' : ''} ${disabled ? 'disabled' : ''} ${fullWidth ? 'full-width' : ''} ${className}`}
       onKeyDown={handleKeyDown}
       tabIndex={disabled ? -1 : 0}

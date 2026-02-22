@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Plus, X, Settings, LayoutGrid, Sparkles, Save, Trash2
 } from 'lucide-react';
@@ -12,6 +12,8 @@ import { generateComponentData } from '../../utils/bookAnalysisApi';
 import { GeneratedDataPreviewModal } from './work-info/GeneratedDataPreviewModal';
 import MessageModal from '../common/MessageModal';
 import type { MessageType } from '../common/MessageModal';
+import GuideTip from '../common/GuideTip';
+import { SpotlightOverlay } from '../common/SpotlightOverlay';
 import './WorkInfoManager.css';
 
 // Import refactored modules
@@ -38,6 +40,76 @@ import type {
 // type GeneratedDataType = string | unknown[] | Record<string, unknown>;
 
 // ============ 主组件 ============
+
+// --- Guided Components for Auto-Focus ---
+
+interface GuidedInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  isActiveGuide: boolean;
+  tipsEnabled: boolean;
+}
+
+const GuidedInput: React.FC<GuidedInputProps> = ({ isActiveGuide, tipsEnabled, ...props }) => {
+  const inputRef = useRef<HTMLInputElement>(null);
+  
+  useEffect(() => {
+    if (isActiveGuide && tipsEnabled && inputRef.current) {
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isActiveGuide, tipsEnabled]);
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    if (isActiveGuide && tipsEnabled && !props.value) {
+      // Force focus back if empty and active guide
+      // Use setTimeout to avoid conflict with other click events (like closing modal)
+      // But we want to be strict as per user request
+      requestAnimationFrame(() => {
+         // Check if we are still active (in case it changed)
+         if (document.activeElement !== inputRef.current) {
+             inputRef.current?.focus();
+         }
+      });
+    }
+    props.onBlur?.(e);
+  };
+
+  return <input ref={inputRef} {...props} onBlur={handleBlur} />;
+};
+
+interface GuidedTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+  isActiveGuide: boolean;
+  tipsEnabled: boolean;
+}
+
+const GuidedTextarea: React.FC<GuidedTextareaProps> = ({ isActiveGuide, tipsEnabled, ...props }) => {
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  
+  useEffect(() => {
+    if (isActiveGuide && tipsEnabled && inputRef.current) {
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isActiveGuide, tipsEnabled]);
+
+  const handleBlur = (e: React.FocusEvent<HTMLTextAreaElement>) => {
+    if (isActiveGuide && tipsEnabled && !props.value) {
+      requestAnimationFrame(() => {
+         if (document.activeElement !== inputRef.current) {
+             inputRef.current?.focus();
+         }
+      });
+    }
+    props.onBlur?.(e);
+  };
+
+  return <textarea ref={inputRef} {...props} onBlur={handleBlur} />;
+};
+
+// -----------------------------------------
 
 interface WorkInfoManagerProps {
   workId?: string | null;
@@ -97,6 +169,23 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
     type: 'info',
     message: '',
   });
+
+  // State for guide tips global toggle
+  const [tipsEnabled, setTipsEnabled] = useState(true);
+  
+  useEffect(() => {
+    const checkTips = () => {
+      const enabled = localStorage.getItem('wawawriter_guide_tips_enabled');
+      setTipsEnabled(enabled === null || enabled === 'true');
+    };
+    checkTips();
+    window.addEventListener('wawawriter_guide_tips_updated', checkTips);
+    window.addEventListener('storage', checkTips);
+    return () => {
+      window.removeEventListener('wawawriter_guide_tips_updated', checkTips);
+      window.removeEventListener('storage', checkTips);
+    };
+  }, []);
 
   const showMessage = (message: string, type: MessageType = 'info', title?: string, onConfirm?: () => void) => {
     setMessageState({
@@ -236,6 +325,55 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
     
   }, [template, onPreviewDataChange, onWorkInfoUpdate]);
 
+  // Helper to check if component has value
+  const hasValue = (val: unknown): boolean => {
+    if (val === null || val === undefined) return false;
+    if (typeof val === 'string') return val.trim().length > 0;
+    if (Array.isArray(val)) return val.length > 0;
+    if (typeof val === 'object') return Object.keys(val).length > 0;
+    return !!val;
+  };
+
+  // Recursive function to find first empty component
+  const findFirstEmptyComponent = (components: ComponentConfig[]): { id: string; tabId?: string; parentId?: string } | null => {
+    for (const comp of components) {
+      if (comp.type === 'tabs' && comp.config?.tabs && comp.config.tabs.length > 0) {
+          for (const tab of comp.config.tabs) {
+              if (tab.components) {
+                  const result = findFirstEmptyComponent(tab.components);
+                  if (result) {
+                      // If found in a tab, bubble up the tab info
+                      // We only attach parentId/tabId if not already present (deepest wins? no, we want the immediate parent tab)
+                      // Actually we need the top-level tab info for switching.
+                      // If nested tabs exist, we might need a chain. 
+                      // But for now let's assume one level of tabs as per UI.
+                      return { ...result, tabId: tab.id, parentId: comp.id };
+                  }
+              }
+          }
+      } else {
+          if (!hasValue(comp.value)) {
+              return { id: comp.id };
+          }
+      }
+    }
+    return null;
+  };
+
+  const activeModuleSafe = template?.modules?.[activeModuleIndex];
+  const firstEmptyInfo = activeModuleSafe ? findFirstEmptyComponent(activeModuleSafe.components) : null;
+  const firstEmptyComponentId = firstEmptyInfo?.id;
+  
+  // Auto-switch tabs to show the guided component
+  useEffect(() => {
+    if (tipsEnabled && firstEmptyInfo?.parentId && firstEmptyInfo?.tabId) {
+      const { parentId, tabId } = firstEmptyInfo;
+      if (activeTabs[parentId] !== tabId) {
+         setActiveTabs(prev => ({ ...prev, [parentId]: tabId }));
+      }
+    }
+  }, [firstEmptyInfo, tipsEnabled, activeTabs]);
+
   if (loading) {
     return <div className="loading-container">加载中...</div>;
   }
@@ -292,12 +430,49 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
   const handlePreviewSave = (data: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
     if (!previewData) return;
     const { target } = previewData;
-    updateComponentValue(target.componentId, data, target.moduleId);
+
+    let finalData = data;
+
+    // Attempt to find component type to handle data transformation
+    let compType = '';
+    
+    const module = template.modules.find(m => m.id === target.moduleId);
+    if (module) {
+        const comp = module.components.find(c => c.id === target.componentId);
+        if (comp) {
+            compType = comp.type;
+        } else {
+            // Check nested in tabs
+            for (const c of module.components) {
+                if (c.type === 'tabs' && c.config.tabs) {
+                    for (const tab of c.config.tabs) {
+                        const subComp = tab.components?.find(sc => sc.id === target.componentId);
+                        if (subComp) {
+                            compType = subComp.type;
+                            break;
+                        }
+                    }
+                }
+                if (compType) break;
+            }
+        }
+    }
+
+    // Transform data for specific types
+    if (compType === 'keyvalue') {
+        // If we received a plain object, convert to KeyValueItem[]
+        if (typeof data === 'object' && data !== null && !Array.isArray(data)) {
+            finalData = Object.entries(data).map(([key, value]) => ({
+                key,
+                value: typeof value === 'object' ? JSON.stringify(value) : String(value)
+            }));
+        }
+    }
+
+    updateComponentValue(target.componentId, finalData, target.moduleId);
   };
 
-  // 这里需要保留 renderComponent 函数，因为它包含很多 UI 逻辑
-  // 我将简化它，并使用 updateComponentValue 替代 updateValue
-  
+
   const renderComponent = (
     comp: ComponentConfig, 
     moduleId: string, 
@@ -314,10 +489,16 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
       }
     };
 
+    // Auto-focus logic for the guided component
+    const isActiveGuide = comp.id === firstEmptyComponentId;
+
     switch (comp.type) {
       case 'text':
         return (
-          <input
+          <GuidedInput
+            id={`guided-comp-${comp.id}`}
+            isActiveGuide={isActiveGuide}
+            tipsEnabled={tipsEnabled}
             type="text"
             className="comp-input"
             value={(comp.value as string) || ''}
@@ -329,7 +510,10 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
         
       case 'textarea':
         return (
-          <textarea
+          <GuidedTextarea
+            id={`guided-comp-${comp.id}`}
+            isActiveGuide={isActiveGuide}
+            tipsEnabled={tipsEnabled}
             className="comp-textarea"
             value={(comp.value as string) || ''}
             onChange={(e) => updateValue(e.target.value)}
@@ -341,6 +525,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
       case 'select':
         return (
           <CustomSelect
+            id={`guided-comp-${comp.id}`}
             value={(comp.value as string) || ''}
             onChange={(val) => updateValue(val)}
             options={(comp.config.options || []) as SelectOption[]}
@@ -350,7 +535,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
 
       case 'tags':
         return (
-            <div className="comp-tags-container">
+            <div className="comp-tags-container" id={`guided-comp-${comp.id}`}>
                  <div className="tags-list">
                     {Array.isArray(comp.value) && (comp.value as string[]).map((tag, i) => (
                         <span key={i} className="tag-item">
@@ -384,35 +569,41 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
 
       case 'multiselect':
         return (
-          <MultiSelectEditor
-            value={(comp.value as string[]) || []}
-            onChange={(val) => updateValue(val)}
-            options={comp.config.options}
-            maxCount={comp.config.maxCount}
-            placeholder={comp.config.placeholder}
-          />
+          <div id={`guided-comp-${comp.id}`}>
+            <MultiSelectEditor
+              value={(comp.value as string[]) || []}
+              onChange={(val) => updateValue(val)}
+              options={comp.config.options}
+              maxCount={comp.config.maxCount}
+              placeholder={comp.config.placeholder}
+            />
+          </div>
         );
 
       case 'list':
         return (
-          <ListEditor
-            value={(comp.value as string[]) || []}
-            onChange={(val) => updateValue(val)}
-            placeholder={comp.config.placeholder}
-          />
+          <div id={`guided-comp-${comp.id}`}>
+            <ListEditor
+              value={(comp.value as string[]) || []}
+              onChange={(val) => updateValue(val)}
+              placeholder={comp.config.placeholder}
+            />
+          </div>
         );
 
       case 'keyvalue':
         return (
-          <KeyValueEditor
-            value={(comp.value as any[]) || []} // eslint-disable-line @typescript-eslint/no-explicit-any
-            onChange={(val) => updateValue(val)}
-          />
+          <div id={`guided-comp-${comp.id}`}>
+            <KeyValueEditor
+              value={(comp.value as any[]) || []} // eslint-disable-line @typescript-eslint/no-explicit-any
+              onChange={(val) => updateValue(val)}
+            />
+          </div>
         );
 
       case 'image':
         return (
-          <div className="comp-image-uploader">
+          <div className="comp-image-uploader" id={`guided-comp-${comp.id}`}>
              {comp.value ? (
                <div className="image-preview">
                  <img src={comp.value as string} alt="Uploaded" />
@@ -438,6 +629,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
             moduleId={moduleId}
             tabsComponentId={comp.id}
             renderComponent={renderComponent}
+            targetGuideId={firstEmptyComponentId}
             onUpdateTabs={(newTabs) => {
               setTemplate(prev => {
                 if (!prev) return null;
@@ -477,30 +669,36 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
 
       case 'timeline':
         return (
-          <TimelineEditor
-            component={comp}
-            onChange={(newEvents) => updateValue(newEvents)}
-            availableCharacters={getDependencyCharacters(template.modules, comp.dataDependencies)}
-            isEditMode={isEditMode}
-          />
+          <div id={`guided-comp-${comp.id}`}>
+            <TimelineEditor
+              component={comp}
+              onChange={(newEvents) => updateValue(newEvents)}
+              availableCharacters={getDependencyCharacters(template.modules, comp.dataDependencies)}
+              isEditMode={isEditMode}
+            />
+          </div>
         );
 
       case 'character-card':
         return (
-          <CharacterCard
-             component={comp}
-             onChange={(newData) => updateValue(newData)}
-             isEditMode={isEditMode}
-          />
+          <div id={`guided-comp-${comp.id}`}>
+            <CharacterCard
+              component={comp}
+              onChange={(newData) => updateValue(newData)}
+              isEditMode={isEditMode}
+            />
+          </div>
         );
         
       case 'faction':
          return (
-            <FactionEditor
+            <div id={`guided-comp-${comp.id}`}>
+              <FactionEditor
                 component={comp}
                 onChange={(newData) => updateValue(newData)}
                 isEditMode={isEditMode}
-            />
+              />
+            </div>
          );
 
       case 'relation-graph': {
@@ -521,7 +719,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
           };
 
           return (
-            <div className="comp-relation-graph" style={{ width: '100%', height: '600px', minHeight: '600px' }}>
+            <div className="comp-relation-graph" id={`guided-comp-${comp.id}`} style={{ width: '100%', height: '600px', minHeight: '600px' }}>
               <CharacterRelations 
                 key={`relation-graph-${comp.id}`}
                 data={graphData}
@@ -768,6 +966,16 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
              >
                <Save size={16} /> {isSaving ? '保存中...' : '保存'}
              </button>
+             <GuideTip
+               id="work-info-template-market"
+               content={
+                 <div>
+                   <h4>模板市场</h4>
+                   <p>点击此处浏览和使用预设的作品信息模板，快速搭建世界观架构。</p>
+                 </div>
+               }
+               placement="bottom"
+             >
              <button 
                className="btn-secondary"
                onClick={() => setShowTemplateMarket(true)}
@@ -776,6 +984,17 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
              >
                <LayoutGrid size={16} /> 模板市场
              </button>
+             </GuideTip>
+             <GuideTip
+               id="work-info-edit-mode"
+               content={
+                 <div>
+                   <h4>编辑模式</h4>
+                   <p>点击此处开启编辑模式，可以自定义作品信息的模板结构，添加或删除模块和组件。</p>
+                 </div>
+               }
+               placement="bottom"
+             >
              <button 
                className={`edit-mode-btn ${isEditMode ? 'active' : ''}`}
                onClick={() => setIsEditMode(!isEditMode)}
@@ -783,6 +1002,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
                {isEditMode ? <Settings size={16} /> : <Settings size={16} />}
                {isEditMode ? '完成编辑' : '编辑模板'}
              </button>
+             </GuideTip>
              {isEditMode && (
                <>
                  <button 
@@ -805,39 +1025,93 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
            </div>
         </div>
         <div className="module-components">
-          {activeModule?.components.map(comp => {
-             const showGenerateBtn = ['text', 'textarea', 'list', 'character-card', 'rank-system'].includes(comp.type);
+          {activeModule?.components.map((comp, index) => {
+             const showGenerateBtn = ['text', 'textarea', 'list', 'character-card', 'rank-system', 'keyvalue'].includes(comp.type);
+             
+             // AI生成按钮
+             const generateBtn = (
+                <button 
+                  className="icon-btn"
+                  onClick={() => handleGenerateData(comp, activeModule.id)}
+                  disabled={generatingComponents[comp.id]}
+                  title="AI生成内容"
+                  style={{ padding: '4px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#3b82f6' }}
+                >
+                  {generatingComponents[comp.id] ? (
+                    <span className="loading-spinner small" style={{ width: '16px', height: '16px', border: '2px solid #e2e8f0', borderTopColor: '#3b82f6', borderRadius: '50%', display: 'block', animation: 'spin 1s linear infinite' }}></span>
+                  ) : (
+                    <Sparkles size={16} />
+                  )}
+                </button>
+             );
+
+             // 编辑按钮
+             const settingsBtn = (
+                <button 
+                  className="comp-edit-btn"
+                  title="编辑组件"
+                  onClick={() => {
+                  setEditingComponentId(comp.id);
+                  setEditingComponentData(comp);
+                  setShowAddComponent(true);
+                }}>
+                  <Settings size={14} />
+                </button>
+             );
+
              return (
              <div key={comp.id} className="comp-wrapper">
-               <div className="comp-header">
-                 <label>{comp.label}</label>
+                <div className="comp-header">
+                  {/* Sequential Guide: Show tip only for the first empty component */}
+                  {comp.id === firstEmptyComponentId ? (
+                     <GuideTip
+                       id={`guide-fill-${comp.id}`}
+                       forceVisible={true}
+                       content={
+                         <div>
+                           <h4>请填写{comp.label}</h4>
+                           <p>为了完善作品设定，请填写这一项内容。完成后将自动提示下一项。</p>
+                         </div>
+                       }
+                       placement="right"
+                     >
+                       <label>{comp.label}</label>
+                     </GuideTip>
+                  ) : (
+                     <label>{comp.label}</label>
+                  )}
                  <div className="header-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     {showGenerateBtn && (
-                        <button 
-                          className="icon-btn"
-                          onClick={() => handleGenerateData(comp, activeModule.id)}
-                          disabled={generatingComponents[comp.id]}
-                          title="AI生成内容"
-                          style={{ padding: '4px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#3b82f6' }}
+                      index === 0 ? (
+                        <GuideTip
+                          id="work-info-ai-generate"
+                          content={
+                            <div>
+                              <h4>AI 辅助生成</h4>
+                              <p>点击此处，AI 可以根据上下文自动为您生成或补全内容。</p>
+                            </div>
+                          }
+                          placement="left"
                         >
-                          {generatingComponents[comp.id] ? (
-                            <span className="loading-spinner small" style={{ width: '16px', height: '16px', border: '2px solid #e2e8f0', borderTopColor: '#3b82f6', borderRadius: '50%', display: 'block', animation: 'spin 1s linear infinite' }}></span>
-                          ) : (
-                            <Sparkles size={16} />
-                          )}
-                        </button>
+                          {generateBtn}
+                        </GuideTip>
+                      ) : generateBtn
                     )}
                     {isEditMode && (
-                      <button 
-                        className="comp-edit-btn"
-                        title="编辑组件"
-                        onClick={() => {
-                        setEditingComponentId(comp.id);
-                        setEditingComponentData(comp);
-                        setShowAddComponent(true);
-                      }}>
-                        <Settings size={14} />
-                      </button>
+                      index === 0 ? (
+                        <GuideTip
+                          id="work-info-comp-settings"
+                          content={
+                            <div>
+                              <h4>组件设置</h4>
+                              <p>点击此处可以配置该组件的属性，包括标题、提示词、选项等。</p>
+                            </div>
+                          }
+                          placement="left"
+                        >
+                          {settingsBtn}
+                        </GuideTip>
+                      ) : settingsBtn
                     )}
                  </div>
                </div>
@@ -945,6 +1219,19 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
           closeMessage();
           if (messageState.onConfirm) messageState.onConfirm();
         }}
+      />
+      
+      <SpotlightOverlay 
+        targetId={firstEmptyComponentId ? `guided-comp-${firstEmptyComponentId}` : ''}
+        isActive={
+          tipsEnabled && 
+          !!firstEmptyComponentId && 
+          !showAddComponent && 
+          !showAddModule && 
+          !showTemplateMarket && 
+          !previewModalOpen && 
+          !messageState.isOpen
+        }
       />
     </div>
   );
