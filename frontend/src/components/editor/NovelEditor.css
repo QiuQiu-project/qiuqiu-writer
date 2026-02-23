@@ -135,6 +135,16 @@
   border-color: var(--accent-hover);
 }
 
+.toolbar-btn.toolbar-btn-copy-done {
+  background: var(--success-light, rgba(82, 196, 26, 0.12));
+  color: var(--success-primary, #52c41a);
+  border-color: var(--success-primary, #52c41a);
+}
+
+.toolbar-btn.toolbar-btn-copy-done svg {
+  color: var(--success-primary, #52c41a);
+}
+
 .toolbar-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;

@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState } from 'react';
 import { Editor } from '@tiptap/react';
-import { Undo2, Redo2, Save, Heading, Bold, Underline, ChevronDown, Settings, History } from 'lucide-react';
+import { Undo2, Redo2, Save, Heading, Bold, Underline, ChevronDown, Settings, History, Copy, Check } from 'lucide-react';
 
 interface ChapterEditorToolbarProps {
   editor: Editor | null;
@@ -23,6 +23,7 @@ export default function ChapterEditorToolbar({
   const headingButtonRef = useRef<HTMLButtonElement>(null);
   const dropdownMenuRef = useRef<HTMLDivElement>(null);
   const [currentHeading, setCurrentHeading] = useState<string>('P');
+  const [copyJustDone, setCopyJustDone] = useState(false);
 
   // 点击外部关闭标题下拉菜单
   useEffect(() => {
@@ -265,6 +266,25 @@ export default function ChapterEditorToolbar({
       </div>
       <div className="toolbar-divider" />
       <div className="toolbar-group toolbar-group-end">
+        <button
+          type="button"
+          className={`toolbar-btn ${copyJustDone ? 'toolbar-btn-copy-done' : ''}`}
+          onClick={async () => {
+            if (!editor) return;
+            const text = editor.getText();
+            try {
+              await navigator.clipboard.writeText(text);
+              setCopyJustDone(true);
+              setTimeout(() => setCopyJustDone(false), 1500);
+            } catch {
+              setCopyJustDone(true);
+              setTimeout(() => setCopyJustDone(false), 1500);
+            }
+          }}
+          title={copyJustDone ? '已复制到剪贴板' : '复制全文'}
+        >
+          {copyJustDone ? <Check size={16} /> : <Copy size={16} />}
+        </button>
         <button
           className="toolbar-btn"
           onClick={() => onManualSave()}
