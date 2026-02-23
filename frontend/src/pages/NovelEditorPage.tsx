@@ -26,6 +26,7 @@ import ThemeSelector from '../components/ThemeSelector';
 import ChapterEditorToolbar from '../components/editor/ChapterEditorToolbar';
 import EditorSelectionPopup from '../components/editor/EditorSelectionPopup';
 import OnboardingGuide from '../components/common/OnboardingGuide';
+import HeaderSettingsMenu from '../components/editor/HeaderSettingsMenu';
 
 // Hooks
 import { useYjsEditor } from '../hooks/useYjsEditor';
@@ -939,6 +940,18 @@ export default function NovelEditorPage() {
               >
                 <MessageSquare size={24} />
               </button>
+              <div style={{ marginLeft: '8px' }}>
+                <HeaderSettingsMenu
+                  onFindReplace={() => {
+                    handleReplace();
+                    setMobileMenuOpen(false);
+                  }}
+                  tipsEnabled={tipsEnabled}
+                  onToggleTips={toggleTips}
+                  onDeleteWork={handleDeleteWork}
+                  isMobile={true}
+                />
+              </div>
             </>
           ) : (
             <>
@@ -950,33 +963,16 @@ export default function NovelEditorPage() {
                         : '已同步')
                     : '离线模式'}
                 </span>
-                <button 
-                  className="action-btn delete-work-btn" 
-                  onClick={handleDeleteWork}
-                  title="删除作品"
-                >
-                  <Trash2 size={16} />
-                </button>
-                <button 
-                    className="action-btn" 
-                    onClick={() => {
-                      handleReplace();
-                      setMobileMenuOpen(false);
-                    }}
-                  >
-                    <span>查找替换</span>
-                  </button>
-                <button 
-                  className="action-btn" 
-                  onClick={toggleTips}
-                  title={tipsEnabled ? "关闭功能引导" : "开启功能引导"}
-                  style={tipsEnabled ? { color: '#eab308' } : { opacity: 0.5 }}
-                >
-                  {tipsEnabled ? <Lightbulb size={16} /> : <LightbulbOff size={16} />}
-                </button>
-                <div className="action-btn theme-selector-header-wrap" title="主题">
-                  <ThemeSelector onClose={() => setMobileMenuOpen(false)} />
-                </div>
+                
+                <HeaderSettingsMenu
+                  onFindReplace={() => {
+                    handleReplace();
+                    setMobileMenuOpen(false);
+                  }}
+                  tipsEnabled={tipsEnabled}
+                  onToggleTips={toggleTips}
+                  onDeleteWork={handleDeleteWork}
+                />
               </div>
               <div className="sidebar-toggle-buttons">
                 <button
