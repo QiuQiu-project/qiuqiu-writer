@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X } from 'lucide-react';
 import './GuideTip.css';
 
 interface GuideTipProps {
@@ -16,7 +15,6 @@ const TIP_SEEN_PREFIX = 'wawawriter_guide_tip_seen_';
 
 export default function GuideTip({ id, content, children, placement = 'top', forceVisible = false }: GuideTipProps) {
   const [isVisible, setIsVisible] = useState(false);
-  const [isEnabled, setIsEnabled] = useState(true);
   const [position, setPosition] = useState({ top: 0, left: 0, width: 0, height: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -24,15 +22,14 @@ export default function GuideTip({ id, content, children, placement = 'top', for
     const checkVisibility = () => {
       // Check global setting
       const globalEnabled = localStorage.getItem(GLOBAL_ENABLED_KEY);
-      const isGlobalEnabled = globalEnabled === null || globalEnabled === 'true';
-      setIsEnabled(isGlobalEnabled);
+      // const isGlobalEnabled = globalEnabled === null || globalEnabled === 'true';
 
       // Check if this specific tip has been seen
       const hasSeen = localStorage.getItem(`${TIP_SEEN_PREFIX}${id}`);
       
       // console.log(`[GuideTip:${id}] checkVisibility: global=${isGlobalEnabled}, seen=${hasSeen}, force=${forceVisible}`);
       
-      if (forceVisible || (isGlobalEnabled && !hasSeen)) {
+      if (forceVisible || (!hasSeen && globalEnabled !== 'false')) {
         setIsVisible(true);
       } else {
         setIsVisible(false);
@@ -49,14 +46,10 @@ export default function GuideTip({ id, content, children, placement = 'top', for
     const updatePosition = () => {
       if (containerRef.current && isVisible) {
         const rect = containerRef.current.getBoundingClientRect();
-        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-        const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
         
         // Calculate position based on placement
         // We just store the anchor rect info, and let CSS or render logic handle the offset
         // But for Portal, we need absolute coordinates
-        let top = rect.top + scrollTop;
-        let left = rect.left + scrollLeft;
         
         // Adjust for placement logic handled in render
         setPosition({ 
@@ -64,7 +57,7 @@ export default function GuideTip({ id, content, children, placement = 'top', for
           left: rect.left,
           width: rect.width,
           height: rect.height
-        } as any);
+        });
       }
     };
 
@@ -100,7 +93,7 @@ export default function GuideTip({ id, content, children, placement = 'top', for
   };
   
   // Calculate position styles
-  const pos = position as any;
+  const pos = position;
   if (pos.top !== undefined) {
     if (placement === 'top') {
       popoverStyle.top = pos.top - 8;

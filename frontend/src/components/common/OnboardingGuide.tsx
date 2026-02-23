@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { BookOpen, PenTool } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { BookOpen } from 'lucide-react';
 import './OnboardingGuide.css';
 
 interface OnboardingGuideProps {
@@ -15,10 +15,13 @@ export default function OnboardingGuide({ onStart, onSkip, workId }: OnboardingG
 
   useEffect(() => {
     // Check if we've already shown the guide for this work
-    const hasShown = localStorage.getItem(`${STORAGE_KEY_PREFIX}${workId}`);
-    if (!hasShown) {
-      setIsVisible(true);
-    }
+    const timer = setTimeout(() => {
+      const hasShown = localStorage.getItem(`${STORAGE_KEY_PREFIX}${workId}`);
+      if (!hasShown) {
+        setIsVisible(true);
+      }
+    }, 0);
+    return () => clearTimeout(timer);
   }, [workId]);
 
   const handleStart = () => {

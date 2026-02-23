@@ -1,17 +1,8 @@
 import { useState, useEffect, useRef, useMemo, memo } from 'react';
-import { Plus, User, Maximize2, X, Trash2, Pencil } from 'lucide-react';
-import { ExtensionCategory, Graph, register } from '@antv/g6';
-import { ReactNode } from '@antv/g6-extension-react';
+import { Plus, Maximize2, X, Trash2, Pencil, ZoomIn, ZoomOut } from 'lucide-react';
+import { Graph } from '@antv/g6';
 import type { GraphData } from '@antv/g6';
 import './CharacterRelations.css';
-
-// 注册 React 节点扩展
-try {
-  register(ExtensionCategory.NODE, 'react', ReactNode);
-} catch (error) {
-  // 忽略重复注册的错误
-  console.debug('G6 React Node extension registration skipped:', error);
-}
 
 function getCssVar(name: string, fallback: string): string {
   try {
@@ -53,27 +44,6 @@ interface CharacterRelationsProps {
   dependencyKeys?: string[];
 }
 
-interface NodeData {
-  data?: {
-    name?: string;
-  };
-  id?: string;
-}
-
-// 自定义 React 节点组件
-const CharacterNode = ({ data }: { data: NodeData }) => {
-  const { name } = data.data || {};
-  
-  return (
-    <div className="character-node-react">
-      <div className="character-node-circle">
-        <User size={24} />
-      </div>
-      <div className="character-node-label">{name || data.id}</div>
-    </div>
-  );
-};
-
 // 创建稳定的数据字符串用于比较
 // 注意：只比较角色的 name 和 gender，不比较 id（因为 id 可能包含时间戳，不稳定）
 function getDataId(data?: CharacterRelationsData): string {
@@ -105,6 +75,12 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
   // 使用稳定的数据ID来检测数据变化
   const dataId = useMemo(() => getDataId(data), [data]);
   const prevDataIdRef = useRef<string>('');
+  
+  // 用于在回调中获取最新数据，避免依赖闭包过期
+  const latestDataRef = useRef({ characters, relations, onChange });
+  useEffect(() => {
+    latestDataRef.current = { characters, relations, onChange };
+  }, [characters, relations, onChange]);
 
   // 同步外部数据变化 - 使用深度比较避免不必要的更新
   useEffect(() => {
@@ -183,28 +159,55 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
         type: 'create-edge',
         trigger: 'drag',
         onFinish: (e: unknown) => {
-          const ev = e as { [key: string]: unknown } | undefined;
-          const dataObj =
-            (ev?.data as Record<string, unknown> | undefined) ||
-            ((ev?.item as { model?: Record<string, unknown> } | undefined)
-              ?.model);
+          const ev = e as { item?: { id?: string; model?: { source?: string; target?: string } }; source?: string; target?: string; data?: Record<string, unknown> };
           
           // 记录临时创建的边ID
-          const edgeId = (ev?.item as { id?: string } | undefined)?.id;
+          const edgeId = ev.item?.id;
           if (edgeId) {
             tempEdgeIdRef.current = edgeId;
           }
 
-          const sourceId = (dataObj?.source as string | undefined) || undefined;
-          const targetId = (dataObj?.target as string | undefined) || undefined;
+          // G6 5.0 event compatibility
+          const model = ev.item?.model || {};
+          const dataObj = ev.data || {};
+          const sourceId = model.source || ev.source || (dataObj.source as string);
+          const targetId = model.target || ev.target || (dataObj.target as string);
+          
           if (!sourceId || !targetId) return;
+          
+          // 自动保存连线，并打开编辑框填写类型
+          const { relations: currentRelations, characters: currentCharacters, onChange: currentOnChange } = latestDataRef.current;
+          
+          const newRelation: Relation = {
+            id: `rel_${Date.now()}`,
+            from: sourceId,
+            to: targetId,
+            type: '',
+            description: '',
+          };
+          
+          const newRelations = [...currentRelations, newRelation];
+          setRelations(newRelations);
+          
+          // 使用 setTimeout 避免在渲染周期内更新父组件，可能导致状态丢失或冲突
+          setTimeout(() => {
+            if (currentOnChange) {
+              currentOnChange({
+                characters: currentCharacters,
+                relations: newRelations,
+              });
+            }
+          }, 0);
+          
+          // 立即打开编辑框
+          setEditingRelation(newRelation.id);
           setEditForm({
             relationFrom: sourceId,
             relationTo: targetId,
             relationType: '',
             relationDescription: '',
           });
-          setAddingRelation(true);
+          // 不再设置 addingRelation(true)
         },
       });
     } else {
@@ -247,24 +250,31 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
       
       return {
         id: char.id,
-        type: 'react' as const, // 使用 react 节点类型
+        type: 'circle', // Use built-in circle node
         data: {
           label: char.name,
           name: char.name,
           gender: char.gender,
         },
-        // G6 5.0 使用 style.x 和 style.y 设置初始位置
         style: {
-          x: x, // 位置在 style 中
-          y: y, // 位置在 style 中
-          size: [80, 80] as [number, number], // 节点大小 [width, height]
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          component: (data: any) => <CharacterNode data={data} />, // React 组件
+          x: x, 
+          y: y, 
+          size: 40, 
+          fill: char.gender === '女' ? '#ffadd2' : '#91caff',
+          stroke: '#d9d9d9',
+          lineWidth: 1,
+          labelText: char.name,
+          labelPlacement: 'bottom',
+          labelFill: edgeColor,
+          labelFontSize: 12,
         },
       };
     });
 
-    const edges = relations.map((rel) => ({
+    const validNodeIds = new Set(characters.map(c => c.id));
+    const edges = relations
+      .filter(rel => validNodeIds.has(rel.from) && validNodeIds.has(rel.to))
+      .map((rel) => ({
       id: rel.id,
       source: rel.from,
       target: rel.to,
@@ -299,9 +309,7 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
     if (viewMode !== 'graph') {
       return;
     }
-    // 如果 graphDataId 没有变化，不重新初始化
-    if (graphDataId === prevGraphDataIdRef.current && graphDataId !== '') {
-      // 不返回清理函数，保持图实例
+    if (graphRef.current && graphDataId === prevGraphDataIdRef.current && graphDataId !== '') {
       return;
     }
 
@@ -339,6 +347,10 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
     // 如果容器尺寸为 0，等待一下再初始化
     if (width === 0 || height === 0) {
       const timer = setTimeout(() => {
+        if (!containerRef.current) {
+          isInitializingRef.current = false;
+          return;
+        }
         // 再次检查 graphDataId 是否变化
         if (graphDataId !== prevGraphDataIdRef.current) {
           isInitializingRef.current = false;
@@ -346,11 +358,11 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
         }
         width = container.offsetWidth || 800;
         height = container.offsetHeight || 600;
-        if (width > 0 && height > 0) {
-          initializeGraph(width, height, data);
-        } else {
-          initializeGraph(800, 600, data);
-        }
+        // 确保有非零尺寸
+        if (width === 0) width = 800;
+        if (height === 0) height = 600;
+        
+        initializeGraph(width, height, data);
       }, 200);
       return () => {
         clearTimeout(timer);
@@ -361,16 +373,14 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
 
     initializeGraph(width, height, data);
 
-    function initializeGraph(width: number, height: number, data: GraphData) {
-      // 在初始化前再次检查 graphDataId 是否仍然匹配
+    async function initializeGraph(width: number, height: number, data: GraphData) {
       const currentGraphDataId = graphDataId;
       
-      // 如果图已存在，先销毁
       if (graphRef.current) {
         try {
           graphRef.current.destroy();
         } catch {
-          // 忽略清理错误
+          // ignore
         }
         graphRef.current = null;
       }
@@ -380,38 +390,44 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
         return;
       }
 
-      // 确保容器有最小尺寸
       if (width < 100) width = 800;
       if (height < 100) height = 600;
 
       let graph: Graph | null = null;
       
       try {
-        // 创建图实例 - G6 5.0 方式（按照官方文档）
+        console.log('[CharacterRelations] Initializing G6 Graph...', { width, height, nodeCount: data.nodes?.length });
+        
         const edgeColor = getCssVar('--text-primary', '#000000');
         const labelBg = getCssVar('--bg-secondary', '#ffffff');
         const labelText = getCssVar('--text-primary', '#000000');
+        
         graph = new Graph({
           container: containerRef.current,
           width,
           height,
           data,
+          autoFit: 'view',
+          padding: 20,
           node: {
-            type: 'react', // 使用 react 节点类型
+            type: 'circle',
             style: {
-              size: [80, 80] as [number, number], // 节点大小 [width, height]
-              component: (data: unknown) => <CharacterNode data={data as NodeData} />, // React 组件
+              size: 40,
+              labelPlacement: 'bottom',
+              labelText: (d: unknown) => {
+                const data = d as { data?: { label?: string } };
+                return data.data?.label || '';
+              },
+              labelFill: edgeColor,
+              labelFontSize: 12,
             },
           } as unknown as object,
           edge: {
+            type: 'line',
             style: {
               stroke: edgeColor,
               lineWidth: 2,
-              endArrow: {
-                type: 'vee',
-                size: 8,
-                fill: edgeColor,
-              },
+              endArrow: true,
             },
             labelText: (d: unknown) => {
               const dd = d as { data?: { label?: string } } | undefined;
@@ -423,7 +439,7 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
             labelBackground: true,
             labelBackgroundFill: labelBg,
             labelBackgroundOpacity: 0.95,
-            labelPlacement: 'center', // 标签居中
+            labelPlacement: 'center',
           } as unknown as object,
           behaviors: manualLinkingRef.current
             ? [
@@ -433,155 +449,102 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
                   type: 'create-edge',
                   trigger: 'drag',
                   onFinish: (e: unknown) => {
-                    const ev = e as { [key: string]: unknown } | undefined;
-                    const dataObj =
-                      (ev?.data as Record<string, unknown> | undefined) ||
-                      ((ev?.item as { model?: Record<string, unknown> } | undefined)
-                        ?.model);
-                    const sourceId = (dataObj?.source as string | undefined) || undefined;
-                    const targetId = (dataObj?.target as string | undefined) || undefined;
+                    const event = e as { item?: { id?: string; model?: { source?: string; target?: string } }; source?: string; target?: string };
+                    const edgeId = event.item?.id;
+                    if (edgeId) {
+                      tempEdgeIdRef.current = edgeId;
+                    }
+                    // G6 5.0 event compatibility
+                    const model = event.item?.model || {};
+                    const sourceId = model.source || event.source;
+                    const targetId = model.target || event.target;
+                    
                     if (!sourceId || !targetId) return;
+                    
+                    // 自动保存连线，并打开编辑框填写类型
+                    const { relations: currentRelations, characters: currentCharacters, onChange: currentOnChange } = latestDataRef.current;
+                    
+                    const newRelation: Relation = {
+                      id: `rel_${Date.now()}`,
+                      from: sourceId,
+                      to: targetId,
+                      type: '',
+                      description: '',
+                    };
+                    
+                    const newRelations = [...currentRelations, newRelation];
+                    setRelations(newRelations);
+                    
+                    // 使用 setTimeout 避免在渲染周期内更新父组件，可能导致状态丢失或冲突
+                    setTimeout(() => {
+                      if (currentOnChange) {
+                        currentOnChange({
+                          characters: currentCharacters,
+                          relations: newRelations,
+                        });
+                      }
+                    }, 0);
+                    
+                    // 立即打开编辑框
+                    setEditingRelation(newRelation.id);
                     setEditForm({
                       relationFrom: sourceId,
                       relationTo: targetId,
                       relationType: '',
                       relationDescription: '',
                     });
-                    setAddingRelation(true);
+                    // 不再设置 addingRelation(true)
                   },
                 },
               ]
             : ['drag-canvas', 'zoom-canvas', 'drag-element'],
         });
 
-        // 在 render 之前再次检查 graphDataId 是否仍然匹配
         if (currentGraphDataId !== prevGraphDataIdRef.current) {
-          // graphDataId 已经变化，销毁刚创建的图实例
-          try {
-            graph.destroy();
-          } catch {
-            // 忽略清理错误
-          }
+          try { graph.destroy(); } catch { /* ignore */ }
           isInitializingRef.current = false;
           return;
         }
 
-        // G6 5.0 需要显式调用 render（按照官方文档）
-        // render() 可能返回 Promise，但即使不是 Promise 也安全
-        const renderResult = graph.render();
+        await graph.render();
         
-        // 如果 render() 返回 Promise，等待它完成
-        if (renderResult && typeof renderResult.then === 'function') {
-          renderResult
-            .then(() => {
-              // render 完成后再次检查 graphDataId 是否仍然匹配
-              if (currentGraphDataId === prevGraphDataIdRef.current && graph) {
-                graphRef.current = graph;
-                
-                // 标记初始化完成
-                isInitializingRef.current = false;
+        if (currentGraphDataId === prevGraphDataIdRef.current && graph) {
+          graphRef.current = graph;
+          isInitializingRef.current = false;
+          console.log('[CharacterRelations] G6 Graph initialized successfully');
 
-                // 节点点击事件已移除 - 角色不允许编辑
-
-                // 边点击事件 - 直接进入编辑界面
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            graph.on('edge:click', (e: any) => {
-              const edgeId = e.item?.getID?.() || e.target?.id || e.item?.id;
-              if (edgeId) {
-                    const relation = relations.find((r) => r.id === edgeId);
-                    if (relation) {
-                      setEditingRelation(edgeId);
-                      setEditForm({
-                        relationType: relation.type,
-                        relationDescription: relation.description,
-                        relationFrom: relation.from,
-                        relationTo: relation.to,
-                      });
-                    }
-                  }
-                });
-
-            
-
-            // 节点点击事件 - 仅用于非连线模式下的交互（如有）
-            // 注意：手动连线现在通过 create-edge behavior 处理，不再需要 node:click
-              } else {
-                // graphDataId 已经变化，销毁图实例
-                if (graph) {
-                  try {
-                    graph.destroy();
-                  } catch {
-                    // 忽略清理错误
-                  }
-                }
-                isInitializingRef.current = false;
-              }
-            })
-            .catch(() => {
-              // render 失败，清理图实例
-              if (graph) {
-                try {
-                  graph.destroy();
-                } catch {
-                  // 忽略清理错误
-                }
-              }
-              isInitializingRef.current = false;
-            });
-        } else {
-          // render() 不是 Promise，直接设置
-          if (currentGraphDataId === prevGraphDataIdRef.current && graph) {
-            graphRef.current = graph;
-            
-            // 标记初始化完成
-            isInitializingRef.current = false;
-
-            // 节点点击事件 - 必须在 graph 创建成功后注册
-            // 节点点击事件已移除 - 角色不允许编辑
-
-            // 边点击事件 - 直接进入编辑界面
-            graph.on('edge:click', (e: unknown) => {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const event = e as any;
-              const edgeId = event.item?.getID?.() || event.target?.id || event.item?.id;
-              if (!edgeId) return;
+          graph.on('edge:click', (e: unknown) => {
+            const event = e as { target?: { id?: string }; item?: { id?: string } };
+            const edgeId = event.target?.id || event.item?.id;
+            if (edgeId) {
               const relation = relations.find((r) => r.id === edgeId);
-              if (!relation) return;
-              setEditingRelation(edgeId);
-              setEditForm({
-                relationType: relation.type,
-                relationDescription: relation.description,
-                relationFrom: relation.from,
-                relationTo: relation.to,
-              });
-            });
-
-            
-          } else {
-            // graphDataId 已经变化，销毁图实例
-            if (graph) {
-              try {
-                graph.destroy();
-              } catch {
-                // 忽略清理错误
+              if (relation) {
+                setEditingRelation(edgeId);
+                setEditForm({
+                  relationType: relation.type,
+                  relationDescription: relation.description,
+                  relationFrom: relation.from,
+                  relationTo: relation.to,
+                });
               }
             }
-            isInitializingRef.current = false;
+          });
+        } else {
+          if (graph) {
+            try { graph.destroy(); } catch { /* ignore */ }
           }
+          isInitializingRef.current = false;
         }
-      } catch {
+      } catch (err) {
+        console.error('[CharacterRelations] G6 Graph initialization failed:', err);
         if (graph) {
-          try {
-            graph.destroy();
-          } catch {
-            // 忽略清理错误
-          }
+          try { graph.destroy(); } catch { /* ignore */ }
         }
-        // 即使失败也要重置标志
         isInitializingRef.current = false;
       }
 
     }
+
 
     // 窗口大小改变时调整图大小
     const handleResize = () => {
@@ -604,7 +567,7 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
       isInitializingRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [graphDataId]); // 只使用稳定的 graphDataId 作为依赖，避免 graphData 对象引用变化导致循环
+  }, [graphDataId, viewMode]); // 只使用稳定的 graphDataId 作为依赖，避免 graphData 对象引用变化导致循环
 
   // 组件卸载时清理图实例
   useEffect(() => {
@@ -646,39 +609,55 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
       return;
     }
 
-    // 延迟一下确保容器已渲染
-    const timer = setTimeout(() => {
+    const container = fullscreenContainerRef.current;
+
+    let resizeCleanup: (() => void) | null = null;
+
+    const createGraph = () => {
       if (!fullscreenContainerRef.current) return;
+      const el = fullscreenContainerRef.current;
+      // 与内联图一致：若容器尚未有尺寸则用备用尺寸，避免节点不渲染
+      let w = el.offsetWidth || 0;
+      let h = el.offsetHeight || 0;
+      if (w < 100) w = window.innerWidth - 100;
+      if (h < 100) h = window.innerHeight - 150;
 
-      const container = fullscreenContainerRef.current;
-      const width = container.offsetWidth || window.innerWidth - 100;
-      const height = container.offsetHeight || window.innerHeight - 150;
-
-      // 如果全屏图已存在，先销毁
       if (fullscreenGraphRef.current) {
         try {
           fullscreenGraphRef.current.destroy();
         } catch {
-          // 忽略清理错误
+          // ignore
         }
+        fullscreenGraphRef.current = null;
       }
+      resizeCleanup?.();
 
       try {
-        // 创建全屏图实例
         const edgeColor = getCssVar('--text-primary', '#000000');
         const labelBg = getCssVar('--bg-secondary', '#ffffff');
-        const labelText = getCssVar('--text-primary', '#000000');
+        const labelTextColor = getCssVar('--text-primary', '#000000');
+        const canvasBg = getCssVar('--bg-secondary', '#f5f5f5');
         const fullscreenGraph = new Graph({
-          container: container,
-          width,
-          height,
+          container: el,
+          width: w,
+          height: h,
+          background: canvasBg,
           data: graphData,
+          autoFit: 'view',
+          padding: 20,
           node: {
-            type: 'react',
-            style: {
-              size: [80, 80] as [number, number], // 节点大小 [width, height]
-              component: (data: unknown) => <CharacterNode data={data as NodeData} />, // React 组件
-            },
+            type: 'circle',
+            style: (datum: { style?: Record<string, unknown>; data?: { label?: string; gender?: string } }) => ({
+              ...(datum?.style || {}),
+              size: 40,
+              labelPlacement: 'bottom',
+              fill: (datum?.style?.fill as string) ?? (datum?.data?.gender === '女' ? '#ffadd2' : '#91caff'),
+              stroke: (datum?.style?.stroke as string) ?? '#595959',
+              lineWidth: 1,
+              labelText: (datum?.style?.labelText as string) ?? datum?.data?.label ?? '',
+              labelFill: labelTextColor,
+              labelFontSize: 12,
+            }),
           } as unknown as object,
           edge: {
             style: {
@@ -694,7 +673,7 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
               const dd = d as { data?: { label?: string } } | undefined;
               return dd?.data?.label || '';
             },
-            labelFill: labelText,
+            labelFill: labelTextColor,
             labelFontSize: 12,
             labelFontWeight: 500,
             labelBackground: true,
@@ -706,40 +685,76 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
         });
 
         const renderResult = fullscreenGraph.render();
-        
-        if (renderResult && typeof renderResult.then === 'function') {
-          renderResult.then(() => {
-            fullscreenGraphRef.current = fullscreenGraph;
-          }).catch(() => {
-            
-          });
-        } else {
+        const afterRender = () => {
           fullscreenGraphRef.current = fullscreenGraph;
+          requestAnimationFrame(() => {
+            fullscreenGraph.fitView?.().catch(() => {});
+          });
+        };
+        if (renderResult && typeof renderResult.then === 'function') {
+          renderResult.then(afterRender).catch(() => {});
+        } else {
+          afterRender();
         }
 
-        // 窗口大小改变时调整全屏图大小
         const handleResize = () => {
           if (fullscreenGraphRef.current && fullscreenContainerRef.current) {
-            const newWidth = fullscreenContainerRef.current.offsetWidth || window.innerWidth - 100;
-            const newHeight = fullscreenContainerRef.current.offsetHeight || window.innerHeight - 150;
-            if (newWidth > 0 && newHeight > 0) {
-              fullscreenGraphRef.current.resize(newWidth, newHeight);
+            const nw = fullscreenContainerRef.current.offsetWidth || window.innerWidth - 100;
+            const nh = fullscreenContainerRef.current.offsetHeight || window.innerHeight - 150;
+            if (nw > 0 && nh > 0) {
+              fullscreenGraphRef.current.resize(nw, nh);
             }
           }
         };
-
         window.addEventListener('resize', handleResize);
-
-        return () => {
-          window.removeEventListener('resize', handleResize);
-        };
+        resizeCleanup = () => window.removeEventListener('resize', handleResize);
       } catch {
         // ignore
       }
-    }, 100);
+    };
+
+    // 优先等容器有尺寸再创建；若一段时间后仍无尺寸则用窗口尺寸创建，确保节点能显示
+    let rafId: number;
+    let resizeObserver: ResizeObserver | null = null;
+
+    const tryCreate = () => {
+      if (!container) return;
+      const cw = container.offsetWidth;
+      const ch = container.offsetHeight;
+      if (cw > 0 && ch > 0) {
+        createGraph();
+        return;
+      }
+      rafId = requestAnimationFrame(tryCreate);
+    };
+    rafId = requestAnimationFrame(tryCreate);
+
+    const timeoutId = setTimeout(() => {
+      if (fullscreenGraphRef.current) return;
+      if (fullscreenContainerRef.current) createGraph();
+    }, 250);
+
+    resizeObserver = new ResizeObserver(() => {
+      if (!fullscreenContainerRef.current || fullscreenGraphRef.current) return;
+      const w = fullscreenContainerRef.current.offsetWidth;
+      const h = fullscreenContainerRef.current.offsetHeight;
+      if (w > 0 && h > 0) createGraph();
+    });
+    if (container) resizeObserver.observe(container);
 
     return () => {
-      clearTimeout(timer);
+      cancelAnimationFrame(rafId);
+      clearTimeout(timeoutId);
+      resizeObserver?.disconnect();
+      resizeCleanup?.();
+      if (fullscreenGraphRef.current) {
+        try {
+          fullscreenGraphRef.current.destroy();
+        } catch {
+          // ignore
+        }
+        fullscreenGraphRef.current = null;
+      }
     };
   }, [isFullscreen, graphData, characters.length, viewMode]);
 
@@ -771,14 +786,16 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
               关系图
             </button>
           </div>
-          <button
-            className="action-btn"
-            onClick={() => setAddingRelation(true)}
-            title="添加关系"
-          >
-            <Plus size={16} />
-            <span>添加关系</span>
-          </button>
+          {viewMode === 'list' && (
+            <button
+              className="action-btn"
+              onClick={() => setAddingRelation(true)}
+              title="添加关系"
+            >
+              <Plus size={16} />
+              <span>添加关系</span>
+            </button>
+          )}
           {viewMode === 'graph' && (
             <>
               <button
@@ -923,6 +940,7 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
                     setEditForm({ ...editForm, relationType: e.target.value })
                   }
                   placeholder="例如：朋友、敌人、亲戚"
+                  autoFocus
                 />
               </label>
               <label>
@@ -1044,6 +1062,7 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
                     setEditForm({ ...editForm, relationType: e.target.value })
                   }
                   placeholder="例如：朋友、敌人、亲戚"
+                  autoFocus
                 />
               </label>
               <label>
@@ -1127,18 +1146,53 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
         <div className="fullscreen-modal-overlay">
           <div className="fullscreen-modal">
             <div className="fullscreen-header">
-              <h3>人物关系图</h3>
-              <button
-                className="close-fullscreen-btn"
-                onClick={() => setIsFullscreen(false)}
-              >
-                <X size={20} />
-              </button>
+              <h3>人物关系图 {characters.length > 0 ? `(${characters.length} 角色)` : ''}</h3>
+              <div className="fullscreen-header-actions">
+                <button
+                  type="button"
+                  className="fullscreen-zoom-btn"
+                  title="放大"
+                  onClick={() => fullscreenGraphRef.current?.zoomBy(1.25)}
+                >
+                  <ZoomIn size={18} />
+                  <span>放大</span>
+                </button>
+                <button
+                  type="button"
+                  className="fullscreen-zoom-btn"
+                  title="缩小"
+                  onClick={() => fullscreenGraphRef.current?.zoomBy(0.8)}
+                >
+                  <ZoomOut size={18} />
+                  <span>缩小</span>
+                </button>
+                <button
+                  type="button"
+                  className="fullscreen-zoom-btn"
+                  title="适应视口"
+                  onClick={() => fullscreenGraphRef.current?.fitView?.()}
+                >
+                  <Maximize2 size={18} />
+                  <span>适应视口</span>
+                </button>
+                <button
+                  className="close-fullscreen-btn"
+                  onClick={() => setIsFullscreen(false)}
+                  title="关闭"
+                >
+                  <X size={20} />
+                </button>
+              </div>
             </div>
-            <div
-              className="fullscreen-canvas"
-              ref={fullscreenContainerRef}
-            ></div>
+            <div className="fullscreen-canvas-wrapper">
+              {/* 画布容器必须无 React 子节点，否则 React 协调时会移除 G6 追加的 canvas */}
+              <div className="fullscreen-canvas" ref={fullscreenContainerRef} />
+              {characters.length === 0 && (
+                <div className="fullscreen-empty-state">
+                  暂无角色数据，请先添加角色
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

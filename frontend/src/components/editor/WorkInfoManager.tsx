@@ -726,7 +726,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
                 dependencyKeys={comp.dataDependencies || []}
                 onChange={(newData) => {
                   updateValue({
-                    characters: [], 
+                    characters: newData.characters || [],
                     relations: newData.relations || []
                   });
                 }}

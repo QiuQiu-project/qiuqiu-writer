@@ -19,8 +19,8 @@ export const SpotlightOverlay: React.FC<SpotlightOverlayProps> = ({
 
   useEffect(() => {
     if (!isActive || !targetId) {
-      setRect(null);
-      return;
+      const timer = setTimeout(() => setRect(null), 0);
+      return () => clearTimeout(timer);
     }
 
     const updateRect = () => {

@@ -14,40 +14,35 @@ export const getDependencyCharacters = (modules: ModuleConfig[], dataDependencie
   if (!dataDependencies || dataDependencies.length === 0) return [];
 
   const findDependencyData = (depKey: string): unknown[] => {
+    const allFoundData: unknown[] = [];
+    
     for (const module of modules) {
-      const findInComponents = (components: ComponentConfig[], path: string = ''): unknown[] | null => {
+      const findInComponents = (components: ComponentConfig[]) => {
         for (const compItem of components) {
           if (compItem.dataKey === depKey) {
             if (compItem.value !== undefined && compItem.value !== null) {
               if (Array.isArray(compItem.value)) {
-                return compItem.value as unknown[];
+                allFoundData.push(...compItem.value);
               } else if (typeof compItem.value === 'object' && compItem.value !== null) {
                 const obj = compItem.value as { characters?: unknown[] };
                 if (Array.isArray(obj.characters)) {
-                  return obj.characters;
+                  allFoundData.push(...obj.characters);
                 }
               }
-            } else {
-              return [];
             }
           }
           if (compItem.type === 'tabs' && compItem.config?.tabs) {
             for (const tab of compItem.config.tabs) {
               if (tab.components) {
-                const found = findInComponents(tab.components, `${path} > ${tab.label || tab.id}`);
-                if (found) return found;
+                findInComponents(tab.components);
               }
             }
           }
         }
-        return null;
       };
-      const found = findInComponents(module.components, module.name);
-      if (found) {
-        return found;
-      }
+      findInComponents(module.components);
     }
-    return [];
+    return allFoundData;
   };
 
   const allDependencyCharacters: CharacterData[] = [];
