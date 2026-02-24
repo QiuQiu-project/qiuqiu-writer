@@ -996,9 +996,9 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
              <button 
                className={`edit-mode-btn header-btn ${isEditMode ? 'active' : ''}`}
                onClick={() => setIsEditMode(!isEditMode)}
+               title = {isEditMode ? '完成编辑' : '编辑模板'}
              >
                {isEditMode ? <Settings size={16} /> : <Settings size={16} />}
-               <span>{isEditMode ? '完成编辑' : '编辑模板'}</span>
              </button>
              </GuideTip>
              {isEditMode && (

@@ -34,6 +34,12 @@ export const useWorkInfoData = (
   /** 为 true 时跳过下一次「template 变化」触发的自动保存，避免进入作品时用当前模板覆盖后端 metadata */
   const skipNextBackendSaveRef = useRef(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  // 使用 ref 追踪最新的 template，以便在卸载时获取最新状态进行保存
+  const templateRef = useRef(template);
+  useEffect(() => {
+    templateRef.current = template;
+  }, [template]);
 
   // 加载默认模板（兜底：作品无 template_config 时优先用用户第一个，没有则由后端确保并返回用户默认小说模板）
   const loadDefaultTemplate = useCallback(async (templates: WorkTemplate[] = []): Promise<TemplateConfig | null> => {
@@ -317,7 +323,7 @@ export const useWorkInfoData = (
       }
   }, [workId, template]);
 
-  // 监听模板变化并自动保存到缓存和后端（仅在实际用户编辑后保存，进入作品时由 loadData 设置的 template 不触发后端保存）
+  // 监听模板变化并自动保存到缓存（不再自动保存到后端）
   useEffect(() => {
     if (!workId || !template) return;
 
@@ -333,38 +339,32 @@ export const useWorkInfoData = (
       lastModified: Date.now()
     }, workId, template.id);
 
-    // 2. 延迟保存到后端 (Debounce 2秒)
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
+    // 2. 原自动保存到后端的逻辑已移除，改为在组件卸载时触发保存
+  }, [template, workId]);
 
-    saveTimeoutRef.current = setTimeout(async () => {
-      try {
-        const componentData = extractComponentDataFromTemplate(template.modules);
+  // 组件卸载时保存数据到后端
+  useEffect(() => {
+    return () => {
+      const currentTemplate = templateRef.current;
+      if (workId && currentTemplate) {
+        const componentData = extractComponentDataFromTemplate(currentTemplate.modules);
         const metadataToSave = {
           template_config: {
-            templateId: templateIdForBackend(template.id),
+            templateId: templateIdForBackend(currentTemplate.id),
           },
           component_data: componentData,
           ...componentData
         };
-
         
-        await worksApi.updateWork(workId, {
+        // 尝试在卸载时保存
+        worksApi.updateWork(workId, {
           metadata: metadataToSave
+        }).catch(() => {
+          // ignore error on unmount
         });
-        
-      } catch {
-        // ignore
-      }
-    }, 2000);
-
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [template, workId]);
+  }, [workId]);
 
   return {
     template,

@@ -134,8 +134,11 @@ class WorksApiClient extends BaseApiClient {
       throw new Error('创建作品失败：服务器未返回作品ID');
     }
     
-    // 将后端类型转换为前端类型
+    // 转换作品类型
     const work = this.mapBackendWork(response);
+    
+    // 更新缓存
+    await this.cacheWork(work);
     
     return work;
   }
@@ -318,7 +321,12 @@ class WorksApiClient extends BaseApiClient {
     const response = await this.put<BackendWorkResponse>(`/api/v1/works/${workId}`, backendUpdates);
     
     // 转换作品类型
-    return this.mapBackendWork(response);
+    const work = this.mapBackendWork(response);
+    
+    // 更新缓存
+    await this.cacheWork(work);
+    
+    return work;
   }
 
   /**
@@ -338,7 +346,12 @@ class WorksApiClient extends BaseApiClient {
     );
     
     // 转换作品类型
-    return this.mapBackendWork(response);
+    const work = this.mapBackendWork(response);
+    
+    // 更新缓存
+    await this.cacheWork(work);
+    
+    return work;
   }
 
   /**
@@ -352,22 +365,20 @@ class WorksApiClient extends BaseApiClient {
    * 发布作品
    */
   async publishWork(workId: string): Promise<Work> {
-    const response = await this.post<Work>(`/api/v1/works/${workId}/publish/`);
-    return {
-      ...response,
-      work_type: mapWorkTypeToFrontend(response.work_type as BackendWorkType),
-    };
+    const response = await this.post<BackendWorkResponse>(`/api/v1/works/${workId}/publish/`);
+    const work = this.mapBackendWork(response);
+    await this.cacheWork(work);
+    return work;
   }
 
   /**
    * 归档作品
    */
   async archiveWork(workId: string): Promise<Work> {
-    const response = await this.post<Work>(`/api/v1/works/${workId}/archive/`);
-    return {
-      ...response,
-      work_type: mapWorkTypeToFrontend(response.work_type as BackendWorkType),
-    };
+    const response = await this.post<BackendWorkResponse>(`/api/v1/works/${workId}/archive/`);
+    const work = this.mapBackendWork(response);
+    await this.cacheWork(work);
+    return work;
   }
 }
 
