@@ -871,53 +871,64 @@ export default function NovelEditorPage() {
             <span>退出</span>
           </button>
           <div className="work-info">
+            <h1 
+              ref={titleEditableRef}
+              className="work-title work-title-editable"
+              contentEditable
+              suppressContentEditableWarning
+              onBlur={handleSaveTitle}
+              onKeyDown={handleTitleKeyDown}
+              onClick={(e) => e.stopPropagation()}
+              title="点击编辑标题"
+            >
+              {work?.title || ''}
+            </h1>
             <div className="work-info-row">
-              <h1 
-                ref={titleEditableRef}
-                className="work-title work-title-editable"
-                contentEditable
-                suppressContentEditableWarning
-                onBlur={handleSaveTitle}
-                onKeyDown={handleTitleKeyDown}
-                onClick={(e) => e.stopPropagation()}
-                title="点击编辑标题"
-              >
-                {work?.title || ''}
-              </h1>
-              <span 
-                className="word-count-tooltip-wrapper"
-                data-tooltip-visible={showWordCountTooltip}
-                onMouseEnter={() => {
-                  if (!isMobile) {
-                    setShowWordCountTooltip(true);
-                  }
-                }}
-                onMouseLeave={() => !isMobile && setShowWordCountTooltip(false)}
-                onClick={(e) => {
-                  if (isMobile) {
-                    e.stopPropagation();
-                    setShowWordCountTooltip(!showWordCountTooltip);
-                  }
-                }}
-              >
-                <Info size={14} />
-                {showWordCountTooltip && (
-                  <div 
-                    className="word-count-tooltip"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {selectedChapter != null && (
-                      <span className="word-count-tooltip-line">本章字数：{currentChapterWordCount} 字</span>
-                    )}
-                    {selectedChapter != null && <span className="word-count-tooltip-sep"> </span>}
-                    <span className="word-count-tooltip-line">总字数：{work?.word_count ?? 0} 字</span>
-                  </div>
-                )}
-              </span>
-            </div>
-            <div className="work-tags">
-              {work?.category && <span className="tag">{work.category}</span>}
-              {work?.genre && <span className="tag">{work.genre}</span>}
+              <div className="work-stats-inline">
+                <span className="sync-status-text">
+                  {syncStatus.isOnline 
+                    ? (syncStatus.pendingCount > 0 
+                        ? `同步中 (${syncStatus.pendingCount})` 
+                        : '已同步')
+                    : '离线模式'}
+                </span>
+                <span className="stats-divider">·</span>
+                <span>本章字数：{currentChapterWordCount}</span>
+                <span className="stats-divider">·</span>
+                <span>总字数：{work?.word_count ?? 0}</span>
+                <span 
+                  className="word-count-tooltip-wrapper"
+                  data-tooltip-visible={showWordCountTooltip}
+                  onMouseEnter={() => {
+                    if (!isMobile) {
+                      setShowWordCountTooltip(true);
+                    }
+                  }}
+                  onMouseLeave={() => !isMobile && setShowWordCountTooltip(false)}
+                  onClick={(e) => {
+                    if (isMobile) {
+                      e.stopPropagation();
+                      setShowWordCountTooltip(!showWordCountTooltip);
+                    }
+                  }}
+                >
+                  <Info size={13} />
+                  {showWordCountTooltip && (
+                    <div 
+                      className="word-count-tooltip"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="tooltip-section">
+                        <div className="tooltip-title">原创保护</div>
+                        <div className="tooltip-content">
+                          球球写作尊重每一位作者的创作成果和知识权，不会将作者上传或发布在本平台上的任何内容用于AI训练或其他机器学习用途。<br />
+                          生成结果仅供您参考，内容由AI大模型输出，不代表我们的态度或观点。
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -952,24 +963,6 @@ export default function NovelEditorPage() {
           ) : (
             <>
               <div className="header-actions">
-                <span className={`status-tag-header ${syncStatus.isOnline ? 'online' : 'offline'}`}>
-                  {syncStatus.isOnline 
-                    ? (syncStatus.pendingCount > 0 
-                        ? `同步中 (${syncStatus.pendingCount})` 
-                        : '已同步')
-                    : '离线模式'}
-                </span>
-                
-                <HeaderSettingsMenu
-                  onFindReplace={() => {
-                    handleReplace();
-                    setMobileMenuOpen(false);
-                  }}
-                  tipsEnabled={tipsEnabled}
-                  onToggleTips={toggleTips}
-                  onDeleteWork={handleDeleteWork}
-                />
-              </div>
               <div className="sidebar-toggle-buttons">
                 <button
                   className={`sidebar-toggle-btn-header left-toggle-header ${leftSidebarCollapsed ? 'collapsed' : ''}`}
@@ -986,6 +979,19 @@ export default function NovelEditorPage() {
                   {rightSidebarCollapsed ? <PanelRightOpen size={16} /> : <PanelRightClose size={16} />}
                 </button>
               </div>
+                
+                
+                <HeaderSettingsMenu
+                  onFindReplace={() => {
+                    handleReplace();
+                    setMobileMenuOpen(false);
+                  }}
+                  tipsEnabled={tipsEnabled}
+                  onToggleTips={toggleTips}
+                  onDeleteWork={handleDeleteWork}
+                />
+              </div>
+
             </>
           )}
         </div>

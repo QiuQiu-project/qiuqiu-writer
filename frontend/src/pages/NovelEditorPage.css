@@ -24,6 +24,8 @@
   flex-shrink: 0;
   box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.08);
   gap: 24px;
+  position: relative;
+  z-index: 1000; /* 确保在主体之上 */
 }
 
 @media (max-width: 768px) {
@@ -111,44 +113,22 @@
 .work-info {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
   min-width: 0;
   flex: 1;
   overflow: visible;
   position: relative;
+  justify-content: center;
 }
 
 .work-info-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  flex-wrap: nowrap;
+  gap: 8px;
+  flex-wrap: nowrap !important; /* 强制不换行，覆盖 index.css 中的 wrap */
   min-width: 0;
   overflow: visible;
   position: relative;
-}
-
-/* tooltip：桌面端一行，移动端两行避免看不完 */
-.word-count-tooltip .word-count-tooltip-line {
-  display: inline;
-}
-.word-count-tooltip .word-count-tooltip-sep {
-  margin: 0 4px;
-}
-@media (max-width: 768px) {
-  .word-count-tooltip {
-    white-space: normal;
-    max-width: min(280px, 85vw);
-  }
-  .word-count-tooltip .word-count-tooltip-line {
-    display: block;
-  }
-  .word-count-tooltip .word-count-tooltip-line:not(:first-child) {
-    margin-top: 4px;
-  }
-  .word-count-tooltip .word-count-tooltip-sep {
-    display: none;
-  }
 }
 
 .work-title {
@@ -157,17 +137,32 @@
   color: var(--text-primary, #000000);
   margin: 0;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 2px 4px;
   border-radius: 4px;
   transition: all 0.2s ease;
   min-width: 0;
-  flex: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.2;
 }
 
-/* 悬停时不改变背景 */
+.word-count-tooltip-wrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: help;
+  color: var(--text-tertiary, #999999);
+  transition: color 0.2s;
+  padding: 2px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.word-count-tooltip-wrapper:hover {
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+}
 
 .work-title-editable {
   cursor: text;
@@ -222,15 +217,7 @@
 
 /* 顶部导航栏中的同步状态标签 */
 .status-tag-header {
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  white-space: nowrap;
-  transition: all 0.2s ease;
-  margin-right: 8px;
+  display: none;
 }
 
 .status-tag-header.online {
@@ -276,12 +263,26 @@
   color: var(--text-primary, #000000);
 }
 
-/* 作品名后的字数统计 */
-.word-count-inline {
+.work-stats-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 13px;
-  color: var(--text-secondary, #666666);
+  color: var(--text-tertiary, #999999);
+  white-space: nowrap !important; /* 强制不换行 */
+  flex-wrap: nowrap !important;
+}
+
+.stats-divider {
+  color: var(--border-light, #e0e0e0);
+  font-weight: bold;
+  margin: 0 2px;
+}
+
+.sync-status-text {
   font-weight: 500;
-  white-space: nowrap;
+  color: var(--text-secondary, #666666);
+  flex-shrink: 0;
 }
 
 /* 统一的 tooltip 样式 */
@@ -296,13 +297,15 @@
 .tooltip {
   position: fixed;
   padding: 6px 12px;
-  background: rgba(31, 41, 55, 0.95);
-  backdrop-filter: blur(8px);
-  color: #ffffff;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #1a1a1a;
   font-size: 12px;
   white-space: nowrap;
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(0, 0, 0, 0.08);
   z-index: 99999;
   pointer-events: none;
   opacity: 0;
@@ -323,56 +326,61 @@
   left: 50%;
   transform: translateX(-50%);
   border: 5px solid transparent;
-  border-bottom-color: rgba(31, 41, 55, 0.95);
+  border-bottom-color: rgba(255, 255, 255, 0.95);
 }
 
-/* 总字数 tooltip - 使用统一样式 */
-.word-count-tooltip-wrapper {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  cursor: pointer;
-  flex-shrink: 0;
-  z-index: 100000;
-}
-
+/* 总字数 tooltip - 优化位置与透明度 */
 .word-count-tooltip {
-  position: absolute;
-  left: calc(100% + 8px);
-  top: 50%;
-  transform: translateY(-50%);
-  padding: 6px 12px;
-  background: rgba(31, 41, 55, 0.95);
-  backdrop-filter: blur(8px);
-  color: #ffffff;
-  font-size: 12px;
-  white-space: nowrap;
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-  z-index: 99999;
+  position: fixed; /* 改用 fixed 定位，彻底解决父容器裁剪和层级问题 */
+  top: 65px; /* 紧贴顶部工具栏下方 */
+  left: 24px; /* 对齐左侧间距 */
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.4) !important; /* 透明度调整为 0.4 */
+  backdrop-filter: blur(16px) !important; /* 增加模糊度，确保在 0.4 透明度下内容依然可读 */
+  -webkit-backdrop-filter: blur(16px) !important;
+  color: #1a1a1a !important;
+  font-size: 13px;
+  width: 300px;
+  white-space: normal !important;
+  word-wrap: break-word !important;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important; /* 调整边框颜色，使其在透明背景下更自然 */
+  z-index: 2000000 !important; /* 极高层级 */
   pointer-events: auto;
-  animation: tooltipFadeInRight 0.2s ease-out;
+  animation: tooltipFadeInDown 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-@keyframes tooltipFadeInRight {
+@keyframes tooltipFadeInDown {
   from {
     opacity: 0;
-    transform: translateY(-50%) translateX(-8px);
+    transform: translateY(-10px);
   }
   to {
     opacity: 1;
-    transform: translateY(-50%) translateX(0);
+    transform: translateY(0);
   }
 }
 
-.word-count-tooltip::before {
-  content: '';
-  position: absolute;
-  right: 100%;
-  top: 50%;
-  transform: translateY(-50%);
-  border: 5px solid transparent;
-  border-right-color: rgba(31, 41, 55, 0.95);
+.word-count-tooltip::after {
+  content: none; /* 移除原来的箭头，因为 fixed 定位无法精准对齐 */
+}
+
+.word-count-tooltip .tooltip-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.word-count-tooltip .tooltip-title {
+  font-weight: 700;
+  color: #000;
+  font-size: 14px;
+}
+
+.word-count-tooltip .tooltip-content {
+  line-height: 1.6;
+  color: #444;
 }
 
 .header-right {
@@ -1013,7 +1021,7 @@
   width: 100%;
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: 100; /* 提高层级 */
   background: var(--bg-primary);
   border-bottom: 1px solid var(--border-light, #e0e0e0);
   /* 只有工具栏有顶部圆角 */
