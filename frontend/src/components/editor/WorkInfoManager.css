@@ -146,6 +146,21 @@
   gap: 12px;
 }
 
+.header-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 40px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  box-sizing: border-box;
+}
+
 .icon-btn {
   display: flex;
   align-items: center;
@@ -167,18 +182,22 @@
   border-color: var(--border-light);
 }
 
-.edit-mode-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
+.header-btn.btn-secondary {
   background: var(--bg-secondary);
   border: 1px solid var(--border-light);
-  border-radius: 8px;
   color: var(--text-secondary);
-  font-size: 13px;
-  cursor: pointer;
-  transition: all var(--transition-base);
+}
+
+.header-btn.btn-secondary:hover {
+  background: var(--bg-primary);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.edit-mode-btn {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
 }
 
 .edit-mode-btn:hover {
@@ -298,13 +317,35 @@
     flex-wrap: wrap;
     gap: 8px;
   }
+
+  .module-header .btn-text {
+    display: none;
+  }
   
   .module-header h2 {
     font-size: 16px;
   }
-  
-  .header-actions {
+
+  .comp-header {
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+
+  .comp-header > *:first-child {
+    flex: 1 1 0%;
+    min-width: 3em;
+  }
+
+  .comp-header label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .comp-header .header-actions {
     margin-left: auto;
+    flex: 0 0 auto;
+    width: max-content;
   }
   
   .module-components {
@@ -329,15 +370,35 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+  flex-wrap: nowrap;
   margin-bottom: 16px;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--border-light);
+}
+
+/* 标题区域（含 GuideTip 包裹时）占满剩余空间，保证标题可见且与设置同行 */
+.comp-header > *:first-child {
+  flex: 1 1 0%;
+  min-width: 4em;
+  overflow: hidden;
 }
 
 .comp-header label {
   font-size: 15px;
   font-weight: 600;
   color: var(--text-primary);
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.comp-header .header-actions {
+  margin-left: auto;
+  flex: 0 0 auto;
+  width: max-content;
 }
 
 .comp-content {

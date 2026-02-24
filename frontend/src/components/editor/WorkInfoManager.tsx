@@ -957,15 +957,6 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
         <div className="module-header">
            <h2>{activeModule?.name}</h2>
            <div className="header-actions">
-             <button 
-               className="btn-secondary"
-               onClick={saveData}
-               disabled={isSaving}
-               title="保存数据"
-               style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-             >
-               <Save size={16} /> {isSaving ? '保存中...' : '保存'}
-             </button>
              <GuideTip
                id="work-info-template-market"
                content={
@@ -977,14 +968,21 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
                placement="bottom"
              >
              <button 
-               className="btn-secondary"
+               className="btn-secondary header-btn"
                onClick={() => setShowTemplateMarket(true)}
                title="模板市场"
-               style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
              >
-               <LayoutGrid size={16} /> 模板市场
+               <LayoutGrid size={16} /> <span className="btn-text">模板市场</span>
              </button>
              </GuideTip>
+             <button 
+               className="btn-secondary header-btn"
+               onClick={saveData}
+               disabled={isSaving}
+               title="保存数据"
+             >
+               <Save size={16} /> <span className="btn-text">{isSaving ? '保存中...' : '保存'}</span>
+             </button>
              <GuideTip
                id="work-info-edit-mode"
                content={
@@ -996,29 +994,28 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
                placement="bottom"
              >
              <button 
-               className={`edit-mode-btn ${isEditMode ? 'active' : ''}`}
+               className={`edit-mode-btn header-btn ${isEditMode ? 'active' : ''}`}
                onClick={() => setIsEditMode(!isEditMode)}
              >
                {isEditMode ? <Settings size={16} /> : <Settings size={16} />}
-               {isEditMode ? '完成编辑' : '编辑模板'}
+               <span>{isEditMode ? '完成编辑' : '编辑模板'}</span>
              </button>
              </GuideTip>
              {isEditMode && (
                <>
                  <button 
-                   className="btn-secondary"
+                   className="btn-secondary header-btn"
                    onClick={() => setShowAddModule(true)}
-                   style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                  >
-                   <Plus size={16} /> 添加模块
+                   <Plus size={16} /> <span className="btn-text">添加模块</span>
                  </button>
                  <button 
-                   className="btn-secondary"
+                   className="btn-secondary header-btn"
                    onClick={handleDeleteModule}
-                   style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ef4444', borderColor: '#fecaca', background: '#fef2f2' }}
+                   style={{ color: '#ef4444', borderColor: '#fecaca', background: '#fef2f2' }}
                    title="删除当前模块"
                  >
-                   <Trash2 size={16} /> 删除模块
+                   <Trash2 size={16} /> <span className="btn-text">删除模块</span>
                  </button>
                </>
              )}

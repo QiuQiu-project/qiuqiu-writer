@@ -259,7 +259,7 @@ export default function TemplateMarketModal({
                         }}
                         title="编辑模板信息"
                       >
-                        <Edit2 size={14} /> 编辑
+                        <Edit2 size={14} /> <span className="btn-text">编辑</span>
                       </button>
                       <button 
                         className="card-btn delete"
@@ -269,7 +269,7 @@ export default function TemplateMarketModal({
                         }}
                         title="删除模板"
                       >
-                        <Trash2 size={14} /> 删除
+                        <Trash2 size={14} /> <span className="btn-text">删除</span>
                       </button>
                       </>
                     )}
@@ -294,14 +294,14 @@ export default function TemplateMarketModal({
                       }}
                       title="基于此模板创建新模板"
                     >
-                      <Save size={14} /> 另存为
+                      <Save size={14} /> <span className="btn-text">另存为</span>
                     </button>
                     {!tpl.is_public && (
                     <button 
                       className="card-btn use"
                       onClick={() => onSelectTemplate(tpl)}
                     >
-                      <Download size={14} /> 使用
+                      <Download size={14} /> <span className="btn-text">使用</span>
                     </button>
                     )}
                   </div>

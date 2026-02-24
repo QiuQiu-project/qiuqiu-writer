@@ -199,6 +199,48 @@
   line-height: 1.4;
 }
 
+.card-footer {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.card-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  background: white;
+  color: #64748b;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.card-btn:hover {
+  background: #f8fafc;
+  color: #3b82f6;
+  border-color: #3b82f6;
+}
+
+.card-btn.edit:hover { color: #3b82f6; border-color: #3b82f6; }
+.card-btn.delete:hover { color: #ef4444; border-color: #ef4444; }
+.card-btn.save-as:hover { color: #10b981; border-color: #10b981; }
+.card-btn.use:hover { color: #8b5cf6; border-color: #8b5cf6; }
+
+.card-btn.public {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #3b82f6;
+}
+
 @media (max-width: 768px) {
   .template-market-modal-content {
     width: 100%;
@@ -233,5 +275,14 @@
 
   .market-content {
     padding: 16px;
+  }
+
+  .card-footer .btn-text {
+    display: none;
+  }
+
+  .card-btn {
+    padding: 6px;
+    justify-content: center;
   }
 }
