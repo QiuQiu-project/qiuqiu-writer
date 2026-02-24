@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Check } from 'lucide-react';
 
 interface MultiSelectOption {
@@ -25,23 +26,46 @@ export default function MultiSelectEditor({
   disabled = false
 }: MultiSelectEditorProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Update dropdown position when opened
+  useEffect(() => {
+    if (isOpen && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      setDropdownPos({
+        top: rect.bottom + window.scrollY + 8,
+        left: rect.left + window.scrollX,
+        width: rect.width
+      });
+    }
+  }, [isOpen]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      if (
+        containerRef.current && !containerRef.current.contains(event.target as Node) &&
+        dropdownRef.current && !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('resize', () => setIsOpen(false));
+    window.addEventListener('scroll', () => setIsOpen(false), true);
+
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('resize', () => setIsOpen(false));
+      window.removeEventListener('scroll', () => setIsOpen(false), true);
     };
   }, []);
 
-  const handleSelect = (optionValue: string) => {
+  const handleSelect = (optionValue: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     if (disabled) return;
     
     if (value.includes(optionValue)) {
@@ -67,6 +91,65 @@ export default function MultiSelectEditor({
   const getOptionColor = (val: string) => {
     return options.find(o => o.value === val)?.color;
   };
+
+  const dropdownMenu = isOpen && !disabled ? createPortal(
+    <div 
+      className="available-tags" 
+      ref={dropdownRef}
+      style={{
+        position: 'absolute',
+        top: dropdownPos.top,
+        left: dropdownPos.left,
+        width: dropdownPos.width,
+        zIndex: 10001, // Higher than SpotlightOverlay (9990)
+        boxShadow: 'var(--shadow-md)',
+        backgroundColor: 'var(--bg-primary, #ffffff)',
+        border: '1px solid var(--border-color, #e0e0e0)',
+        borderRadius: 'var(--radius-sm)',
+        marginTop: '0', // Positioned via top
+        maxHeight: '200px',
+        overflowY: 'auto',
+      }}
+    >
+      {options.length === 0 ? (
+        <div className="no-options" style={{ padding: '12px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+          无可用选项
+        </div>
+      ) : (
+        options.map(opt => {
+          const isSelected = value.includes(opt.value);
+          const isOptionDisabled = maxCount && value.length >= maxCount && !isSelected;
+          
+          return (
+            <button
+              key={opt.value}
+              className={`tag-option ${isSelected ? 'selected' : ''} ${isOptionDisabled ? 'disabled' : ''}`}
+              onClick={(e) => !isOptionDisabled && handleSelect(opt.value, e)}
+              style={{
+                backgroundColor: isSelected ? (opt.color || 'var(--accent-primary)') : 'transparent',
+                borderColor: opt.color || 'var(--accent-primary)',
+                color: isSelected ? 'white' : (opt.color || 'var(--accent-primary)'),
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                margin: '4px',
+                border: '1px solid',
+                borderRadius: '16px',
+                cursor: isOptionDisabled ? 'not-allowed' : 'pointer',
+                fontSize: '13px',
+                opacity: isOptionDisabled ? 0.5 : 1
+              }}
+            >
+              {opt.label}
+              {isSelected && <Check size={12} style={{ marginLeft: '4px' }} />}
+            </button>
+          )
+        })
+      )}
+    </div>,
+    document.body
+  ) : null;
 
   return (
     <div className="comp-multiselect" ref={containerRef}>
@@ -94,36 +177,7 @@ export default function MultiSelectEditor({
         ))}
       </div>
 
-      {isOpen && !disabled && (
-        <div className="available-tags">
-          {options.length === 0 ? (
-            <div className="no-options">
-            无可用选项
-          </div>
-          ) : (
-            options.map(opt => {
-              const isSelected = value.includes(opt.value);
-              const isOptionDisabled = maxCount && value.length >= maxCount && !isSelected;
-              
-              return (
-                <button
-                  key={opt.value}
-                  className={`tag-option ${isSelected ? 'selected' : ''} ${isOptionDisabled ? 'disabled' : ''}`}
-                  onClick={() => !isOptionDisabled && handleSelect(opt.value)}
-                  style={{
-                    backgroundColor: isSelected ? (opt.color || 'var(--accent-primary)') : 'transparent',
-                    borderColor: opt.color || 'var(--accent-primary)',
-                    color: isSelected ? 'white' : (opt.color || 'var(--accent-primary)')
-                  }}
-                >
-                  {opt.label}
-                  {isSelected && <Check size={12} style={{ marginLeft: '4px' }} />}
-                </button>
-              );
-            })
-          )}
-        </div>
-      )}
+      {dropdownMenu}
     </div>
   );
 }
