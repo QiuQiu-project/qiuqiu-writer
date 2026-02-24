@@ -172,8 +172,26 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
 
   // State for guide tips global toggle
   const [tipsEnabled, setTipsEnabled] = useState(true);
+  const [isOnboardingActive, setIsOnboardingActive] = useState(() => {
+    if (typeof window === 'undefined' || !workId) return false;
+    return localStorage.getItem(`wawawriter_onboarding_${workId}`) !== 'true';
+  });
   
   useEffect(() => {
+    const checkOnboarding = () => {
+      if (!workId) return;
+      const hasShownOnboarding = localStorage.getItem(`wawawriter_onboarding_${workId}`) === 'true';
+      setIsOnboardingActive(!hasShownOnboarding);
+    };
+
+    checkOnboarding();
+
+    const handleOnboardingFinished = () => {
+      setIsOnboardingActive(false);
+    };
+
+    window.addEventListener('wawawriter_onboarding_finished', handleOnboardingFinished);
+    
     const checkTips = () => {
       const enabled = localStorage.getItem('wawawriter_guide_tips_enabled');
       setTipsEnabled(enabled === null || enabled === 'true');
@@ -181,11 +199,15 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
     checkTips();
     window.addEventListener('wawawriter_guide_tips_updated', checkTips);
     window.addEventListener('storage', checkTips);
+    window.addEventListener('storage', checkOnboarding);
+    
     return () => {
+      window.removeEventListener('wawawriter_onboarding_finished', handleOnboardingFinished);
       window.removeEventListener('wawawriter_guide_tips_updated', checkTips);
       window.removeEventListener('storage', checkTips);
+      window.removeEventListener('storage', checkOnboarding);
     };
-  }, []);
+  }, [workId]);
 
   const showMessage = (message: string, type: MessageType = 'info', title?: string, onConfirm?: () => void) => {
     setMessageState({
@@ -335,24 +357,19 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
   };
 
   // Recursive function to find first empty component
-  const findFirstEmptyComponent = (components: ComponentConfig[]): { id: string; tabId?: string; parentId?: string } | null => {
+  const findFirstEmptyComponent = (components: ComponentConfig[], dismissed: Record<string, boolean>): { id: string; tabId?: string; parentId?: string } | null => {
     for (const comp of components) {
       if (comp.type === 'tabs' && comp.config?.tabs && comp.config.tabs.length > 0) {
           for (const tab of comp.config.tabs) {
               if (tab.components) {
-                  const result = findFirstEmptyComponent(tab.components);
+                  const result = findFirstEmptyComponent(tab.components, dismissed);
                   if (result) {
-                      // If found in a tab, bubble up the tab info
-                      // We only attach parentId/tabId if not already present (deepest wins? no, we want the immediate parent tab)
-                      // Actually we need the top-level tab info for switching.
-                      // If nested tabs exist, we might need a chain. 
-                      // But for now let's assume one level of tabs as per UI.
                       return { ...result, tabId: tab.id, parentId: comp.id };
                   }
               }
           }
       } else {
-          if (!hasValue(comp.value)) {
+          if (!hasValue(comp.value) && !dismissed[comp.id]) {
               return { id: comp.id };
           }
       }
@@ -361,8 +378,41 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
   };
 
   const activeModuleSafe = template?.modules?.[activeModuleIndex];
-  const firstEmptyInfo = activeModuleSafe ? findFirstEmptyComponent(activeModuleSafe.components) : null;
-  const firstEmptyComponentId = firstEmptyInfo?.id;
+  const [dismissedGuides, setDismissedGuides] = useState<Record<string, boolean>>({});
+  
+  const firstEmptyInfo = activeModuleSafe && !isOnboardingActive ? findFirstEmptyComponent(activeModuleSafe.components, dismissedGuides) : null;
+  const firstEmptyComponentId = firstEmptyInfo ? firstEmptyInfo.id : '';
+  
+  // Update firstEmptyComponentId logic to account for manual dismissal
+  useEffect(() => {
+    const handleGuideUpdate = () => {
+      // Force re-calculation by checking localStorage
+      const newDismissed: Record<string, boolean> = {};
+      if (activeModuleSafe) {
+        const checkComponents = (components: ComponentConfig[]) => {
+          components.forEach(comp => {
+            if (localStorage.getItem(`wawawriter_guide_tip_seen_guide-fill-${comp.id}`) === 'true') {
+              newDismissed[comp.id] = true;
+            }
+            if (comp.type === 'tabs' && comp.config?.tabs) {
+              comp.config.tabs.forEach(tab => {
+                if (tab.components) {
+                  checkComponents(tab.components);
+                }
+              });
+            }
+          });
+        };
+        checkComponents(activeModuleSafe.components);
+      }
+      setDismissedGuides(newDismissed);
+    };
+
+    window.addEventListener('wawawriter_guide_tips_updated', handleGuideUpdate);
+    // Initial check
+    handleGuideUpdate();
+    return () => window.removeEventListener('wawawriter_guide_tips_updated', handleGuideUpdate);
+  }, [activeModuleSafe]);
   
   // Auto-switch tabs to show the guided component
   useEffect(() => {
@@ -1223,6 +1273,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
         isActive={
           tipsEnabled && 
           !!firstEmptyComponentId && 
+          !isEditMode &&
           !showAddComponent && 
           !showAddModule && 
           !showTemplateMarket && 

@@ -125,7 +125,13 @@ export default function NovelEditorPage() {
 
     setTipsEnabled(newState);
     window.dispatchEvent(new Event('wawawriter_guide_tips_updated'));
-    showMessage(newState ? '已开启功能引导（已重置提示状态）' : '已关闭功能引导', 'info');
+    showMessage(
+      newState ? '已开启功能引导（已重置提示状态）' : '已关闭功能引导', 
+      'info', 
+      undefined, 
+      undefined, 
+      { toast: true, autoCloseMs: 2000 }
+    );
   };
   
   // ===== UI状态管理 =====

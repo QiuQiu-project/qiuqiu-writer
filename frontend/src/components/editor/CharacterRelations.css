@@ -39,46 +39,17 @@
   align-items: center;
 }
 
-/* 列表/关系图 切换：固定总宽、两按钮等宽、统一轮廓 */
-.view-toggle {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  width: 160px;
-  min-width: 160px;
-  height: 32px;
-  border: 1px solid var(--border-light);
-  border-radius: 8px;
-  overflow: hidden;
-  background: var(--bg-secondary);
-  flex-shrink: 0;
+/* 视图切换按钮样式 */
+.toggle-view-btn {
+  min-width: 100px !important;
+  background: var(--bg-secondary) !important;
+  border-color: var(--border-light) !important;
+  color: var(--text-primary) !important;
 }
 
-.toggle-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  padding: 0 12px;
-  margin: 0;
-  font-size: 13px;
-  font-weight: 500;
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease;
-  box-sizing: border-box;
-}
-
-.toggle-btn.active {
-  background: var(--accent-primary);
-  color: var(--text-inverse);
-}
-
-.toggle-btn:not(.active):hover {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
+.toggle-view-btn:hover {
+  background: var(--bg-tertiary) !important;
+  border-color: var(--accent-primary) !important;
 }
 
 .action-btn {

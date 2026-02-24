@@ -27,12 +27,14 @@ export default function OnboardingGuide({ onStart, onSkip, workId }: OnboardingG
   const handleStart = () => {
     localStorage.setItem(`${STORAGE_KEY_PREFIX}${workId}`, 'true');
     setIsVisible(false);
+    window.dispatchEvent(new CustomEvent('wawawriter_onboarding_finished', { detail: { workId } }));
     onStart();
   };
 
   const handleSkip = () => {
     localStorage.setItem(`${STORAGE_KEY_PREFIX}${workId}`, 'true');
     setIsVisible(false);
+    window.dispatchEvent(new CustomEvent('wawawriter_onboarding_finished', { detail: { workId } }));
     onSkip();
   };
 

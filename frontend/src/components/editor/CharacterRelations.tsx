@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, memo } from 'react';
-import { Plus, Maximize2, X, Trash2, Pencil, ZoomIn, ZoomOut, Link2 } from 'lucide-react';
+import { Plus, Maximize2, X, Trash2, Pencil, ZoomIn, ZoomOut, Link2, List, Share2 } from 'lucide-react';
 import { Graph } from '@antv/g6';
 import type { GraphData } from '@antv/g6';
 import { useIsMobile } from '../../hooks/useMediaQuery';
@@ -760,22 +760,15 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
           )}
         </div>
         <div className="header-actions">
-          <div className="view-toggle">
-            <button
-              className={`toggle-btn ${viewMode === 'list' ? 'active' : ''}`}
-              onClick={() => setViewMode('list')}
-              type="button"
-            >
-              列表
-            </button>
-            <button
-              className={`toggle-btn ${viewMode === 'graph' ? 'active' : ''}`}
-              onClick={() => setViewMode('graph')}
-              type="button"
-            >
-              关系图
-            </button>
-          </div>
+          <button
+            className="action-btn toggle-view-btn"
+            onClick={() => setViewMode(viewMode === 'list' ? 'graph' : 'list')}
+            type="button"
+            title={viewMode === 'list' ? '切换到关系图视图' : '切换到列表视图'}
+          >
+            {viewMode === 'list' ? <Share2 size={16} /> : <List size={16} />}
+            <span>{viewMode === 'list' ? '关系图' : '列表'}</span>
+          </button>
           {viewMode === 'list' && (
             <button
               className="action-btn"

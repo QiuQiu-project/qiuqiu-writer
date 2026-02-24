@@ -27,9 +27,13 @@ export default function GuideTip({ id, content, children, placement = 'top', for
       // Check if this specific tip has been seen
       const hasSeen = localStorage.getItem(`${TIP_SEEN_PREFIX}${id}`);
       
-      // console.log(`[GuideTip:${id}] checkVisibility: global=${isGlobalEnabled}, seen=${hasSeen}, force=${forceVisible}`);
+      // If the tip has been seen, it should not be visible even if forced
+      if (hasSeen === 'true') {
+        setIsVisible(false);
+        return;
+      }
       
-      if (forceVisible || (!hasSeen && globalEnabled !== 'false')) {
+      if (forceVisible || globalEnabled !== 'false') {
         setIsVisible(true);
       } else {
         setIsVisible(false);
@@ -82,6 +86,9 @@ export default function GuideTip({ id, content, children, placement = 'top', for
     localStorage.setItem(`${TIP_SEEN_PREFIX}${id}`, 'true');
     // Clicking "Got it" only closes the current tip, it should not turn off the global switch
     // Otherwise, other unread tips will also disappear
+    
+    // Dispatch event to notify other components (like SpotlightOverlay) that a tip has been dismissed
+    window.dispatchEvent(new Event('wawawriter_guide_tips_updated'));
   };
 
   // Render children normally, but wrap with ref
