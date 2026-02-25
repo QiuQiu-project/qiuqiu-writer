@@ -37,7 +37,7 @@
   box-shadow: var(--shadow-lg);
   padding: 6px;
   min-width: 180px;
-  z-index: 10001;
+  z-index: 10010; /* Higher than GuideTip (9999) and OnboardingGuide (10001) */
   display: flex;
   flex-direction: column;
   gap: 2px;

@@ -12,8 +12,8 @@ import { generateComponentData } from '../../utils/bookAnalysisApi';
 import { GeneratedDataPreviewModal } from './work-info/GeneratedDataPreviewModal';
 import MessageModal from '../common/MessageModal';
 import type { MessageType } from '../common/MessageModal';
-import GuideTip from '../common/GuideTip';
-import { SpotlightOverlay } from '../common/SpotlightOverlay';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- used when GuideTip wrappers are uncommented
+// import GuideTip from '../common/GuideTip';
 import './WorkInfoManager.css';
 
 // Import refactored modules
@@ -572,16 +572,23 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
           />
         );
 
-      case 'select':
+      case 'select': {
+        // 规范化 options：确保每项都有 value 和 label（模板/API 可能只含 label）
+        const rawOptions = (comp.config.options || []) as { value?: string; label: string }[];
+        const options: SelectOption[] = rawOptions.map(opt => ({
+          value: opt.value ?? opt.label ?? '',
+          label: opt.label ?? opt.value ?? '',
+        })).filter(opt => opt.value !== '' || opt.label !== '');
         return (
           <CustomSelect
             id={`guided-comp-${comp.id}`}
             value={(comp.value as string) || ''}
             onChange={(val) => updateValue(val)}
-            options={(comp.config.options || []) as SelectOption[]}
+            options={options}
             placeholder={comp.config.placeholder || '请选择'}
           />
         );
+      }
 
       case 'tags':
         return (
@@ -1007,7 +1014,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
         <div className="module-header">
            <h2>{activeModule?.name}</h2>
            <div className="header-actions">
-             <GuideTip
+             {/* <GuideTip
                id="work-info-template-market"
                content={
                  <div>
@@ -1016,7 +1023,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
                  </div>
                }
                placement="bottom"
-             >
+             > */}
              <button 
                className="btn-secondary header-btn"
                onClick={() => setShowTemplateMarket(true)}
@@ -1024,7 +1031,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
              >
                <LayoutGrid size={16} /> <span className="btn-text">模板市场</span>
              </button>
-             </GuideTip>
+             {/* </GuideTip> */}
              <button 
                className="btn-secondary header-btn"
                onClick={saveData}
@@ -1033,7 +1040,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
              >
                <Save size={16} /> <span className="btn-text">{isSaving ? '保存中...' : '保存'}</span>
              </button>
-             <GuideTip
+             {/* <GuideTip
                id="work-info-edit-mode"
                content={
                  <div>
@@ -1042,7 +1049,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
                  </div>
                }
                placement="bottom"
-             >
+             > */}
              <button 
                className={`edit-mode-btn header-btn ${isEditMode ? 'active' : ''}`}
                onClick={() => setIsEditMode(!isEditMode)}
@@ -1050,7 +1057,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
              >
                {isEditMode ? <Settings size={16} /> : <Settings size={16} />}
              </button>
-             </GuideTip>
+             {/* </GuideTip> */}
              {isEditMode && (
                <>
                  <button 
@@ -1111,53 +1118,39 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
                 <div className="comp-header">
                   {/* Sequential Guide: Show tip only for the first empty component */}
                   {comp.id === firstEmptyComponentId ? (
-                     <GuideTip
-                       id={`guide-fill-${comp.id}`}
-                       forceVisible={true}
-                       content={
-                         <div>
-                           <h4>请填写{comp.label}</h4>
-                           <p>为了完善作品设定，请填写这一项内容。完成后将自动提示下一项。</p>
-                         </div>
-                       }
-                       placement="right"
-                     >
+                    //  <GuideTip
+                    //    id={`guide-fill-${comp.id}`}
+                    //    forceVisible={true}
+                    //    content={
+                    //      <div>
+                    //        <h4>请填写{comp.label}</h4>
+                    //        <p>为了完善作品设定，请填写这一项内容。完成后将自动提示下一项。</p>
+                    //      </div>
+                    //    }
+                    //    placement="right"
+                    //  >
                        <label>{comp.label}</label>
-                     </GuideTip>
+                    //  </GuideTip>
                   ) : (
                      <label>{comp.label}</label>
                   )}
                  <div className="header-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     {showGenerateBtn && (
                       index === 0 ? (
-                        <GuideTip
-                          id="work-info-ai-generate"
-                          content={
-                            <div>
-                              <h4>AI 辅助生成</h4>
-                              <p>点击此处，AI 可以根据上下文自动为您生成或补全内容。</p>
-                            </div>
-                          }
-                          placement="left"
-                        >
+                        <>
+                          {/* <GuideTip id="work-info-ai-generate" content={...} placement="left"> */}
                           {generateBtn}
-                        </GuideTip>
+                          {/* </GuideTip> */}
+                        </>
                       ) : generateBtn
                     )}
                     {isEditMode && (
                       index === 0 ? (
-                        <GuideTip
-                          id="work-info-comp-settings"
-                          content={
-                            <div>
-                              <h4>组件设置</h4>
-                              <p>点击此处可以配置该组件的属性，包括标题、提示词、选项等。</p>
-                            </div>
-                          }
-                          placement="left"
-                        >
+                        <>
+                          {/* <GuideTip id="work-info-comp-settings" content={...} placement="left"> */}
                           {settingsBtn}
-                        </GuideTip>
+                          {/* </GuideTip> */}
+                        </>
                       ) : settingsBtn
                     )}
                  </div>
@@ -1266,20 +1259,6 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
           closeMessage();
           if (messageState.onConfirm) messageState.onConfirm();
         }}
-      />
-      
-      <SpotlightOverlay 
-        targetId={firstEmptyComponentId ? `guided-comp-${firstEmptyComponentId}` : ''}
-        isActive={
-          tipsEnabled && 
-          !!firstEmptyComponentId && 
-          !isEditMode &&
-          !showAddComponent && 
-          !showAddModule && 
-          !showTemplateMarket && 
-          !previewModalOpen && 
-          !messageState.isOpen
-        }
       />
     </div>
   );

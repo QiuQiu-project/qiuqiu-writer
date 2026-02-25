@@ -78,8 +78,9 @@ export default function CustomSelect({
   };
 
   const selectedOption = options.find(opt => opt.value === value);
-  const displayText = selectedOption ? selectedOption.label : placeholder;
-  const isEmpty = !selectedOption;
+  // 有选中项用 label；没有匹配项但 value 有值（如历史数据或 options 未加载）时显示 value，否则显示 placeholder
+  const displayText = selectedOption ? selectedOption.label : (value ? String(value) : placeholder);
+  const isEmpty = !value;
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // 计算下拉菜单位置

@@ -101,7 +101,7 @@ export default function MultiSelectEditor({
         top: dropdownPos.top,
         left: dropdownPos.left,
         width: dropdownPos.width,
-        zIndex: 10001, // Higher than SpotlightOverlay (9990)
+        zIndex: 10010, // Higher than GuideTip (9999) and OnboardingGuide (10001)
         boxShadow: 'var(--shadow-md)',
         backgroundColor: 'var(--bg-primary, #ffffff)',
         border: '1px solid var(--border-color, #e0e0e0)',
