@@ -95,6 +95,7 @@ pillow==11.3.0
 portalocker==2.10.1
 protobuf==6.31.1
 pycparser==2.22
+psutil==6.1.1
 pydantic-core==2.33.2
 pydantic-extra-types==2.10.5
 pydantic-settings==2.10.1
