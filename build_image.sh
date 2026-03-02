@@ -19,15 +19,15 @@ if [ ! -d "$BACKEND_DIR" ]; then
 fi
 
 # 检查 Dockerfile 是否存在
-if [ ! -f "$BACKEND_DIR/Dockerfile" ]; then
-    echo "❌ 错误: 找不到 $BACKEND_DIR/Dockerfile，请先创建它。"
+if [ ! -f "$BACKEND_DIR/docker/Dockerfile" ]; then
+    echo "❌ 错误: 找不到 $BACKEND_DIR/docker/Dockerfile，请先创建它。"
     exit 1
 fi
 
 # 执行构建
 # 使用 --no-cache 确保每次构建都是最新的依赖（可选）
 cd "$BACKEND_DIR"
-docker build -t "$IMAGE_NAME:latest" -t "$IMAGE_NAME:$TAG" .
+docker build -t "$IMAGE_NAME:latest" -t "$IMAGE_NAME:$TAG" -f docker/Dockerfile .
 
 if [ $? -eq 0 ]; then
     echo "✅ 镜像构建成功！"

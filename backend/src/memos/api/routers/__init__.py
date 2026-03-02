@@ -44,3 +44,7 @@ def get_yjs_router():
     from memos.api.routers.yjs_router import router
     return router
 
+def get_feedback_router():
+    from memos.api.routers.feedback_router import router
+    return router
+

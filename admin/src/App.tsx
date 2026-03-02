@@ -11,6 +11,7 @@ import AuditLogs from './pages/AuditLogs';
 import Cubes from './pages/Cubes';
 import Maintenance from './pages/Maintenance';
 import InvitationCodes from './pages/InvitationCodes';
+import Feedback from './pages/Feedback';
 
 // Simple Auth Guard
 const RequireAuth: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -43,6 +44,7 @@ const App: React.FC = () => {
           <Route path="maintenance" element={<Maintenance />} />
           <Route path="invitation-codes" element={<InvitationCodes />} />
           <Route path="audit-logs" element={<AuditLogs />} />
+          <Route path="feedback" element={<Feedback />} />
           <Route path="settings" element={<div>Settings (Coming Soon)</div>} />
         </Route>
       </Routes>

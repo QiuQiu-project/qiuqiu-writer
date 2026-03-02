@@ -3,7 +3,7 @@
 # ==========================================
 
 # 1. 基础镜像
-FROM python:3.11-slim
+FROM docker.m.daocloud.io/library/python:3.11-slim
 
 # 2. 设置环境变量
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -39,5 +39,4 @@ EXPOSE 8000
 
 # 8. 启动脚本
 # 生产环境不使用 --reload
-# 启动前运行 init_admin_auto.py 确保数据库和管理员账号初始化
-CMD ["sh", "-c", "python init_admin_auto.py && uvicorn memos.api.ai_api:app --host 0.0.0.0 --port 8000"]
+CMD ["uvicorn", "memos.api.ai_api:app", "--host", "0.0.0.0", "--port", "8000"]

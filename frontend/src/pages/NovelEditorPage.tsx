@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Info, Menu, X, MessageSquare, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { ArrowLeft, Info, Menu, X, MessageSquare, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, MessageCircleQuestion } from 'lucide-react';
 import { EditorContent } from '@tiptap/react';
 
 // 组件
@@ -26,6 +26,7 @@ import ChapterEditorToolbar from '../components/editor/ChapterEditorToolbar';
 import EditorSelectionPopup from '../components/editor/EditorSelectionPopup';
 import OnboardingGuide from '../components/common/OnboardingGuide';
 import HeaderSettingsMenu from '../components/editor/HeaderSettingsMenu';
+import FeedbackModal from '../components/common/FeedbackModal';
 
 // Hooks
 import { useYjsEditor } from '../hooks/useYjsEditor';
@@ -90,6 +91,7 @@ export default function NovelEditorPage() {
   
   // ===== 功能引导状态 =====
   const [tipsEnabled, setTipsEnabled] = useState(true);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   useEffect(() => {
     const checkTipsEnabled = () => {
@@ -1403,6 +1405,25 @@ export default function NovelEditorPage() {
           closeMessage();
           if (messageState.onConfirm) messageState.onConfirm();
         }}
+      />
+
+      {/* 问题反馈按钮（右下角固定） */}
+      <button
+        className="feedback-fab"
+        onClick={() => setFeedbackOpen(true)}
+        title="问题反馈"
+      >
+        <MessageCircleQuestion size={18} />
+      </button>
+
+      {/* 问题反馈弹窗 */}
+      <FeedbackModal
+        isOpen={feedbackOpen}
+        onClose={() => setFeedbackOpen(false)}
+        onShowMessage={(msg, type) =>
+          showMessage(msg, type, undefined, undefined, { toast: true, autoCloseMs: 2500 })
+        }
+        context={{ work_id: workId, chapter_id: selectedChapter }}
       />
 
       {/* 新手引导 */}

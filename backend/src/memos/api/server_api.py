@@ -7,6 +7,7 @@ from memos.api.exceptions import APIExceptionHandler
 from memos.api.middleware.request_context import RequestContextMiddleware
 from memos.api.routers.server_router import router as server_router
 from memos.api.routers.admin_router import router as admin_router
+from memos.api.routers.feedback_router import router as feedback_router
 
 
 
@@ -28,6 +29,7 @@ app.add_middleware(RequestContextMiddleware, source="server_api")
 # Include routers
 app.include_router(server_router)
 app.include_router(admin_router)
+app.include_router(feedback_router)
 
 
 # Request validation failed

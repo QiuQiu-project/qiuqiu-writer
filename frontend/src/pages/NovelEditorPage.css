@@ -2609,3 +2609,44 @@
   background: rgba(255, 255, 255, 0.92);
   border-bottom-color: rgba(37, 99, 235, 0.08);
 }
+
+/* 问题反馈悬浮按钮 */
+.feedback-fab {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 2500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.12));
+  background: var(--glass-bg, rgba(255, 255, 255, 0.06));
+  color: var(--text-tertiary, #888);
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.feedback-fab:hover {
+  border-color: var(--accent-primary, #3b82f6);
+  color: var(--accent-primary, #3b82f6);
+  background: var(--glass-bg-hover, rgba(59, 130, 246, 0.1));
+  transform: scale(1.08);
+}
+
+:root[data-theme="light"] .feedback-fab {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(37, 99, 235, 0.2);
+  color: #64748b;
+}
+
+:root[data-theme="light"] .feedback-fab:hover {
+  background: rgba(37, 99, 235, 0.08);
+  border-color: #2563eb;
+  color: #2563eb;
+}

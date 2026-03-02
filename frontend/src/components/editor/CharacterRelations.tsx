@@ -876,7 +876,8 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
           onClick={() => {
             if (tempEdgeIdRef.current && graphRef.current) {
               try {
-                graphRef.current.removeData(tempEdgeIdRef.current as any);
+                // @ts-expect-error G6 5.0 DataID type mismatch
+                graphRef.current.removeData(tempEdgeIdRef.current);
               } catch {
                 /* ignore */
               }

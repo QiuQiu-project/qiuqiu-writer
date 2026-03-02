@@ -222,32 +222,43 @@ export function useYjsEditor(options: UseYjsEditorOptions): UseYjsEditorReturn {
   }, [documentId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ===== 创建编辑器 =====
-  // 依赖 collabState 使编辑器在协作就绪时完整重建
-  const editor = useEditor({
-    extensions: [
+  // 使用 useMemo 构造扩展列表，确保稳定性
+  const extensions = useMemo(() => {
+    const baseExtensions = [
       StarterKit.configure({
         // 由 Collaboration 扩展提供撤销重做
-        undoRedo: false,
-        // StarterKit 默认包含 underline，如果不需要可以禁用
-        // underline: false, // 保持默认启用 underline
+        history: false,
       }),
       Placeholder.configure({
         placeholder,
       }),
-      // 仅在 collabState 就绪后添加协作扩展（同一 Y.Doc，不同 field 区分章节）
-      ...(collabState
-        ? [
-            Collaboration.configure({
-              document: collabState.ydoc,
-              field: collabState.field,
-            }),
-            CollaborationCursor.configure({
-              provider: collabState.wsProvider,
-              user: userInfo,
-            }),
-          ]
-        : []),
-    ],
+    ];
+
+    // 仅在 collabState 就绪后添加协作扩展
+    if (collabState) {
+      try {
+        return [
+          ...baseExtensions,
+          Collaboration.configure({
+            document: collabState.ydoc,
+            field: collabState.field,
+          }),
+          CollaborationCursor.configure({
+            provider: collabState.wsProvider,
+            user: userInfo,
+          }),
+        ];
+      } catch {
+          
+          return baseExtensions;
+        }
+    }
+
+    return baseExtensions;
+  }, [collabState, userInfo, placeholder]);
+
+  const editor = useEditor({
+    extensions,
     editable,
     editorProps: {
       attributes: {
@@ -263,7 +274,7 @@ export function useYjsEditor(options: UseYjsEditorOptions): UseYjsEditorReturn {
         onUpdate(html);
       }
     },
-  }, [collabState]); // 当 collabState 改变时重新创建编辑器
+  }, [extensions]); // 当 extensions 改变时重新创建编辑器
 
   // ===== 初始内容应用逻辑 =====
   // 确保在 Yjs 状态完全同步（本地 IndexedDB + 远程 WebSocket）后再决定是否注入初始内容

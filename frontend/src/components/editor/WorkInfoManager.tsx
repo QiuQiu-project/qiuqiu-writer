@@ -12,7 +12,6 @@ import { generateComponentData } from '../../utils/bookAnalysisApi';
 import { GeneratedDataPreviewModal } from './work-info/GeneratedDataPreviewModal';
 import MessageModal from '../common/MessageModal';
 import type { MessageType } from '../common/MessageModal';
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- used when GuideTip wrappers are uncommented
 // import GuideTip from '../common/GuideTip';
 import './WorkInfoManager.css';
 

@@ -2,8 +2,11 @@
 认证API路由
 """
 
+import logging
 from datetime import timedelta
 from typing import Any, Dict
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer
@@ -401,9 +404,6 @@ async def update_current_user_profile(
     """
     更新当前用户资料
     """
-    import logging
-    logger = logging.getLogger(__name__)
-    
     user_service = UserService()
     
     # 准备更新数据

@@ -67,7 +67,8 @@ try:
     templates_router_module = importlib.import_module('memos.api.routers.templates_router')
     works_router_module = importlib.import_module('memos.api.routers.works_router')
     prompt_template_router_module = importlib.import_module('memos.api.routers.prompt_template_router')
-    
+    feedback_router_module = importlib.import_module('memos.api.routers.feedback_router')
+
     # 获取路由对象
     auth_router = auth_router_module.router
     admin_router = admin_router_module.router
@@ -76,6 +77,7 @@ try:
     templates_router = templates_router_module.router
     works_router = works_router_module.router
     prompt_template_router = prompt_template_router_module.router
+    feedback_router = feedback_router_module.router
     
     logger.info(f"📋 Works router prefix: {works_router.prefix}")
     logger.info(f"📋 Works router routes count: {len(works_router.routes)}")
@@ -91,6 +93,7 @@ try:
     app.include_router(templates_router)
     app.include_router(works_router)
     app.include_router(prompt_template_router)
+    app.include_router(feedback_router)
     logger.info("✅ WriterAI application routers registered successfully")
 except Exception as e:
     logger.error(f"❌ WriterAI application routers not available: {e}", exc_info=True)

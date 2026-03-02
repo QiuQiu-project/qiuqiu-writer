@@ -130,7 +130,7 @@ services:
       - ../backend:/app
     working_dir: /app
     command: >
-      sh -c "pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r docker/requirements.txt && python init_admin_auto.py && uvicorn memos.api.ai_api:app --host 0.0.0.0 --port 8000 --reload"
+      sh -c "uvicorn memos.api.ai_api:app --host 0.0.0.0 --port 8000 --reload"
     depends_on:
       postgres:
         condition: service_healthy

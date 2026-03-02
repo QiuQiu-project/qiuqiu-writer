@@ -64,7 +64,7 @@ services:
       MONGODB_HOST: mongodb
     # 生产环境不再挂载源码，使用镜像内的代码
     command: >
-      sh -c "python init_admin_auto.py && uvicorn memos.api.ai_api:app --host 0.0.0.0 --port 8000"
+      sh -c "uvicorn memos.api.ai_api:app --host 0.0.0.0 --port 8000"
     depends_on:
       postgres:
         condition: service_healthy

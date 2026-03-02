@@ -14,6 +14,7 @@ import {
   DatabaseOutlined,
   ThunderboltOutlined,
   GiftOutlined,
+  MessageOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 
@@ -93,6 +94,11 @@ const MainLayout: React.FC = () => {
       key: '/audit-logs',
       icon: <SafetyCertificateOutlined />,
       label: 'Audit Logs',
+    },
+    {
+      key: '/feedback',
+      icon: <MessageOutlined />,
+      label: '问题反馈',
     },
     {
       key: '/settings',
