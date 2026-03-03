@@ -1,11 +1,8 @@
-# qiuqiuwriter 统一部署：多镜像编排
-# 所有中间件各用一个官方镜像，由 compose 统一启停
-# 使用方式：
-#   仅基础设施: docker compose up -d postgres redis mongodb
-#   含可选服务: docker compose up -d postgres redis mongodb qdrant neo4j
-#   含后端:     docker compose up -d
+# qiuqiuwriter 基础设施部署
+# 包含：PostgreSQL, Redis, MongoDB, Qdrant, Neo4j
+# 启动命令：docker compose -f docker-compose.infra.yml -p qiuqiuwriter up -d
 
-name: qiuqiuwriter
+name: qiuqiuwriter-infra
 
 services:
   # ---------- 基础设施（应用依赖） ----------
@@ -106,70 +103,6 @@ services:
     networks:
       - qiuqiuwriter_net
 
-  # ---------- 可选：后端应用（依赖上述服务） ----------
-  backend:
-    image: qiuqiuwriter-backend:latest
-    container_name: qiuqiuwriter-backend
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      PYTHONPATH: /app/src
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      MONGODB_HOST: mongodb
-      MONGODB_PORT: 27017
-      QDRANT_HOST: qdrant
-      QDRANT_PORT: 6333
-      NEO4J_URI: bolt://neo4j:7687
-    ports:
-      - "${BACKEND_PORT:-8000}:8000"
-    volumes:
-      - ../backend:/app
-    working_dir: /app
-    command: >
-      sh -c "uvicorn memos.api.ai_api:app --host 0.0.0.0 --port 8000 --reload"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      mongodb:
-        condition: service_healthy
-    networks:
-      - qiuqiuwriter_net
-
-  # ---------- 前端与管理后台（Nginx 托管） ----------
-  frontend:
-    image: nginx:alpine
-    container_name: qiuqiuwriter-frontend
-    restart: unless-stopped
-    ports:
-      - "81:81"
-    volumes:
-      - ../frontend/dist:/usr/share/nginx/html:ro
-      - ./nginx/frontend.conf:/etc/nginx/conf.d/default.conf:ro
-    depends_on:
-      - backend
-    networks:
-      - qiuqiuwriter_net
-
-  admin:
-    image: nginx:alpine
-    container_name: qiuqiuwriter-admin
-    restart: unless-stopped
-    ports:
-      - "8889:8889"
-    volumes:
-      - ../admin/dist:/usr/share/nginx/html:ro
-      - ./nginx/admin.conf:/etc/nginx/conf.d/default.conf:ro
-    depends_on:
-      - backend
-    networks:
-      - qiuqiuwriter_net
-
 volumes:
   postgres_data:
   redis_data:
@@ -180,4 +113,5 @@ volumes:
 
 networks:
   qiuqiuwriter_net:
+    name: qiuqiuwriter_qiuqiuwriter_net
     driver: bridge

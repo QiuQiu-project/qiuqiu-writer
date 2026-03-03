@@ -3,18 +3,40 @@
 
 # 参数解析
 USE_DOCKER=false
-while [[ "$#" -gt 0 ]]; do
-    case $1 in
-        --docker) USE_DOCKER=true ;;
-        *) echo "未知参数: $1"; exit 1 ;;
+START_INFRA=false
+START_APP=false
+
+# 检查参数
+for arg in "$@"; do
+    case $arg in
+        --docker)
+            USE_DOCKER=true
+            ;;
+        --infra)
+            START_INFRA=true
+            ;;
+        --app)
+            START_APP=true
+            ;;
+        *)
+            echo "未知参数: $arg"
+            exit 1
+            ;;
     esac
-    shift
 done
+
+# 如果指定了 --docker 但没有指定 infra 或 app，默认启动全部
+if [ "$USE_DOCKER" = true ] && [ "$START_INFRA" = false ] && [ "$START_APP" = false ]; then
+    START_INFRA=true
+    START_APP=true
+fi
 
 echo "=========================================="
 echo "启动 QiuQiuWriter 项目"
 if [ "$USE_DOCKER" = true ]; then
     echo "运行模式: Docker 容器化"
+    if [ "$START_INFRA" = true ]; then echo "  - 包含: 基础设施 (DBs)"; fi
+    if [ "$START_APP" = true ]; then echo "  - 包含: 应用服务 (App)"; fi
 else
     echo "运行模式: 本地开发"
 fi
@@ -35,41 +57,71 @@ else
     fi
 fi
 
+# ---------- Docker 模式 ----------
 if [ "$USE_DOCKER" = true ]; then
-    # ---------- Docker 模式 ----------
     echo "🐳 正在启动 Docker 容器..."
     cd "$(dirname "$0")/docker" || exit 1
     
-    # 基础设施：不重新创建
-    echo "  - 启动基础设施 (postgres, redis, mongodb...)"
-    docker-compose up -d --no-recreate postgres redis mongodb qdrant neo4j
+    # 基础设施
+    if [ "$START_INFRA" = true ]; then
+        echo "  - 启动基础设施 (postgres, redis, mongodb...)"
+        # 使用 -p qiuqiuwriter-infra 保持独立的项目名称
+        # --no-recreate: 如果容器已经存在，不要重新创建，防止数据丢失或不必要的重启
+        docker-compose -f docker-compose.infra.yml -p qiuqiuwriter-infra up -d --no-recreate --remove-orphans
+    fi
     
     # 应用容器
-    echo "  - 启动应用服务 (backend, frontend, admin)"
-    docker-compose up -d backend frontend admin
+    if [ "$START_APP" = true ]; then
+        echo "  - 启动应用服务 (backend, frontend, admin)"
+        # 使用 -p qiuqiuwriter-app 保持独立的项目名称
+        docker-compose -f docker-compose.app.yml -p qiuqiuwriter-app up -d --remove-orphans
+    fi
     
     echo ""
     echo "=========================================="
-    echo "✅ 所有服务已在 Docker 中启动！"
+    echo "✅ 指定的服务已在 Docker 中启动！"
     echo "=========================================="
     echo "前端: http://localhost:81"
     echo "管理后台: http://localhost:8889"
     echo "后端 API: http://localhost:8000"
     echo "API 文档: http://localhost:8000/docs"
     echo ""
-    echo "使用 'docker-compose logs -f' 查看实时日志"
+    echo "使用 'cd docker && docker-compose -f ... logs -f' 查看实时日志"
     echo "按 Ctrl+C 退出日志查看（容器将继续运行）"
     echo ""
     
-    docker-compose logs -f
+    # 显示日志 (优先显示 App 日志，如果只启动了 Infra 则显示 Infra 日志)
+    if [ "$START_APP" = true ]; then
+        docker-compose -f docker-compose.app.yml -p qiuqiuwriter-app logs -f
+    elif [ "$START_INFRA" = true ]; then
+        docker-compose -f docker-compose.infra.yml -p qiuqiuwriter-infra logs -f
+    fi
     exit 0
 fi
 
 # ---------- 本地模式 (默认) ----------
 
+# 启动依赖服务 (Infra)
+if command -v docker &> /dev/null && docker info > /dev/null 2>&1; then
+    echo "检查依赖服务..."
+    cd "$(dirname "$0")/docker" || exit 1
+    # 只启动基础设施
+    docker-compose -f docker-compose.infra.yml -p qiuqiuwriter-infra up -d 2>/dev/null
+    cd ..
+    echo "✓ 依赖服务已启动"
+fi
+
 # 启动后端
 echo "启动后端服务..."
-cd "$(dirname "$0")/memos" || exit 1
+# 尝试定位后端目录
+if [ -d "$(dirname "$0")/backend" ]; then
+    cd "$(dirname "$0")/backend" || exit 1
+elif [ -d "$(dirname "$0")/memos" ]; then
+    cd "$(dirname "$0")/memos" || exit 1
+else
+    echo "✗ 找不到 backend 或 memos 目录"
+    exit 1
+fi
 
 if [ ! -d ".venv" ]; then
     echo "✗ 虚拟环境不存在，请先运行: python -m venv .venv && source .venv/bin/activate && pip install -e ."
@@ -78,15 +130,8 @@ fi
 
 source .venv/bin/activate
 export ENABLE_PREFERENCE_MEMORY=false
-
-# 启动依赖服务
-if command -v docker &> /dev/null && docker info > /dev/null 2>&1; then
-    echo "检查依赖服务..."
-    cd ../docker || exit 1
-    docker-compose up -d --no-recreate postgres redis mongodb qdrant neo4j 2>/dev/null
-    cd ..
-    echo "✓ 依赖服务已启动"
-fi
+# 添加 src 到 PYTHONPATH (适配 backend/src/memos 结构)
+export PYTHONPATH=$PYTHONPATH:$(pwd)/src
 
 echo "启动 MemOS API 服务器..."
 echo "后端将在 http://localhost:8001 运行"
@@ -104,7 +149,9 @@ sleep 3
 
 # 启动前端
 echo "启动前端服务..."
-cd "$(dirname "$0")/frontend" || exit 1
+# 回到项目根目录再进入 frontend
+cd ..
+cd frontend || exit 1
 
 if [ ! -d "node_modules" ]; then
     echo "安装前端依赖..."
