@@ -217,7 +217,7 @@ export default function NovelEditorPage() {
     restoreChapter,
   } = useChapterOperations({
     workId,
-    onSuccess: (msg: string) => showMessage(msg, 'success'),
+    onSuccess: (msg: string) => showMessage(msg, 'success', undefined, undefined, { toast: true, autoCloseMs: 2000 }),
     onError: (msg: string) => showMessage(msg, 'error'),
     onUpdateTrigger: () => setUpdateTrigger(prev => prev + 1),
     onSuccessEdit: (data) => {
@@ -819,11 +819,11 @@ export default function NovelEditorPage() {
         if (!workId) return;
         try {
           await worksApi.deleteWork(workId);
-          showMessage('作品已删除', 'success');
+          showMessage('作品已删除', 'success', undefined, undefined, { toast: true, autoCloseMs: 2000 });
           const uid = authApi.getUserInfo()?.id;
           navigate(uid ? `/users/${uid}` : '/');
-        } catch {
-          
+        } catch (err) {
+
           showMessage('删除作品失败', 'error');
         }
       }

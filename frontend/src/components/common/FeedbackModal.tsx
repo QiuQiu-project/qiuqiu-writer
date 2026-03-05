@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, Bug, Lightbulb, MessageSquare } from 'lucide-react';
 import { feedbackApi, type FeedbackCreate } from '../../utils/feedbackApi';
+import { parseError } from '../../utils/errorUtils';
 import './FeedbackModal.css';
 
 interface FeedbackModalProps {
@@ -47,8 +48,7 @@ export default function FeedbackModal({ isOpen, onClose, onShowMessage, context 
       setType('bug');
       onClose();
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : '提交失败，请稍后再试';
-      onShowMessage?.(msg, 'error');
+      onShowMessage?.(parseError(e, '提交失败，请稍后再试'), 'error');
     } finally {
       setSubmitting(false);
     }

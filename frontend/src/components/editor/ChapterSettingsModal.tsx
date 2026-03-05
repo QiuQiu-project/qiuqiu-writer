@@ -5,6 +5,7 @@ import { formatOutlineForEditor, formatDetailedOutlineForEditor } from '../../ut
 import LoadingSpinner from '../common/LoadingSpinner';
 import MessageModal from '../common/MessageModal';
 import type { MessageType } from '../common/MessageModal';
+import { parseError } from '../../utils/errorUtils';
 import './ChapterSettingsModal.css';
 
 interface Character {
@@ -240,6 +241,8 @@ export default function ChapterSettingsModal({
     message: string;
     title?: string;
     onConfirm?: () => void;
+    toast?: boolean;
+    autoCloseMs?: number;
   }>({
     isOpen: false,
     type: 'info',
@@ -247,13 +250,11 @@ export default function ChapterSettingsModal({
   });
 
   const showMessage = (message: string, type: MessageType = 'info', title?: string, onConfirm?: () => void) => {
-    setMessageState({
-      isOpen: true,
-      type,
-      message,
-      title,
-      onConfirm,
-    });
+    setMessageState({ isOpen: true, type, message, title, onConfirm });
+  };
+
+  const showToast = (message: string, type: MessageType = 'success') => {
+    setMessageState({ isOpen: true, type, message, toast: true, autoCloseMs: 2000 });
   };
 
   const closeMessage = () => {
@@ -885,10 +886,11 @@ export default function ChapterSettingsModal({
                           },
                         );
 
-                        showMessage('章节内容生成完成！已流式填充到编辑器中。', 'success', '生成完成', onClose);
+                        showToast('章节内容生成完成！已流式填充到编辑器中。');
+                        onClose();
                       } catch (error) {
-                        
-                        showMessage(error instanceof Error ? error.message : '生成内容失败', 'error');
+
+                        showMessage(parseError(error), 'error', '生成失败');
                       } finally {
                         setIsGeneratingContent(false);
                       }
@@ -975,6 +977,8 @@ export default function ChapterSettingsModal({
           title={messageState.title}
           message={messageState.message}
           type={messageState.type}
+          toast={messageState.toast}
+          autoCloseMs={messageState.autoCloseMs}
           onConfirm={() => {
             closeMessage();
             if (messageState.onConfirm) messageState.onConfirm();

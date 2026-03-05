@@ -4,6 +4,7 @@ import './App.css';
 import MainLayout from './components/layout/MainLayout';
 import LoadingSpinner from './components/common/LoadingSpinner';
 import RequireAuth from './components/auth/RequireAuth';
+import LoginModal from './components/auth/LoginModal';
 import { authApi } from './utils/authApi';
 
 // 路由懒加载 - 提升首屏加载性能
@@ -68,9 +69,28 @@ function AppContent() {
 }
 
 function App() {
+  const [sessionExpiredOpen, setSessionExpiredOpen] = useState(false);
+
+  useEffect(() => {
+    const handler = () => {
+      // 只在已登录状态下弹出（避免未登录的接口请求也触发）
+      if (authApi.isAuthenticated()) {
+        authApi.clearToken();
+        setSessionExpiredOpen(true);
+      }
+    };
+    window.addEventListener('auth:session-expired', handler);
+    return () => window.removeEventListener('auth:session-expired', handler);
+  }, []);
+
   return (
     <Router>
       <AppContent />
+      <LoginModal
+        isOpen={sessionExpiredOpen}
+        onClose={() => setSessionExpiredOpen(false)}
+        onLoginSuccess={() => setSessionExpiredOpen(false)}
+      />
     </Router>
   );
 }

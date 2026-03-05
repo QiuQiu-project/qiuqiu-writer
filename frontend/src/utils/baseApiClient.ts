@@ -4,6 +4,7 @@
  */
 
 import { API_BASE_URL } from './apiConfig';
+import { ApiError } from './errorUtils';
 
 export class BaseApiClient {
   protected baseUrl: string;
@@ -51,9 +52,18 @@ export class BaseApiClient {
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-                throw new Error(
-          errorData.detail || errorData.message || `API request failed: ${response.statusText}`
-        );
+        const message = errorData.detail || errorData.message || `API request failed: ${response.statusText}`;
+        const error = new ApiError(message, response.status);
+
+        // 认证失效：广播事件，让全局登录框响应
+        if (
+          response.status === 401 ||
+          (response.status === 403 && message.includes('Not authenticated'))
+        ) {
+          window.dispatchEvent(new CustomEvent('auth:session-expired'));
+        }
+
+        throw error;
       }
 
       const data = await response.json();

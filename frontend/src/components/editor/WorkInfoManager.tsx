@@ -12,6 +12,7 @@ import { generateComponentData } from '../../utils/bookAnalysisApi';
 import { GeneratedDataPreviewModal } from './work-info/GeneratedDataPreviewModal';
 import MessageModal from '../common/MessageModal';
 import type { MessageType } from '../common/MessageModal';
+import { parseError } from '../../utils/errorUtils';
 // import GuideTip from '../common/GuideTip';
 import './WorkInfoManager.css';
 
@@ -163,11 +164,25 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
     message: string;
     title?: string;
     onConfirm?: () => void;
+    toast?: boolean;
+    autoCloseMs?: number;
   }>({
     isOpen: false,
     type: 'info',
     message: '',
   });
+
+  const showMessage = (message: string, type: MessageType = 'info', title?: string, onConfirm?: () => void) => {
+    setMessageState({ isOpen: true, type, message, title, onConfirm });
+  };
+
+  const showToast = (message: string, type: MessageType = 'success') => {
+    setMessageState({ isOpen: true, type, message, toast: true, autoCloseMs: 2000 });
+  };
+
+  const closeMessage = () => {
+    setMessageState(prev => ({ ...prev, isOpen: false }));
+  };
 
   // State for guide tips global toggle
   const [tipsEnabled, setTipsEnabled] = useState(true);
@@ -207,20 +222,6 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
       window.removeEventListener('storage', checkOnboarding);
     };
   }, [workId]);
-
-  const showMessage = (message: string, type: MessageType = 'info', title?: string, onConfirm?: () => void) => {
-    setMessageState({
-      isOpen: true,
-      type,
-      message,
-      title,
-      onConfirm,
-    });
-  };
-
-  const closeMessage = () => {
-    setMessageState(prev => ({ ...prev, isOpen: false }));
-  };
 
   // 生成数据预览状态
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
@@ -480,7 +481,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
        }
     } catch (error) {
       
-      showMessage('生成失败: ' + (error instanceof Error ? error.message : String(error)), 'error');
+      showMessage(parseError(error), 'error', '生成失败');
     } finally {
       setGeneratingComponents(prev => ({ ...prev, [comp.id]: false }));
     }
@@ -970,7 +971,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
         });
         // Reset index to 0
         setActiveModuleIndex(0);
-        showMessage('模块已删除', 'success');
+        showToast('模块已删除');
       }
     );
   };
@@ -990,7 +991,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
             description: tpl.description || ''
           });
           setShowTemplateMarket(false);
-          showMessage('模板应用成功', 'success');
+          showToast('模板应用成功');
        } else {
          showMessage('该模板格式不正确，缺少模块配置', 'error');
        }
@@ -1264,6 +1265,8 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
         title={messageState.title}
         message={messageState.message}
         type={messageState.type}
+        toast={messageState.toast}
+        autoCloseMs={messageState.autoCloseMs}
         onConfirm={() => {
           closeMessage();
           if (messageState.onConfirm) messageState.onConfirm();

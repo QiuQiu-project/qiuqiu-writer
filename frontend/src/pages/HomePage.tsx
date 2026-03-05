@@ -16,6 +16,7 @@ import { authApi } from '../utils/authApi';
 import { worksApi } from '../utils/worksApi';
 import MessageModal from '../components/common/MessageModal';
 import type { MessageType } from '../components/common/MessageModal';
+import { parseError } from '../utils/errorUtils';
 import './HomePage.css';
 
 export default function HomePage() {
@@ -29,6 +30,8 @@ export default function HomePage() {
     message: string;
     title?: string;
     onConfirm?: () => void;
+    toast?: boolean;
+    autoCloseMs?: number;
   }>({
     isOpen: false,
     type: 'info',
@@ -105,7 +108,7 @@ export default function HomePage() {
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : '操作失败';
-      showMessage(`操作失败: ${errorMessage}`, 'error');
+      showMessage(parseError(err), 'error', '操作失败');
     } finally {
       setCreating(false);
     }
@@ -246,6 +249,8 @@ export default function HomePage() {
         title={messageState.title}
         message={messageState.message}
         type={messageState.type}
+        toast={messageState.toast}
+        autoCloseMs={messageState.autoCloseMs}
         onConfirm={() => {
           closeMessage();
           if (messageState.onConfirm) messageState.onConfirm();

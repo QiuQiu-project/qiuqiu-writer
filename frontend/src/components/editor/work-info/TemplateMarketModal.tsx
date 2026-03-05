@@ -6,6 +6,7 @@ import { authApi } from '../../../utils/authApi';
 import type { UserInfo } from '../../../utils/authApi';
 import MessageModal from '../../common/MessageModal';
 import type { MessageType } from '../../common/MessageModal';
+import { parseError } from '../../../utils/errorUtils';
 
 import './TemplateMarketModal.css';
 
@@ -74,9 +75,9 @@ export default function TemplateMarketModal({
   }, [openMenuId]);
 
   useEffect(() => {
-    const loadUserInfo = async () => {
+    const loadUserInfo = () => {
       try {
-        const info = await authApi.getUserInfo();
+        const info = authApi.getUserInfo();
         setUserInfo(info);
       } catch {
         // ignore
@@ -126,13 +127,13 @@ export default function TemplateMarketModal({
           description: saveForm.description,
           is_public: saveForm.is_public
         });
-        showMessage('模板更新成功！', 'success');
+        showToast('模板更新成功！');
         setShowSaveForm(false);
         setEditingTemplate(null);
         setSaveForm({ name: '', description: '', is_public: false });
         fetchTemplates();
-      } catch {
-        showMessage('更新失败，请重试', 'error');
+      } catch (e) {
+        showMessage(parseError(e), 'error', '更新失败');
       }
       return;
     }
@@ -150,7 +151,7 @@ export default function TemplateMarketModal({
         source_template_id: sourceTemplateId
       });
 
-      showMessage('模板保存成功！', 'success');
+      showToast('模板保存成功！');
       setShowSaveForm(false);
       setSaveForm({ name: '', description: '', is_public: false });
       setTargetTemplateConfig(undefined);
@@ -158,8 +159,8 @@ export default function TemplateMarketModal({
       if (activeTab === 'mine') {
         fetchTemplates();
       }
-    } catch {
-      showMessage('保存失败，请重试', 'error');
+    } catch (e) {
+      showMessage(parseError(e), 'error', '保存失败');
     }
   };
 
@@ -188,8 +189,8 @@ export default function TemplateMarketModal({
         await templatesApi.deleteTemplate(templateId);
         showToast('模板删除成功');
         fetchTemplates();
-      } catch {
-        showMessage('删除失败，请重试', 'error');
+      } catch (e) {
+        showMessage(parseError(e), 'error', '删除失败');
       }
     });
   };

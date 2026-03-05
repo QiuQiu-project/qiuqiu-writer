@@ -8,6 +8,7 @@ import ImportWorkModal from '../components/ImportWorkModal';
 import WorkRecoveryModal from '../components/WorkRecoveryModal';
 import MessageModal from '../components/common/MessageModal';
 import type { MessageType } from '../components/common/MessageModal';
+import { parseError } from '../utils/errorUtils';
 import './WorksPage.css';
 
 type ViewMode = 'grid' | 'list';
@@ -36,6 +37,8 @@ export default function WorksPage() {
     message: string;
     title?: string;
     onConfirm?: () => void;
+    toast?: boolean;
+    autoCloseMs?: number;
   }>({
     isOpen: false,
     type: 'info',
@@ -43,13 +46,11 @@ export default function WorksPage() {
   });
 
   const showMessage = (message: string, type: MessageType = 'info', title?: string, onConfirm?: () => void) => {
-    setMessageState({
-      isOpen: true,
-      type,
-      message,
-      title,
-      onConfirm,
-    });
+    setMessageState({ isOpen: true, type, message, title, onConfirm });
+  };
+
+  const showToast = (message: string, type: MessageType = 'success') => {
+    setMessageState({ isOpen: true, type, message, toast: true, autoCloseMs: 2000 });
   };
 
   const closeMessage = () => {
@@ -124,7 +125,7 @@ export default function WorksPage() {
           await worksApi.deleteWork(workId);
           
           // 显示成功提示
-          showMessage(`作品《${workTitle}》已成功删除`, 'success');
+          showToast(`作品《${workTitle}》已成功删除`);
           
           // 如果当前页只有这一个作品，且不是第一页，则返回上一页
           if (works.length === 1 && currentPage > 1) {
@@ -137,7 +138,7 @@ export default function WorksPage() {
           
                     const errorMessage = err instanceof Error ? err.message : '删除作品失败，请稍后重试';
           setError(errorMessage);
-          showMessage(`删除失败：${errorMessage}`, 'error');
+          showMessage(parseError(err, `删除作品失败：${errorMessage}`), 'error', '删除失败');
         } finally {
           setLoading(false);
         }
@@ -187,7 +188,7 @@ export default function WorksPage() {
           } catch (err) {
             
             const errorMessage = err instanceof Error ? err.message : '导出失败，请稍后重试';
-                        showMessage(`❌ 导出失败\n\n错误：${errorMessage}\n\n请查看浏览器控制台（F12）获取更多信息。`, 'error');
+            showMessage(parseError(err, `导出失败：${errorMessage}`), 'error', '导出失败');
             throw err; // 重新抛出错误，让调用者知道失败了
           } finally {
             setLoading(false);
@@ -200,7 +201,7 @@ export default function WorksPage() {
             
             const success = await copyToClipboard(workLink);
             if (success) {
-              showMessage('链接已复制到剪贴板', 'success');
+              showToast('链接已复制到剪贴板');
             } else {
               // 如果复制失败，显示链接让用户手动复制
               showMessage(
@@ -251,7 +252,7 @@ export default function WorksPage() {
     } catch (err) {
       
       const errorMessage = err instanceof Error ? err.message : '创建作品失败';
-      showMessage(`创建作品失败: ${errorMessage}`, 'error');
+      showMessage(parseError(err), 'error', '创建失败');
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -262,7 +263,7 @@ export default function WorksPage() {
   const handleImportSuccess = (_workId: string, _workTitle: string) => {
     // 重新加载作品列表
     loadWorks();
-    showMessage(`导入成功：${_workTitle}`, 'success');
+    showToast(`导入成功：${_workTitle}`);
     // 可选：跳转到作品页面
     navigate(`/novel/editor?workId=${_workId}`);
   };
@@ -552,6 +553,8 @@ export default function WorksPage() {
         title={messageState.title}
         message={messageState.message}
         type={messageState.type}
+        toast={messageState.toast}
+        autoCloseMs={messageState.autoCloseMs}
         onConfirm={() => {
           closeMessage();
           if (messageState.onConfirm) messageState.onConfirm();
