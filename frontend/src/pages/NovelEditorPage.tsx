@@ -553,7 +553,10 @@ export default function NovelEditorPage() {
   // ===== 选中文本浮动菜单（AI 对话 / 在编辑器中优化句子） =====
   useEffect(() => {
     if (!editor) return;
-    const onSelectionUpdate = () => {
+
+    let isMouseDown = false;
+
+    const showPopupForSelection = () => {
       const { from, to } = editor.state.selection;
       const doc = editor.state.doc;
       if (from === to) {
@@ -582,8 +585,30 @@ export default function NovelEditorPage() {
         endChar,
       });
     };
+
+    const onMouseDown = () => {
+      isMouseDown = true;
+      setSelectionPopup((prev) => (prev.visible ? { ...prev, visible: false } : prev));
+    };
+
+    const onMouseUp = () => {
+      isMouseDown = false;
+      // 等 TipTap 处理完选区后再显示
+      setTimeout(showPopupForSelection, 30);
+    };
+
+    const onSelectionUpdate = () => {
+      // 鼠标拖选中不显示，松开后 mouseup 触发；键盘选择时直接显示
+      if (isMouseDown) return;
+      showPopupForSelection();
+    };
+
+    editor.view.dom.addEventListener('mousedown', onMouseDown);
+    editor.view.dom.addEventListener('mouseup', onMouseUp);
     editor.on('selectionUpdate', onSelectionUpdate);
     return () => {
+      editor.view.dom.removeEventListener('mousedown', onMouseDown);
+      editor.view.dom.removeEventListener('mouseup', onMouseUp);
       editor.off('selectionUpdate', onSelectionUpdate);
     };
   }, [editor]);

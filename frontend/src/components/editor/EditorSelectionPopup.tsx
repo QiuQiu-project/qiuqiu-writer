@@ -57,7 +57,7 @@ export default function EditorSelectionPopup({
       className="editor-selection-popup"
       style={{
         position: 'fixed',
-        top: Math.max(8, top - 48),
+        top: top + 6,
         left: Math.max(8, Math.min(left, window.innerWidth - 220)),
         zIndex: 10000,
       }}

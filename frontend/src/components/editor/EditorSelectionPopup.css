@@ -2,19 +2,20 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 6px;
-  padding: 6px 8px;
+  gap: 2px;
+  padding: 4px 5px;
   background: var(--bg-primary, #fff);
   border: 1px solid var(--border-light, #e5e7eb);
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  animation: editorSelectionPopupIn 0.15s ease-out;
+  animation: editorSelectionPopupIn 0.12s ease-out;
+  min-width: 130px;
 }
 
 .editor-selection-popup-range {
-  font-size: 12px;
-  color: var(--text-secondary, #6b7280);
-  padding: 2px 4px;
+  font-size: 11px;
+  color: var(--text-secondary, #9ca3af);
+  padding: 2px 6px;
   border-bottom: 1px solid var(--border-light, #e5e7eb);
   margin-bottom: 2px;
 }
@@ -22,7 +23,7 @@
 @keyframes editorSelectionPopupIn {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    transform: translateY(-3px);
   }
   to {
     opacity: 1;
@@ -34,14 +35,15 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 10px;
+  padding: 5px 8px;
   font-size: 13px;
   color: var(--text-primary, #1f2937);
   background: transparent;
   border: none;
-  border-radius: 6px;
+  border-radius: 5px;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.12s;
+  white-space: nowrap;
 }
 
 .editor-selection-popup-btn:hover:not(:disabled) {
@@ -49,10 +51,6 @@
 }
 
 .editor-selection-popup-btn:disabled {
-  opacity: 0.7;
+  opacity: 0.6;
   cursor: not-allowed;
-}
-
-.editor-selection-popup-btn span {
-  white-space: nowrap;
 }
