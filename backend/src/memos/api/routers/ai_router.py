@@ -24,6 +24,7 @@ from memos.api.ai_models import (
     CreateWorkFromFileRequest,
     GenerateChapterContentRequest,
     GenerateComponentDataRequest,
+    GenerateChapterOutlineRequest,
     DefaultPromptData,
     DefaultPromptResponse,
     ErrorResponse,
@@ -1906,4 +1907,131 @@ async def generate_component_data(
         raise
     except Exception as e:
         logger.error(f"Failed to generate component data: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")
+
+
+@router.post(
+    "/generate-chapter-outline",
+    summary="生成章节大纲或细纲",
+    description="根据作品背景和章节信息，使用AI生成章节大纲（outline）或细纲（detailed_outline）",
+)
+async def generate_chapter_outline(
+    request: GenerateChapterOutlineRequest,
+    db: AsyncSession = Depends(get_db_session),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    try:
+        # 验证作品是否存在并检查权限
+        work_service = WorkService(db)
+        work = await work_service.get_work_by_id(request.work_id)
+        if not work:
+            raise HTTPException(status_code=404, detail=f"作品 {request.work_id} 不存在")
+
+        if not await work_service.can_access_work(current_user_id, request.work_id):
+            raise HTTPException(status_code=403, detail="无权访问该作品")
+
+        # 获取AI服务
+        ai_service = get_ai_service()
+        if not ai_service.is_healthy():
+            raise HTTPException(status_code=503, detail="AI服务不可用")
+
+        # 初始化Prompt上下文服务
+        from memos.api.services.prompt_context_service import PromptContextService
+        prompt_service = PromptContextService(db)
+        await prompt_service.initialize()
+
+        # 根据大纲类型确定 template_type
+        template_type = "outline_generation" if request.outline_type == "outline" else "detailed_outline_generation"
+
+        # 从全局 prompt 模板中查找默认模板（work_template_id IS NULL）
+        stmt = select(PromptTemplate).where(
+            and_(
+                PromptTemplate.template_type == template_type,
+                PromptTemplate.work_template_id == None,
+                PromptTemplate.is_active == True,
+                PromptTemplate.is_default == True,
+            )
+        )
+        result = await db.execute(stmt)
+        template = result.scalar_one_or_none()
+
+        # 如果没有默认模板，取任意启用的全局模板
+        if template is None:
+            stmt = select(PromptTemplate).where(
+                and_(
+                    PromptTemplate.template_type == template_type,
+                    PromptTemplate.work_template_id == None,
+                    PromptTemplate.is_active == True,
+                )
+            ).limit(1)
+            result = await db.execute(stmt)
+            template = result.scalar_one_or_none()
+
+        if template is None:
+            raise HTTPException(
+                status_code=400,
+                detail=f"未找到 {template_type} 类型的全局 Prompt 模板，请在管理后台创建并设为默认"
+            )
+
+        # 构建 additional_vars：注入章节标题、人物、地点和当前大纲（用于细纲生成）
+        additional_vars: dict = {
+            "chapter_title": request.chapter_title,
+            "章节标题": request.chapter_title,
+        }
+        if request.characters:
+            chars_str = "\n".join(f"- {c}" for c in request.characters)
+            additional_vars["chapter_characters"] = chars_str
+            additional_vars["章节角色"] = chars_str
+        if request.locations:
+            locs_str = "\n".join(f"- {l}" for l in request.locations)
+            additional_vars["locations"] = locs_str
+            additional_vars["地点"] = locs_str
+        if request.current_outline:
+            additional_vars["current_outline"] = request.current_outline
+            additional_vars["outline"] = request.current_outline
+            additional_vars["大纲"] = request.current_outline
+            additional_vars["current_chapter_outline"] = request.current_outline
+            additional_vars["当前章节大纲"] = request.current_outline
+
+        # 格式化 prompt（带作品上下文、前文摘要等）
+        formatted_prompt = await prompt_service.format_prompt(
+            template=template,
+            work_id=request.work_id,
+            chapter_id=request.chapter_id,
+            auto_build_context=True,
+            additional_vars=additional_vars,
+        )
+
+        if not formatted_prompt:
+            raise HTTPException(status_code=400, detail="无法获取有效的prompt")
+
+        logger.info(f"开始生成章节{'大纲' if request.outline_type == 'outline' else '细纲'}: work_id={request.work_id}, chapter_title={request.chapter_title}")
+
+        # 调用AI生成（纯文本输出，不强制JSON）
+        analysis_settings = request.settings or AnalysisSettings()
+        model = analysis_settings.model or ai_service.default_model
+        temperature = analysis_settings.temperature if analysis_settings.temperature != 0.7 else 0.85
+        max_tokens = analysis_settings.max_tokens
+
+        ai_response = await ai_service.get_ai_response(
+            content="",
+            prompt=formatted_prompt,
+            system_prompt=None,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            use_json_format=False,
+        )
+
+        logger.info(f"✅ {'大纲' if request.outline_type == 'outline' else '细纲'}生成完成，响应长度={len(ai_response)}")
+
+        return {
+            "outline_type": request.outline_type,
+            "generated_text": ai_response,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to generate chapter outline: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")

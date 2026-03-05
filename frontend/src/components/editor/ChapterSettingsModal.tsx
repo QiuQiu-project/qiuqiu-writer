@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Sparkles, Plus, MapPin, Users, FileText, BookOpen, ChevronDown, ChevronRight, Check } from 'lucide-react';
 import { chaptersApi } from '../../utils/chaptersApi';
+import { generateChapterOutline } from '../../utils/bookAnalysisApi';
 import { formatOutlineForEditor, formatDetailedOutlineForEditor } from '../../utils/outlineFormat';
 import LoadingSpinner from '../common/LoadingSpinner';
 import MessageModal from '../common/MessageModal';
@@ -99,6 +100,10 @@ interface ChapterSettingsModalProps {
   defaultCharacterDataKey?: string;
   availableLocations?: Location[];
   availableVolumes?: Volume[];
+  /** 作品 ID（用于 AI 大纲生成） */
+  workId?: string | null;
+  /** 章节 ID（编辑时传入，用于 AI 大纲生成） */
+  chapterId?: number;
   onClose: () => void;
   onSave: (data: ChapterData) => void;
   onGenerateContent?: (content: string, isFinal?: boolean) => void;
@@ -216,6 +221,8 @@ export default function ChapterSettingsModal({
   defaultCharacterDataKey = 'component_data.characters',
   availableLocations = [],
   availableVolumes = [],
+  workId,
+  chapterId,
   onClose,
   onSave,
 }: ChapterSettingsModalProps) {
@@ -525,47 +532,46 @@ export default function ChapterSettingsModal({
   };
 
   const handleGenerateOutline = async () => {
+    if (!workId) {
+      showMessage('无法获取作品ID，请重新打开章节设置', 'warning');
+      return;
+    }
     setIsGeneratingOutline(true);
-    // 模拟 AI 生成
-    setTimeout(() => {
-      const generated = `【AI生成大纲】
-本章主要情节：
-1. 主角面临新的挑战
-2. 与关键人物的对话与冲突
-3. 发现重要线索，推动故事发展
-
-核心冲突：内心矛盾与外部压力的交织
-情感基调：紧张中带有希望`;
+    try {
+      const generated = await generateChapterOutline(workId, title || '新章节', 'outline', {
+        chapterId,
+        characters: selectedCharacters,
+        locations,
+      });
       setOutline(generated);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '生成失败';
+      showMessage(`大纲生成失败：${msg}`, 'error');
+    } finally {
       setIsGeneratingOutline(false);
-    }, 1500);
+    }
   };
 
   const handleGenerateDetailOutline = async () => {
+    if (!workId) {
+      showMessage('无法获取作品ID，请重新打开章节设置', 'warning');
+      return;
+    }
     setIsGeneratingDetail(true);
-    // 模拟 AI 生成
-    setTimeout(() => {
-      const generated = `【AI生成细纲】
-场景一（开场）：
-- 时间：清晨
-- 地点：主角住所
-- 情节：主角醒来，回忆昨日事件
-- 对话要点：内心独白，展现困惑
-
-场景二（发展）：
-- 地点：城市街道
-- 情节：偶遇关键人物
-- 对话要点：信息交换，伏笔铺设
-- 情绪：好奇转为警惕
-
-场景三（高潮）：
-- 地点：神秘场所
-- 情节：发现重要线索
-- 转折点：认知颠覆
-- 悬念设置：为下一章埋下伏笔`;
+    try {
+      const generated = await generateChapterOutline(workId, title || '新章节', 'detailed_outline', {
+        chapterId,
+        currentOutline: outline || undefined,
+        characters: selectedCharacters,
+        locations,
+      });
       setDetailOutline(generated);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '生成失败';
+      showMessage(`细纲生成失败：${msg}`, 'error');
+    } finally {
       setIsGeneratingDetail(false);
-    }, 1500);
+    }
   };
 
   const handleSave = () => {

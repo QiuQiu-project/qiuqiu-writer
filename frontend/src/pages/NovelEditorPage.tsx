@@ -1383,6 +1383,8 @@ export default function NovelEditorPage() {
         defaultCharacterDataKey="component_data.characters"
         availableLocations={[]}
         availableVolumes={volumes.map((vol: { id: string; title: string }) => ({ id: vol.id, title: vol.title }))}
+        workId={workId}
+        chapterId={currentChapterData?.id ? Number(currentChapterData.id) : undefined}
         onClose={closeChapterModal}
         onSave={handleSaveChapter}
         onGenerateContent={handleGenerateContent}

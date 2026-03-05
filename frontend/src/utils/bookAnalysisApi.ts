@@ -1058,6 +1058,45 @@ export async function generateComponentData(
     return result;
 }
 
+/**
+ * 生成章节大纲或细纲
+ */
+export async function generateChapterOutline(
+  workId: string,
+  chapterTitle: string,
+  outlineType: 'outline' | 'detailed_outline',
+  options?: {
+    chapterId?: number;
+    currentOutline?: string;
+    characters?: string[];
+    locations?: string[];
+    settings?: AnalysisSettings;
+  }
+): Promise<string> {
+  const body: Record<string, unknown> = {
+    work_id: workId,
+    chapter_title: chapterTitle,
+    outline_type: outlineType,
+  };
+  if (options?.chapterId) body.chapter_id = options.chapterId;
+  if (options?.currentOutline) body.current_outline = options.currentOutline;
+  if (options?.characters?.length) body.characters = options.characters;
+  if (options?.locations?.length) body.locations = options.locations;
+  if (options?.settings) {
+    body.settings = {
+      model: options.settings.model,
+      temperature: options.settings.temperature,
+      max_tokens: options.settings.maxTokens,
+    };
+  }
+
+  const result = await bookAnalysisClient.post<{ outline_type: string; generated_text: string }>(
+    '/ai/generate-chapter-outline',
+    body
+  );
+  return result.generated_text;
+}
+
 export async function generateChapterContent(
   outline: string,
   detailedOutline: string,

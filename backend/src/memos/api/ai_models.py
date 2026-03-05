@@ -279,6 +279,49 @@ class GenerateComponentDataRequest(BaseModel):
     )
 
 
+class GenerateChapterOutlineRequest(BaseModel):
+    """生成章节大纲或细纲请求模型"""
+
+    work_id: str = Field(
+        ...,
+        description="作品ID",
+        json_schema_extra={"example": "abc123"},
+    )
+    chapter_id: Optional[int] = Field(
+        None,
+        description="章节ID（可选，章节已存在时传入以获取前文上下文）",
+        json_schema_extra={"example": 1},
+    )
+    chapter_title: str = Field(
+        ...,
+        description="章节标题",
+        json_schema_extra={"example": "第一章 初遇"},
+    )
+    outline_type: Literal["outline", "detailed_outline"] = Field(
+        ...,
+        description="大纲类型：outline=大纲，detailed_outline=细纲",
+        json_schema_extra={"example": "outline"},
+    )
+    current_outline: Optional[str] = Field(
+        None,
+        description="当前大纲内容（生成细纲时用于提供上下文）",
+    )
+    characters: List[str] = Field(
+        default_factory=list,
+        description="本章出场人物名称列表",
+        json_schema_extra={"example": ["张三", "李四"]},
+    )
+    locations: List[str] = Field(
+        default_factory=list,
+        description="本章地点列表",
+        json_schema_extra={"example": ["图书馆", "学校"]},
+    )
+    settings: AnalysisSettings | None = Field(
+        default_factory=AnalysisSettings,
+        description="AI生成设置",
+    )
+
+
 class ErrorResponse(BaseResponse[None]):
     """错误响应模型"""
 
