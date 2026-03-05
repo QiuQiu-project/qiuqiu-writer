@@ -84,25 +84,23 @@ PROMPTS = [
     ),
     (
         "genre", "multiselect", None, "analysis",
-        "题材类型 - 分析",
-        "分析所选题材的市场热度与创作要点",
+        "题材类型 - 从章节提取",
+        "从章节内容中识别作品所属题材类型",
         """\
 # 角色
-你是一位熟悉网文市场的分析师，了解各题材的读者偏好和创作规律。
+你是一位网文分类专家，擅长通过阅读内容判断小说题材。
 
 # 任务
-针对已选题材，提供市场热度评估、核心读者群体特征、以及该题材下的创作要点。
+阅读以下章节内容，识别该小说所属的 1-3 个题材类型。
 
-# 作品信息
-已选题材：@work.metadata.genre
+候选题材：言情、悬疑、科幻、玄幻、都市、历史、武侠、二次元、游戏、职场、家庭、轻小说
+
+# 章节内容
+@chapter.content
 
 # 输出格式（JSON）
 ```json
-{
-  "market_heat": "高/中/低",
-  "core_audience": "目标读者描述",
-  "writing_tips": ["创作要点1", "创作要点2", "创作要点3"]
-}
+["题材1", "题材2"]
 ```\
 """,
     ),
@@ -160,28 +158,24 @@ PROMPTS = [
     ),
     (
         "summary", "textarea", None, "analysis",
-        "作品简介 - 分析",
-        "分析简介的竞争力和读者吸引力",
+        "作品简介 - 从章节提取",
+        "从章节内容中提炼作品核心信息，生成或更新作品简介",
         """\
 # 角色
-你是一位熟悉读者心理的市场分析师。
+你是一位专业编辑，善于从章节内容中提炼作品的核心卖点与故事主线。
 
 # 任务
-从商业角度分析当前简介的市场竞争力，包括情感共鸣点、关键词吸引力、以及与同类题材的差异化。
+阅读以下章节内容，提炼出主角信息、核心冲突、故事背景，生成一段 150-250 字的作品简介。
+要求：点明主角、核心矛盾、故事钩子，语言流畅有张力。
 
-# 当前简介
-@work.metadata.summary
+# 已有简介（供参考，如有则在此基础上补充完善）
+{component_data.summary}
 
-# 输出格式（JSON）
-```json
-{
-  "appeal_score": 80,
-  "emotional_hooks": ["情感钩子1", "情感钩子2"],
-  "keywords": ["关键词1", "关键词2"],
-  "differentiation": "与同类作品的差异化描述",
-  "optimization_suggestions": ["优化建议1", "优化建议2"]
-}
-```\
+# 章节内容
+@chapter.content
+
+# 输出
+直接输出简介正文，不需要额外说明。\
 """,
     ),
 
@@ -242,25 +236,26 @@ PROMPTS = [
     ),
     (
         "cover", "image", None, "analysis",
-        "封面图 - 分析",
-        "分析封面的视觉吸引力和市场定位",
+        "封面图 - 从章节提取描述",
+        "从章节内容中提取适合封面设计的视觉元素描述",
         """\
 # 角色
-你是一位专注于网络文学的市场研究员，熟悉各平台封面的点击率规律。
+你是一位视觉策划师，善于从文字内容中提炼适合封面设计的关键视觉元素。
 
 # 任务
-从市场角度分析封面的视觉竞争力，包括在书单中的辨识度、对目标读者的吸引力等。
+阅读以下章节内容，提取其中最具视觉冲击力的场景、人物形象、氛围色调等信息，生成封面设计方向描述。
 
-# 作品信息
-题材：@work.metadata.genre
+# 章节内容
+@chapter.content
 
 # 输出格式（JSON）
 ```json
 {
-  "visibility_score": 75,
-  "target_audience_fit": "与目标读者的匹配度描述",
-  "competitive_analysis": "与同类封面的对比分析",
-  "improvement_priority": ["优先改进项1", "优先改进项2"]
+  "main_character": "主角外貌关键词",
+  "key_scene": "最具代表性的场景描述",
+  "atmosphere": "整体氛围（如：神秘、热血、温情）",
+  "color_tone": "建议色调",
+  "visual_elements": ["视觉元素1", "视觉元素2"]
 }
 ```\
 """,
@@ -343,33 +338,39 @@ PROMPTS = [
     ),
     (
         "char-cards", "character-card", "characters", "analysis",
-        "角色卡片 - 分析",
-        "分析角色群体结构和故事张力",
+        "角色卡片 - 从章节提取",
+        "从章节内容中提取出现的人物信息，生成或更新角色档案",
         """\
 # 角色
-你是一位研究叙事结构的文学分析师，专注于角色在故事中的功能和关系。
+你是一位专业的小说编辑，擅长从章节内容中识别并整理人物信息。
 
 # 任务
-从叙事学角度分析当前角色体系，评估角色群体的完整性、功能分工和情感张力。
+仔细阅读以下章节内容，提取所有出现的角色（主角和配角），整理其姓名、性别、外貌、性格、身份等信息。
+- 如果某角色在已有档案中存在，补充或修正其信息
+- 如果是新出现的角色，创建新档案
+- 只提取章节中有明确描写的信息，不要臆造
 
-# 作品信息
-题材：@work.metadata.genre
-主线剧情：@work.metadata.mainline
-角色数据：@work.metadata.characters
+# 已有角色档案（供参考）
+{component_data.characters}
+
+# 章节内容
+@chapter.content
 
 # 输出格式（JSON）
 ```json
-{
-  "ensemble_completeness": "角色体系完整度评估",
-  "role_distribution": {
-    "protagonist_count": 1,
-    "supporting_count": 3,
-    "antagonist_count": 1
-  },
-  "tension_sources": ["张力来源1", "张力来源2"],
-  "missing_roles": ["建议补充的角色类型"],
-  "standout_characters": ["最具潜力的角色及原因"]
-}
+[
+  {
+    "name": "角色姓名",
+    "role": "protagonist/supporting/antagonist",
+    "gender": "male/female/other",
+    "age": "年龄或年龄段（如不明则留空）",
+    "appearance": "外貌描述（来自章节原文）",
+    "personality": ["性格特点1", "性格特点2"],
+    "background": "背景信息（来自章节内容）",
+    "motivation": "行为动机（如章节中有体现）",
+    "abilities": ["能力/技能（如有描写）"]
+  }
+]
 ```\
 """,
     ),
@@ -438,30 +439,35 @@ PROMPTS = [
     ),
     (
         "char-relations", "relation-graph", "character_relations", "analysis",
-        "人物关系 - 分析",
-        "分析人物关系对故事冲突和情感张力的影响",
+        "人物关系 - 从章节提取",
+        "从章节内容中提取角色之间的关系",
         """\
 # 角色
-你是一位叙事结构分析师，擅长评估人物关系对故事驱动力的贡献。
+你是一位叙事分析师，擅长从文本中识别角色间的互动关系。
 
 # 任务
-从叙事学角度分析当前人物关系网络，评估其对故事张力、情感层次和读者沉浸感的支撑。
+阅读以下章节内容，提取章节中出现的角色之间的关系。
+- 只提取章节中有明确互动或描述的关系
+- 如果已有关系档案，补充新发现的关系，或更新已有关系的描述
+- 关系类型：family（亲属）、friend（朋友）、enemy（敌对）、lover（恋人）、mentor（师徒）、colleague（同事）、other（其他）
 
-# 作品信息
-题材：@work.metadata.genre
-人物关系：@work.metadata.character_relations
+# 已有人物关系（供参考）
+{component_data.character_relations}
+
+# 章节内容
+@chapter.content
 
 # 输出格式（JSON）
 ```json
-{
-  "network_complexity": "simple/moderate/complex",
-  "key_relationship_pairs": [
-    {"pair": "A-B", "dramatic_value": "戏剧价值描述"}
-  ],
-  "emotional_layers": ["情感层次1", "情感层次2"],
-  "conflict_potential": "冲突潜力评分（1-10）",
-  "optimization_suggestions": ["优化建议"]
-}
+[
+  {
+    "source": "角色A姓名",
+    "target": "角色B姓名",
+    "type": "family/friend/enemy/lover/mentor/colleague/other",
+    "description": "关系描述（来自章节内容）",
+    "tension_level": "high/medium/low"
+  }
+]
 ```\
 """,
     ),
@@ -529,27 +535,34 @@ PROMPTS = [
     ),
     (
         "char-timeline", "timeline", "character_timeline", "analysis",
-        "角色时间线 - 分析",
-        "分析时间线节奏和情感高潮分布",
+        "角色时间线 - 从章节提取",
+        "从章节内容中提取关键事件，补充到角色时间线",
         """\
 # 角色
-你是一位研究故事节奏的叙事分析师，擅长评估时间线对读者体验的影响。
+你是一位叙事记录员，负责从章节内容中整理故事发生的关键事件节点。
 
 # 任务
-分析当前角色时间线的节奏分布、情感曲线和高潮点布局，评估其对读者阅读体验的影响。
+阅读以下章节内容，提取本章中发生的关键事件，按时序整理为时间线条目。
+- 只记录有明确情节意义的事件（转折、冲突、重要对话等）
+- 标注涉及的角色
 
-# 作品信息
-角色时间线：@work.metadata.character_timeline
+# 已有时间线（供参考，避免重复）
+{component_data.character_timeline}
+
+# 章节内容
+@chapter.content
 
 # 输出格式（JSON）
 ```json
-{
-  "pacing_rhythm": "fast/balanced/slow",
-  "climax_distribution": "高潮点分布描述",
-  "emotional_curve": ["情感曲线描述"],
-  "engagement_peaks": ["高吸引力节点"],
-  "suggested_adjustments": ["调整建议"]
-}
+[
+  {
+    "time_label": "故事阶段或章节标识",
+    "event": "事件描述",
+    "characters_involved": ["角色A", "角色B"],
+    "significance": "high/medium/low",
+    "emotional_tone": "积极/消极/中性/紧张"
+  }
+]
 ```\
 """,
     ),
@@ -613,27 +626,25 @@ PROMPTS = [
     ),
     (
         "era", "select", None, "analysis",
-        "时代背景 - 分析",
-        "分析所选时代背景的创作机遇与挑战",
+        "时代背景 - 从章节提取",
+        "从章节内容中识别故事所处的时代背景",
         """\
 # 角色
-你是一位熟悉网络文学市场的创作策略分析师。
+你是一位熟悉各类小说背景的分析师，能够从文字细节中判断故事时代。
 
 # 任务
-针对当前所选时代背景，分析该背景下创作本题材故事的优势、挑战以及读者接受度。
+阅读以下章节内容，根据文中出现的环境描写、道具、语言习惯、社会背景等细节，判断故事所处的时代背景。
 
-# 作品信息
-题材：@work.metadata.genre
-时代背景：@work.metadata.era
+可选时代：古代、现代、未来、架空
+
+# 章节内容
+@chapter.content
 
 # 输出格式（JSON）
 ```json
 {
-  "advantages": ["优势1", "优势2"],
-  "challenges": ["挑战1", "挑战2"],
-  "reader_acceptance": "读者接受度评估",
-  "market_trend": "该背景+题材的市场趋势",
-  "creative_tips": ["创作技巧1", "创作技巧2"]
+  "era": "古代/现代/未来/架空",
+  "evidence": ["判断依据1（来自章节）", "判断依据2（来自章节）"]
 }
 ```\
 """,
@@ -693,29 +704,25 @@ PROMPTS = [
     ),
     (
         "world-desc", "textarea", None, "analysis",
-        "世界描述 - 分析",
-        "分析世界观设定对故事的支撑度和创新性",
+        "世界描述 - 从章节提取",
+        "从章节内容中提取世界观信息，生成或补充世界描述",
         """\
 # 角色
-你是一位研究奇幻与小说世界观的分析师，关注世界观设计对读者沉浸感的影响。
+你是一位世界观整理专家，善于从章节描写中提炼故事世界的构成要素。
 
 # 任务
-从世界观设计的角度分析当前世界描述的创新性、完整性和对故事的支撑程度。
+阅读以下章节内容，提取其中涉及的世界观元素：地理环境、社会结构、文化习俗、科技/魔法体系等，整合成一段世界描述。
+- 只提取章节中有明确描写的内容
+- 如果已有世界描述，在其基础上补充新信息
 
-# 作品信息
-世界描述：@work.metadata.world-desc
-题材：@work.metadata.genre
+# 已有世界描述（供参考，如有则补充完善）
+{component_data.world-desc}
 
-# 输出格式（JSON）
-```json
-{
-  "innovation_score": 75,
-  "immersion_potential": "high/medium/low",
-  "world_pillars": ["世界观核心支柱1", "世界观核心支柱2"],
-  "story_support": "对故事的支撑度评估",
-  "expansion_opportunities": ["可延伸扩展的方向"]
-}
-```\
+# 章节内容
+@chapter.content
+
+# 输出
+直接输出世界描述正文，语言简洁客观，不需要额外说明。\
 """,
     ),
 
@@ -784,28 +791,31 @@ PROMPTS = [
     ),
     (
         "rules", "keyvalue", None, "analysis",
-        "世界规则 - 分析",
-        "分析世界规则对故事约束力和戏剧性的贡献",
+        "世界规则 - 从章节提取",
+        "从章节内容中提取世界的运行规则或设定约束",
         """\
 # 角色
-你是一位叙事系统分析师，研究世界规则如何驱动故事冲突和角色决策。
+你是一位世界观分析师，擅长从故事内容中识别世界的隐性或显性规则。
 
 # 任务
-分析当前世界规则体系对故事戏剧性的贡献，评估规则的约束力设计是否能催生有趣的冲突和角色选择。
+阅读以下章节内容，提取其中出现的世界规则、设定约束或特殊体系（如修炼等级、魔法规则、社会法律、禁忌等）。
+- 只提取章节中有明确体现的规则
+- 每条规则用"名称: 描述"的形式表达
 
-# 作品信息
-世界规则：@work.metadata.rules
-主线剧情：@work.metadata.mainline
+# 已有世界规则（供参考，避免重复）
+{component_data.rules}
+
+# 章节内容
+@chapter.content
 
 # 输出格式（JSON）
 ```json
-{
-  "constraint_strength": "strong/moderate/weak",
-  "dramatic_rules": ["最具戏剧价值的规则"],
-  "conflict_catalysts": ["能引发冲突的规则场景"],
-  "plot_holes_risk": ["可能引发逻辑漏洞的规则"],
-  "suggestions": ["优化建议"]
-}
+[
+  {
+    "key": "规则名称",
+    "value": "规则详细描述（来自章节内容）"
+  }
+]
 ```\
 """,
     ),
@@ -880,28 +890,37 @@ PROMPTS = [
     ),
     (
         "factions", "faction", "factions", "analysis",
-        "势力设定 - 分析",
-        "分析势力格局对主线剧情的驱动力",
+        "势力设定 - 从章节提取",
+        "从章节内容中提取出现的势力、组织或阵营信息",
         """\
 # 角色
-你是一位专注于权力叙事的文学分析师，研究势力格局与剧情走向的关系。
+你是一位政治格局分析师，善于从故事内容中识别势力结构。
 
 # 任务
-分析当前势力格局对主线剧情的推动作用，评估权力博弈能否为故事提供持续的张力和读者的期待感。
+阅读以下章节内容，提取其中出现的势力、组织、阵营或帮派，整理其基本信息。
+- 只提取章节中有明确提及或描写的势力
+- 如果已有势力档案，补充新发现的势力或更新已有信息
 
-# 作品信息
-势力设定：@work.metadata.factions
-主线剧情：@work.metadata.mainline
+# 已有势力档案（供参考）
+{component_data.factions}
+
+# 章节内容
+@chapter.content
 
 # 输出格式（JSON）
 ```json
-{
-  "power_structure": "权力结构评估（单极/双极/多极）",
-  "narrative_drive": "high/medium/low",
-  "key_conflict_axes": ["核心对立轴1", "核心对立轴2"],
-  "protagonist_positioning": "主角在势力格局中的定位分析",
-  "story_potential": ["故事潜力挖掘方向"]
-}
+[
+  {
+    "name": "势力名称",
+    "description": "势力简介（来自章节内容）",
+    "hierarchy": ["已知层级（如有描写）"],
+    "goal": "已知目标（如有体现）",
+    "territory": "控制范围（如有描写）",
+    "strength": "strong/medium/weak/unknown",
+    "allies": ["已知盟友势力"],
+    "enemies": ["已知敌对势力"]
+  }
+]
 ```\
 """,
     ),
@@ -967,30 +986,24 @@ PROMPTS = [
     ),
     (
         "mainline", "textarea", None, "analysis",
-        "主线剧情 - 分析",
-        "分析主线剧情的节奏和商业潜力",
+        "主线剧情 - 从章节提取",
+        "从章节内容中提炼主线剧情走向，生成或更新主线描述",
         """\
 # 角色
-你是一位网络文学市场分析师，善于评估故事的商业价值和读者吸引力。
+你是一位资深编辑，擅长从章节内容中梳理故事主线脉络。
 
 # 任务
-从商业角度分析主线剧情的市场潜力，包括爽点设计、读者代入感、追更动力等维度。
+阅读以下章节内容，提炼本章对主线剧情的贡献：核心事件、冲突进展、主角行动。
+综合已有主线信息，生成一段完整的主线剧情描述，包含故事走向和关键节点。
 
-# 作品信息
-题材：@work.metadata.genre
-主线剧情：@work.metadata.mainline
+# 已有主线剧情（供参考，如有则在此基础上补充）
+{component_data.mainline}
 
-# 输出格式（JSON）
-```json
-{
-  "commercial_score": 80,
-  "hook_effectiveness": "钩子效果评估",
-  "reader_immersion": "high/medium/low",
-  "pacing_rhythm": "fast/balanced/slow",
-  "key_attractions": ["核心卖点1", "核心卖点2"],
-  "improvement_priorities": ["优先改进方向"]
-}
-```\
+# 章节内容
+@chapter.content
+
+# 输出
+直接输出主线剧情正文，结构清晰，涵盖已知的起承转合，不需要额外说明。\
 """,
     ),
 
@@ -1063,29 +1076,31 @@ PROMPTS = [
     ),
     (
         "conflicts", "keyvalue", None, "analysis",
-        "核心冲突 - 分析",
-        "分析核心冲突对故事张力和主题深度的贡献",
+        "核心冲突 - 从章节提取",
+        "从章节内容中识别并提取核心冲突",
         """\
 # 角色
-你是一位文学主题分析师，研究冲突设计与故事深度的关系。
+你是一位叙事分析师，擅长识别故事中的冲突层次和矛盾关系。
 
 # 任务
-从主题表达角度分析当前核心冲突的设计，评估其对故事张力、人物成长和主题深度的综合贡献。
+阅读以下章节内容，识别本章中体现的冲突（人与人、人与自我、人与社会、人与自然、人与命运），整理为结构化数据。
+- 只提取章节中有明确体现的冲突
+- 如果已有冲突档案，补充新发现的冲突类型
 
-# 作品信息
-核心冲突：@work.metadata.conflicts
-主线剧情：@work.metadata.mainline
-题材：@work.metadata.genre
+# 已有核心冲突（供参考）
+{component_data.conflicts}
+
+# 章节内容
+@chapter.content
 
 # 输出格式（JSON）
 ```json
-{
-  "tension_contribution": "张力贡献评估",
-  "thematic_depth": "主题深度评分（1-10）",
-  "character_growth_catalysts": ["推动角色成长的冲突"],
-  "reader_emotional_engagement": "读者情感投入分析",
-  "conflict_evolution_suggestions": ["冲突升级方向建议"]
-}
+[
+  {
+    "key": "冲突名称",
+    "value": "冲突描述：冲突双方 + 冲突本质 + 在本章的具体体现"
+  }
+]
 ```\
 """,
     ),
@@ -1158,29 +1173,28 @@ PROMPTS = [
     ),
     (
         "turning-points", "list", None, "analysis",
-        "关键转折 - 分析",
-        "分析转折点分布对读者体验和追更动力的影响",
+        "关键转折 - 从章节提取",
+        "从章节内容中识别关键转折点",
         """\
 # 角色
-你是一位网络文学阅读体验研究员，专注于分析情节节奏对读者追更行为的影响。
+你是一位叙事节奏分析师，擅长识别故事中的转折节点。
 
 # 任务
-分析当前关键转折点的设计对读者追更动力的影响，评估转折节奏和情感冲击力是否能形成有效的"读者钩子"。
+阅读以下章节内容，识别本章中发生的关键转折点（情节反转、重要揭露、人物决策的关键时刻等）。
+- 只提取有明确叙事意义的转折，不记录日常情节推进
+- 如果已有转折档案，补充本章新发现的转折
 
-# 作品信息
-关键转折：@work.metadata.turning-points
-题材：@work.metadata.genre
+# 已有关键转折（供参考，避免重复）
+{component_data.turning-points}
+
+# 章节内容
+@chapter.content
 
 # 输出格式（JSON）
 ```json
-{
-  "reader_hook_strength": "strong/moderate/weak",
-  "most_impactful_turns": ["最具冲击力的转折"],
-  "pacing_assessment": "节奏评估",
-  "subscription_boost_points": ["预计带动订阅的转折点"],
-  "emotional_variety": "情感多样性评估",
-  "optimization_suggestions": ["优化建议"]
-}
+[
+  "转折描述：时机 + 转折内容 + 对故事的影响"
+]
 ```\
 """,
     ),
@@ -1208,6 +1222,7 @@ async def init_novel_standard_prompts():
 
             created = 0
             skipped = 0
+            updated = 0
 
             for (comp_id, comp_type, data_key, category,
                  name, description, prompt_content) in PROMPTS:
@@ -1221,8 +1236,16 @@ async def init_novel_standard_prompts():
                 existing = (await db.execute(check)).scalar_one_or_none()
 
                 if existing:
-                    print(f"  ⏭  跳过（已存在）: {name}")
-                    skipped += 1
+                    # analysis prompt 始终覆盖更新（保证内容与脚本同步）
+                    if category == "analysis":
+                        existing.name = name
+                        existing.description = description
+                        existing.prompt_content = prompt_content
+                        print(f"  🔄 更新: {name}")
+                        updated += 1
+                    else:
+                        print(f"  ⏭  跳过（已存在）: {name}")
+                        skipped += 1
                     continue
 
                 pt = PromptTemplate(
@@ -1250,7 +1273,7 @@ async def init_novel_standard_prompts():
 
             print()
             print("=" * 60)
-            print(f"✅ 初始化完成！创建 {created} 条，跳过 {skipped} 条")
+            print(f"✅ 初始化完成！创建 {created} 条，更新 {updated} 条，跳过 {skipped} 条")
             print("=" * 60)
 
         except Exception as e:
