@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { X, Download, FileText, File, CheckCircle2, Circle, AlertCircle, Check } from 'lucide-react';
 import { worksApi } from '../../utils/worksApi';
 import type { VolumeData } from '../../hooks/useChapterManagement';
