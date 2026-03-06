@@ -22,6 +22,7 @@ interface WorkConnection {
   chapterFragments: Map<string, Y.XmlFragment>;
   refCount: number; // 引用计数，当为 0 时延迟断开
   disconnectTimer?: ReturnType<typeof setTimeout>;
+  keepAliveTimer?: ReturnType<typeof setInterval>;
 }
 
 class YjsConnectionManager {
@@ -46,8 +47,12 @@ class YjsConnectionManager {
     }
 
     // 创建新连接
+    // resyncInterval: 每 20 秒重新发送 sync step1，防止 y-websocket 的 30 秒空闲超时触发断连
     const ydoc = new Y.Doc();
-    const wsProvider = new WebsocketProvider(wsUrl, `work_${workId}`, ydoc, { connect: true });
+    const wsProvider = new WebsocketProvider(wsUrl, `work_${workId}`, ydoc, {
+      connect: true,
+      resyncInterval: 20000,
+    });
     const idbProvider = new IndexeddbPersistence(`work_${workId}`, ydoc);
 
     conn = {
@@ -95,7 +100,9 @@ class YjsConnectionManager {
     if (conn.refCount <= 0) {
       // 延迟断开，以便快速切换章节时可以复用
       conn.disconnectTimer = setTimeout(() => {
-        
+        if (conn.keepAliveTimer) {
+          clearInterval(conn.keepAliveTimer);
+        }
         conn.wsProvider.destroy();
         conn.idbProvider.destroy();
         conn.ydoc.destroy();
@@ -114,11 +121,14 @@ class YjsConnectionManager {
     if (conn.disconnectTimer) {
       clearTimeout(conn.disconnectTimer);
     }
+    if (conn.keepAliveTimer) {
+      clearInterval(conn.keepAliveTimer);
+    }
     conn.wsProvider.destroy();
     conn.idbProvider.destroy();
     conn.ydoc.destroy();
     this.connections.delete(workId);
-    
+
   }
 
   /**

@@ -46,8 +46,6 @@ import type { ChapterFullData } from '../types/document';
 // API和工具
 import { worksApi, type Work } from '../utils/worksApi';
 import { authApi } from '../utils/authApi';
-import { documentCache } from '../utils/documentCache';
-import { syncManager } from '../utils/syncManager';
 import { countCharacters } from '../utils/textUtils';
 import { generateChapterContent } from '../utils/bookAnalysisApi';
 import { chaptersApi } from '../utils/chaptersApi';
@@ -69,7 +67,7 @@ export default function NovelEditorPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updateTrigger, setUpdateTrigger] = useState(0);
-  const [syncStatus, setSyncStatus] = useState(syncManager.getStatus());
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [currentChapterWordCount, setCurrentChapterWordCount] = useState(0);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   /** 选中文本浮动菜单（含章节内字数范围：第 X 字到第 Y 字） */
@@ -256,134 +254,36 @@ export default function NovelEditorPage() {
     ? `work_${workId}_chapter_${selectedChapter}` 
     : '';
   
-  const hasUserEdited = useRef(false);
-
-  const { editor, provider, syncToServer } = useYjsEditor({
+  const { editor, syncToServer } = useYjsEditor({
     documentId,
+    // Yjs IndexedDB (y-indexeddb) 是内容的唯一来源。
+    // 此回调仅在 Yjs 本地和远端均无内容时作为最后兜底（如旧数据迁移场景）。
     fetchInitialContent: async (docId) => {
-      // 优先从本地缓存获取，确保离线编辑的内容不会丢失
-      try {
-        const cached = await documentCache.getDocument(docId);
-        if (cached && cached.content && cached.content.trim().length > 0) {
-          
-          return cached.content;
-        }
-      } catch {
-        // ignore
-      }
-
-      // 本地没有，再从服务器拉取
       const m = docId.match(/^work_(.+?)_chapter_(.+)$/);
       if (!m) return null;
       const chapterId = parseInt(m[2], 10);
       if (Number.isNaN(chapterId)) return null;
       try {
         const res = await chaptersApi.getChapterDocument(chapterId);
-        // 注意：这里的 res.content 可能是 Yjs 的 XML 字符串
         return res?.content || null;
       } catch {
-        // ignore
         return null;
       }
     },
     placeholder: '开始写作...支持 Markdown 格式，如 **粗体**、*斜体*、`代码`、# 标题等',
     editable: true,
     onUpdate: (content) => {
-      hasUserEdited.current = true;
       const wordCount = countCharacters(content);
       setCurrentChapterWordCount(wordCount);
       if (selectedChapter) updateChapterWordCount(selectedChapter, wordCount);
-      
-      // 更新本地缓存
-      // 关键修复：既然正在使用 Yjs 进行实时同步，我们将本地缓存标记为“已同步”
-      // 这样可以避免 SyncManager 触发冗余的 ShareDB 同步请求，从而减少冲突
-      if (documentId) {
-        documentCache.updateDocument(documentId, content, undefined, true).catch(() => {
-          // ignore
-        });
-      }
     },
     onSyncSuccess: () => {
-      
-      setSyncStatus(syncManager.getStatus());
+      // Yjs 同步成功
     },
     onSyncError: () => {
-      
+      // ignore
     },
   });
-
-  // ===== 冲突检测与版本控制 =====
-   // 当编辑器加载完成并同步后，检查本地缓存与线上是否存在冲突
-   useEffect(() => {
-     if (!editor || !documentId || !selectedChapter) return;
- 
-     // 延迟 2 秒检查，确保 Yjs 完成初始同步且用户尚未开始大量编辑
-     const checkConflict = async () => {
-       if (hasUserEdited.current) {
-         
-         return;
-       }
-
-       try {
-         const m = documentId.match(/^work_(.+?)_chapter_(.+)$/);
-         if (!m) return;
-         const chapterId = parseInt(m[2], 10);
- 
-         // 1. 并行获取线上最新内容和本地缓存
-         const [onlineRes, cached] = await Promise.all([
-           chaptersApi.getChapterDocument(chapterId),
-           documentCache.getDocument(documentId)
-         ]);
- 
-         const onlineContent = onlineRes?.content;
-         const localContent = cached?.content;
- 
-         // 2. 如果本地有缓存且与线上不一致
-         if (localContent && onlineContent && localContent !== onlineContent) {
-           // 获取当前编辑器内容
-           const currentEditorContent = editor.getHTML();
-           
-           // 如果当前编辑器内容不等于线上最新内容（说明 Yjs 还没同步到线上新内容，或者同步后本地旧内容占了上风）
-           if (currentEditorContent !== onlineContent) {
-             // 额外检查：如果房间里还有其他用户，我们不应该强行 setContent，因为会破坏他们的编辑
-             // 如果 provider 还没准备好，我们也跳过
-             const awareness = provider?.awareness;
-             const otherUsers = awareness ? awareness.getStates().size - 1 : 0;
-             
-             if (otherUsers > 0) {
-               
-               return;
-             }
-
-             
-             
-             // A. 保存本地版本为历史记录 (使用 Yjs 快照)
-             try {
-              const base64 = createYjsSnapshotFromEditor(editor);
-              await chaptersApi.createYjsSnapshot(chapterId, base64, '冲突自动保存');
-              
-            } catch {
-              // ignore
-            }
-
-            // B. 强制覆盖为线上最新版本 (仅在没有其他用户时安全)
-             editor.commands.setContent(onlineContent);
-             
-             // C. 更新本地缓存
-             await documentCache.updateDocument(documentId, onlineContent);
-             
-             showMessage('检测到本地版本与线上不一致，已将本地保存为历史记录并拉取最新版本', 'info');
-          }
-        }
-      } catch {
-        // ignore
-      }
-    };
- 
-     // 增加延迟到 2 秒
-     const timer = setTimeout(checkConflict, 2000);
-     return () => clearTimeout(timer);
-   }, [editor, documentId, selectedChapter]); // eslint-disable-line react-hooks/exhaustive-deps
   
   // ===== 标题编辑 =====
   const {
@@ -445,16 +345,6 @@ export default function NovelEditorPage() {
     [availableCharacters]
   );
   
-  // ===== 切换章节时设置活动文档 ID =====
-  useEffect(() => {
-    if (documentId) {
-      syncManager.setActiveDocumentId(documentId);
-    }
-    return () => {
-      syncManager.setActiveDocumentId(null);
-    };
-  }, [documentId]);
-
   // ===== 加载作品详情 =====
   useEffect(() => {
     if (!workId) {
@@ -485,12 +375,16 @@ export default function NovelEditorPage() {
     loadWork();
   }, [workId]);
   
-  // ===== 监听同步状态 =====
+  // ===== 监听在线/离线状态 =====
   useEffect(() => {
-    const unsubscribe = syncManager.onStatusChange((status) => {
-      setSyncStatus(status);
-    });
-    return unsubscribe;
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, []);
   
   // ===== 同步标题内容 =====
@@ -955,11 +849,7 @@ export default function NovelEditorPage() {
             <div className="work-info-row">
               <div className="work-stats-inline">
                 <span className="sync-status-text">
-                  {syncStatus.isOnline 
-                    ? (syncStatus.pendingCount > 0 
-                        ? `同步中 (${syncStatus.pendingCount})` 
-                        : '已同步')
-                    : '离线模式'}
+                  {isOnline ? '已同步' : '离线模式'}
                 </span>
                 <span className="stats-divider">·</span>
                 <span>本章字数：{currentChapterWordCount}</span>
@@ -1106,11 +996,7 @@ export default function NovelEditorPage() {
                 </div>
                 <div className="mobile-menu-stats work-stats-inline">
                   <span className="sync-status-text">
-                    {syncStatus.isOnline
-                      ? (syncStatus.pendingCount > 0
-                          ? `同步中 (${syncStatus.pendingCount})`
-                          : '已同步')
-                      : '离线模式'}
+                    {isOnline ? '已同步' : '离线模式'}
                   </span>
                   <span className="stats-divider">·</span>
                   <span>本章字数：{currentChapterWordCount}</span>
