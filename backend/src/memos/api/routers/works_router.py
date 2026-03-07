@@ -289,6 +289,7 @@ async def export_work(
     elif export_req.format == "word":
         try:
             from docx import Document
+            from docx.oxml.ns import qn
         except ImportError:
             raise HTTPException(status_code=500, detail="Word导出功能不可用：缺少python-docx依赖")
 
@@ -301,6 +302,18 @@ async def export_work(
             return _xml_illegal.sub('', text) if text else ''
 
         doc = Document()
+
+        # 设置全局中文字体为仿宋
+        doc.styles['Normal'].font.name = 'FangSong'
+        doc.styles['Normal']._element.rPr.rFonts.set(qn('w:eastAsia'), 'FangSong')
+        
+        # 同样设置标题样式
+        for style_name in ['Heading 1', 'Heading 2', 'Title']:
+            if style_name in doc.styles:
+                style = doc.styles[style_name]
+                style.font.name = 'FangSong'
+                style.element.rPr.rFonts.set(qn('w:eastAsia'), 'FangSong')
+
         doc.add_heading(sanitize(work.title), 0)
 
         if work.description:
