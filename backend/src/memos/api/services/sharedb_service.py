@@ -1862,30 +1862,32 @@ class ShareDBService:
                                 chapter = await chapter_service.get_chapter_by_id(chapter_id)
                                 if chapter:
                                     old_word_count = chapter.word_count or 0
-                                    
-                                    # 更新章节字数
+
+                                    # 更新章节字数（update_chapter 内部会 commit）
                                     await chapter_service.update_chapter(
                                         chapter_id=chapter_id,
                                         word_count=chapter_word_count
                                     )
-                                    
-                                    # 如果字数发生变化，增量更新作品总字数
+
+                                    # 用 SUM 重算作品总字数，替代增量逻辑（防止累积误差）
                                     if chapter_word_count != old_word_count:
-                                        word_count_diff = chapter_word_count - old_word_count
+                                        from sqlalchemy import func, select
+                                        from memos.api.models.chapter import Chapter as ChapterModel
+                                        sum_result = await session.execute(
+                                            select(func.sum(ChapterModel.word_count)).where(
+                                                ChapterModel.work_id == db_work_id,
+                                                ChapterModel.status != "deleted",
+                                            )
+                                        )
+                                        new_total_word_count = sum_result.scalar() or 0
+
                                         work = await work_service.get_work_by_id(work_id)
                                         if work:
-                                            current_total_word_count = work.word_count or 0
-                                            new_total_word_count = current_total_word_count + word_count_diff
-                                            
-                                            # 更新作品总字数
                                             await work_service.update_work(
                                                 work_id=work_id,
                                                 word_count=new_total_word_count
                                             )
-                                            
-                                            logger.info(f"✅ [字数统计] 章节 {chapter_id} 字数: {old_word_count} -> {chapter_word_count}, 作品 {work_id} 总字数: {current_total_word_count} -> {new_total_word_count}")
-                                        
-                                    await session.commit()
+                                            logger.info(f"✅ [字数统计] 章节 {chapter_id} 字数: {old_word_count} -> {chapter_word_count}, 作品 {work_id} 总字数: {work.word_count or 0} -> {new_total_word_count}")
                                     
                                     # 重新获取更新后的章节和作品数据，用于返回给前端
                                     updated_chapter = await chapter_service.get_chapter_by_id(chapter_id)
