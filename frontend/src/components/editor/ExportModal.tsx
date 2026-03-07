@@ -127,9 +127,10 @@ export default function ExportModal({
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
       onClose();
-    } catch (err: any) {
+    } catch (err) {
       console.error('Export failed:', err);
-      setError(err.message || '导出失败，请重试');
+      const errorMessage = (err instanceof Error && err.message) || '导出失败，请重试';
+      setError(errorMessage);
     } finally {
       setIsExporting(false);
     }

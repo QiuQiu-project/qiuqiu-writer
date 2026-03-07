@@ -236,7 +236,7 @@ export const useWorkInfoData = (
     
     // 如果已经初始化过，且 workData 没有显著变化（比如只是其他的 metadata 变了），不要重新加载整个 template
     // 这里我们做一个简单的策略：如果 template 为空，或者 workData 中有明确的 template_config 且跟当前不一样，才重载
-    // 为了解决“数据消失”的问题，我们主要依赖初始化加载一次。后续的数据更新应该通过 syncManager 或具体的事件处理
+    // 为了解决“数据消失”的问题，我们主要依赖初始化加载一次。后续的数据更新应该通过具体的事件处理
     
     if (!initializedRef.current || (workData?.metadata?.template_config && !template)) {
        loadData();

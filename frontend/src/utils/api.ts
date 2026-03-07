@@ -2,7 +2,7 @@
  * API client for 球球写作 backend (MemOS)
  */
 
-import type { ShareDBDocument, SyncResponse } from '../types/sharedb';
+import type { SyncResponse } from '../types/sharedb';
 
 import { BaseApiClient } from './baseApiClient';
 
@@ -110,13 +110,6 @@ class ApiClient extends BaseApiClient {
     return response.data;
   }
 
-  /**
-   * 获取 ShareDB 文档
-   */
-  async getShareDBDocument(docId: string): Promise<ShareDBDocument> {
-    const response = await this.get<ApiResponse<ShareDBDocument>>(`/v1/sharedb/documents/${docId}/`);
-    return response.data;
-  }
 }
 
 export const apiClient = new ApiClient();
