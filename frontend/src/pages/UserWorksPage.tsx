@@ -28,7 +28,7 @@ export default function UserWorksPage() {
     bio: '',
   });
   const [saving, setSaving] = useState(false);
-  const itemsPerPage = 20;
+  const itemsPerPage = 10;
   const isCurrentUser = authApi.isAuthenticated() && 
     authApi.getUserInfo()?.id === userId;
 
@@ -557,27 +557,24 @@ export default function UserWorksPage() {
               </ul>
             )}
 
-            {total > itemsPerPage && (
-              <div className="pagination">
-                <button
-                  className="pagination-btn"
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                >
-                  上一页
-                </button>
-                <span className="pagination-info">
-                  第 {currentPage} 页，共 {Math.ceil(total / itemsPerPage)} 页
-                </span>
-                <button
-                  className="pagination-btn"
-                  disabled={currentPage * itemsPerPage >= total}
-                  onClick={() => setCurrentPage(prev => prev + 1)}
-                >
-                  下一页
-                </button>
-              </div>
-            )}
+            <div className="pagination">
+              <button
+                className={`pagination-nav-btn${currentPage === 1 ? ' disabled' : ''}`}
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                Previous
+              </button>
+              <button
+                className={`pagination-nav-btn${works.length < itemsPerPage || currentPage * itemsPerPage >= total ? ' disabled' : ''}`}
+                disabled={works.length < itemsPerPage || currentPage * itemsPerPage >= total}
+                onClick={() => setCurrentPage(prev => prev + 1)}
+              >
+                Next
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+              </button>
+            </div>
           </>
         )}
         </main>
