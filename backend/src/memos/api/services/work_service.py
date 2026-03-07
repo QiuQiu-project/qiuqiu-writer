@@ -38,7 +38,7 @@ class WorkService:
     async def get_work_by_id(self, work_id: str) -> Optional[Work]:
         """根据ID获取作品"""
         stmt = select(Work).options(
-            selectinload(Work.collaborators),
+            selectinload(Work.collaborators).selectinload(WorkCollaborator.user),
             selectinload(Work.chapters)
         ).where(Work.id == work_id)
 
@@ -105,7 +105,7 @@ class WorkService:
 
         # 获取作品列表
         stmt = select(Work).options(
-            selectinload(Work.collaborators),
+            selectinload(Work.collaborators).selectinload(WorkCollaborator.user),
             selectinload(Work.chapters)
         ).select_from(
             outerjoin(Work, WorkCollaborator, Work.id == WorkCollaborator.work_id)
@@ -386,6 +386,9 @@ class WorkService:
         # get_work_by_id 已经使用 selectinload 加载了 collaborators
         for collaborator in work.collaborators:
             if collaborator.user_id == user_id:
+                # pending 状态的用户没有直接访问权限（除非作品是公开的）
+                if collaborator.permission == 'pending':
+                    continue
                 return True
 
         return work.is_public

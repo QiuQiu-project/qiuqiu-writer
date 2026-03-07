@@ -152,6 +152,7 @@ class WorkResponse(WorkBase):
     updated_at: datetime
     published_at: Optional[datetime]
     owner_id: str
+    collaborators: Optional[List['WorkCollaboratorResponse']] = None
 
     class Config:
         from_attributes = True
@@ -195,7 +196,7 @@ class WorkCollaboratorBase(BaseModel):
 
     @validator("permission")
     def validate_permission(cls, v):
-        allowed_permissions = ["owner", "editor", "reader"]
+        allowed_permissions = ["owner", "editor", "reader", "pending"]
         if v not in allowed_permissions:
             raise ValueError(f"权限级别必须是: {', '.join(allowed_permissions)}")
         return v
@@ -209,7 +210,7 @@ class WorkCollaboratorCreate(BaseModel):
 
     @validator("permission")
     def validate_permission(cls, v):
-        allowed_permissions = ["admin", "editor", "reader"]
+        allowed_permissions = ["admin", "editor", "reader", "pending"]
         if v not in allowed_permissions:
             raise ValueError(f"权限级别必须是: {', '.join(allowed_permissions)}")
         return v
@@ -223,7 +224,7 @@ class WorkCollaboratorUpdate(BaseModel):
     @validator("permission")
     def validate_permission(cls, v):
         if v is not None:
-            allowed_permissions = ["admin", "editor", "reader"]
+            allowed_permissions = ["admin", "editor", "reader", "pending"]
             if v not in allowed_permissions:
                 raise ValueError(f"权限级别必须是: {', '.join(allowed_permissions)}")
         return v
@@ -340,3 +341,5 @@ class WorkPermissionResponse(BaseModel):
     has_permission: bool
     permission_level: str
     message: str
+
+WorkResponse.update_forward_refs()

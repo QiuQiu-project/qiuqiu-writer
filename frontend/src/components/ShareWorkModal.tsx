@@ -175,6 +175,16 @@ export default function ShareWorkModal({ isOpen, workId, workTitle, onClose }: S
     }
   };
 
+  const handleApprove = async (userId: string) => {
+    try {
+      await worksApi.updateCollaborator(workId, userId, { permission: 'editor' });
+      setCollaborators(prev => prev.map(c => c.user_id === userId ? { ...c, permission: 'editor' } : c));
+      showToast('已批准申请');
+    } catch (e) {
+      setErrMsg(e instanceof Error ? e.message : '操作失败');
+    }
+  };
+
   const handleRemove = async (userId: string) => {
     try {
       await worksApi.removeCollaborator(workId, userId);
@@ -189,6 +199,9 @@ export default function ShareWorkModal({ isOpen, workId, workTitle, onClose }: S
     const url = `${window.location.origin}/novel/editor?workId=${workId}`;
     navigator.clipboard?.writeText(url).then(() => showToast('链接已复制'));
   };
+
+  const pendingCollaborators = collaborators.filter(c => c.permission === 'pending');
+  const activeCollaborators = collaborators.filter(c => c.permission !== 'pending');
 
   if (!isOpen) return null;
 
@@ -231,15 +244,68 @@ export default function ShareWorkModal({ isOpen, workId, workTitle, onClose }: S
 
         {errMsg && <div className="swm-err">{errMsg}</div>}
 
+        {/* Pending Requests */}
+        {pendingCollaborators.length > 0 && (
+          <>
+            <div className="swm-section-label">待审核申请</div>
+            <div className="swm-list" style={{ marginBottom: '16px' }}>
+              {pendingCollaborators.map(c => {
+                 const displayName = c.display_name || c.username || c.user_id;
+                 return (
+                   <div key={c.user_id} className="swm-collab-row">
+                      <Avatar name={displayName} avatarUrl={c.avatar_url} size={32} />
+                      <div className="swm-collab-info">
+                        <span className="swm-collab-name">{displayName}</span>
+                        {c.username && c.display_name && (
+                          <span className="swm-collab-sub">@{c.username}</span>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                         <button 
+                           onClick={() => handleApprove(c.user_id)}
+                           style={{
+                             padding: '4px 12px',
+                             background: 'var(--primary, #4e6ef2)',
+                             color: '#fff',
+                             border: 'none',
+                             borderRadius: '4px',
+                             fontSize: '12px',
+                             cursor: 'pointer'
+                           }}
+                         >
+                           批准
+                         </button>
+                         <button 
+                           onClick={() => handleRemove(c.user_id)}
+                           style={{
+                             padding: '4px 12px',
+                             background: 'rgba(255, 77, 79, 0.1)',
+                             color: '#ff4d4f',
+                             border: 'none',
+                             borderRadius: '4px',
+                             fontSize: '12px',
+                             cursor: 'pointer'
+                           }}
+                         >
+                           拒绝
+                         </button>
+                      </div>
+                   </div>
+                 );
+              })}
+            </div>
+          </>
+        )}
+
         {/* Collaborators */}
         <div className="swm-section-label">已共享</div>
         <div className="swm-list">
           {loading ? (
             <div className="swm-list-empty">加载中…</div>
-          ) : collaborators.length === 0 ? (
+          ) : activeCollaborators.length === 0 ? (
             <div className="swm-list-empty">暂无协作者</div>
           ) : (
-            collaborators.map(c => {
+            activeCollaborators.map(c => {
               const displayName = c.display_name || c.username || c.user_id;
               return (
                 <div key={c.user_id} className="swm-collab-row">

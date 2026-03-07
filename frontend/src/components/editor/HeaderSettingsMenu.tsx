@@ -11,6 +11,7 @@ interface HeaderSettingsMenuProps {
   onExport: () => void;
   onShare: () => void;
   isMobile?: boolean;
+  hasPendingRequests?: boolean;
 }
 
 export default function HeaderSettingsMenu({
@@ -20,7 +21,8 @@ export default function HeaderSettingsMenu({
   onDeleteWork,
   onExport,
   onShare,
-  isMobile = false
+  isMobile = false,
+  hasPendingRequests = false,
 }: HeaderSettingsMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -54,6 +56,7 @@ export default function HeaderSettingsMenu({
         onClick={() => setIsOpen(!isOpen)}
         title="设置与工具"
       >
+        {hasPendingRequests && <div className="settings-badge" />}
         <MoreVertical size={isMobile ? 24 : 16} />
       </button>
 
@@ -112,6 +115,7 @@ export default function HeaderSettingsMenu({
           >
             <Users size={16} />
             <span>添加协作者</span>
+            {hasPendingRequests && <span className="menu-item-badge" />}
           </button>
 
           <button 

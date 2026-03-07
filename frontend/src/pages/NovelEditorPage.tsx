@@ -105,6 +105,40 @@ export default function NovelEditorPage() {
     }
     return false;
   }, [work, currentUser]);
+
+  const isPending = useMemo(() => {
+    if (!work || !currentUser) return false;
+    if (work.collaborators) {
+      const collaborator = work.collaborators.find(c => c.user_id === currentUser.id);
+      if (collaborator && collaborator.permission === 'pending') {
+        return true;
+      }
+    }
+    return false;
+  }, [work, currentUser]);
+
+  const hasPendingRequests = useMemo(() => {
+    if (!work || !currentUser || work.owner_id !== currentUser.id) return false;
+    return work.collaborators?.some(c => c.permission === 'pending') ?? false;
+  }, [work, currentUser]);
+
+  const [isApplying, setIsApplying] = useState(false);
+
+  const handleApply = async () => {
+    if (!work) return;
+    try {
+      setIsApplying(true);
+      await worksApi.applyCollaborator(work.id);
+      showMessage('申请已发送，请等待作者批准', 'success', undefined, undefined, { toast: true, autoCloseMs: 3000 });
+      // 重新加载作品信息以更新状态
+      const updatedWork = await worksApi.getWork(work.id, true, true);
+      setWork(updatedWork);
+    } catch (err: any) {
+      showMessage(err.message || '申请失败', 'error');
+    } finally {
+      setIsApplying(false);
+    }
+  };
   
   // ===== 功能引导状态 =====
   const [tipsEnabled, setTipsEnabled] = useState(true);
@@ -853,13 +887,24 @@ export default function NovelEditorPage() {
             您没有编辑该作品的权限，无法查看内容。
           </p>
           <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
-            <button 
-              className="primary-btn"
-              onClick={() => showMessage('申请已发送，请等待作者批准', 'success')}
-              style={{ padding: '8px 24px' }}
-            >
-              申请编辑权限
-            </button>
+            {isPending ? (
+              <button 
+                className="secondary-btn"
+                disabled
+                style={{ padding: '8px 24px', opacity: 0.7, cursor: 'not-allowed' }}
+              >
+                申请审核中
+              </button>
+            ) : (
+              <button 
+                className="primary-btn"
+                onClick={handleApply}
+                disabled={isApplying}
+                style={{ padding: '8px 24px' }}
+              >
+                {isApplying ? '发送中...' : '申请编辑权限'}
+              </button>
+            )}
             <button 
               className="secondary-btn"
               onClick={() => navigate('/')}
@@ -975,6 +1020,7 @@ export default function NovelEditorPage() {
                 onExport={() => setIsExportModalOpen(true)}
                 onShare={() => setIsShareModalOpen(true)}
                 isMobile={true}
+                hasPendingRequests={hasPendingRequests}
               />
             </>
           ) : (
@@ -985,6 +1031,7 @@ export default function NovelEditorPage() {
                 onClick={() => setIsShareModalOpen(true)}
                 title="共享作品"
               >
+                {hasPendingRequests && <div className="share-badge" />}
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
                 <span>分享</span>
               </button>
@@ -1016,6 +1063,7 @@ export default function NovelEditorPage() {
                   onDeleteWork={handleDeleteWork}
                   onExport={() => setIsExportModalOpen(true)}
                   onShare={() => setIsShareModalOpen(true)}
+                  hasPendingRequests={hasPendingRequests}
                 />
               </div>
 

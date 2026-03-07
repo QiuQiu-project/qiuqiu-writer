@@ -7,6 +7,7 @@ from memos.api.core.security import get_current_user_id
 from memos.api.models.volume import Volume
 from memos.api.models.work import Work
 from memos.api.schemas.volume import VolumeCreate, VolumeUpdate, Volume as VolumeSchema
+from memos.api.services.work_service import WorkService
 
 router = APIRouter(prefix="/api/v1/volumes", tags=["卷管理"])
 
@@ -25,13 +26,11 @@ async def create_volume(
     db: AsyncSession = Depends(get_db_session),
     current_user_id: str = Depends(get_current_user_id)
 ):
-    # Check if work exists and user is owner
-    result = await db.execute(select(Work).where(Work.id == work_id))
-    work = result.scalars().first()
-    if not work:
-        raise HTTPException(status_code=404, detail="作品不存在")
-    if work.owner_id != current_user_id:
-        raise HTTPException(status_code=403, detail="没有权限")
+    work_service = WorkService(db)
+    
+    # Check edit permissions (owner or editor)
+    if not await work_service.can_edit_work(current_user_id, work_id):
+        raise HTTPException(status_code=403, detail="没有创建卷的权限")
 
     # Check volume number uniqueness
     result = await db.execute(
@@ -58,15 +57,11 @@ async def list_volumes(
     db: AsyncSession = Depends(get_db_session),
     current_user_id: str = Depends(get_current_user_id)
 ):
-    # Check permissions
-    result = await db.execute(select(Work).where(Work.id == work_id))
-    work = result.scalars().first()
-    if not work:
-        raise HTTPException(status_code=404, detail="作品不存在")
-    
-    # Allow reading public works or owned works
-    if not work.is_public and work.owner_id != current_user_id:
-        raise HTTPException(status_code=403, detail="没有权限")
+    work_service = WorkService(db)
+
+    # Check access permissions (owner, collaborator, or public)
+    if not await work_service.can_access_work(current_user_id, work_id):
+        raise HTTPException(status_code=403, detail="没有访问该作品卷列表的权限")
 
     result = await db.execute(
         select(Volume).where(Volume.work_id == work_id).order_by(Volume.volume_number)
@@ -80,16 +75,16 @@ async def update_volume(
     db: AsyncSession = Depends(get_db_session),
     current_user_id: str = Depends(get_current_user_id)
 ):
+    work_service = WorkService(db)
+
     result = await db.execute(select(Volume).where(Volume.id == volume_id))
     volume = result.scalars().first()
     if not volume:
         raise HTTPException(status_code=404, detail="卷不存在")
 
-    # Check permissions (via work)
-    result = await db.execute(select(Work).where(Work.id == volume.work_id))
-    work = result.scalars().first()
-    if not work or work.owner_id != current_user_id:
-        raise HTTPException(status_code=403, detail="没有权限")
+    # Check edit permissions (owner or editor)
+    if not await work_service.can_edit_work(current_user_id, volume.work_id):
+        raise HTTPException(status_code=403, detail="没有编辑该卷的权限")
 
     if volume_update.title is not None:
         volume.title = volume_update.title
@@ -117,16 +112,16 @@ async def delete_volume(
     db: AsyncSession = Depends(get_db_session),
     current_user_id: str = Depends(get_current_user_id)
 ):
+    work_service = WorkService(db)
+
     result = await db.execute(select(Volume).where(Volume.id == volume_id))
     volume = result.scalars().first()
     if not volume:
         raise HTTPException(status_code=404, detail="卷不存在")
 
-    # Check permissions
-    result = await db.execute(select(Work).where(Work.id == volume.work_id))
-    work = result.scalars().first()
-    if not work or work.owner_id != current_user_id:
-        raise HTTPException(status_code=403, detail="没有权限")
+    # Check permissions (owner or editor)
+    if not await work_service.can_edit_work(current_user_id, volume.work_id):
+        raise HTTPException(status_code=403, detail="没有删除该卷的权限")
 
     await db.delete(volume)
     await db.commit()

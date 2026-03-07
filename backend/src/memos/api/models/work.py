@@ -128,12 +128,7 @@ class Work(Base):
 
         if include_collaborators:
             data["collaborators"] = [
-                {
-                    "user_id": collab.user_id,
-                    "permission": collab.permission,
-                    "role": collab.role,
-                    "joined_at": collab.joined_at.isoformat() if collab.joined_at else None,
-                }
+                collab.to_dict()
                 for collab in self.collaborators
             ]
 

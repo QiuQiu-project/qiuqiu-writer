@@ -869,6 +869,49 @@ async def get_work_collaborators(
     return [collaborator.to_dict() for collaborator in collaborators]
 
 
+@router.post("/{work_id}/collaborators/apply", response_model=WorkCollaboratorResponse)
+async def apply_for_collaboration(
+    work_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db_session),
+    current_user_id: str = Depends(get_current_user_id)
+) -> Dict[str, Any]:
+    """
+    申请成为协作者
+    """
+    work_service = WorkService(db)
+
+    # 检查作品是否存在
+    work = await work_service.get_work_by_id(work_id)
+    if not work:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="作品不存在"
+        )
+    
+    # 检查是否已经是协作者或已申请
+    collaborators = await work_service.get_work_collaborators(work_id)
+    for c in collaborators:
+        if c.user_id == current_user_id:
+            # 如果是 pending 状态，允许重新申请（自动通过为 reader）
+            # 如果不是 pending（即已经是 owner/editor/reader），则提示已存在
+            if c.permission != 'pending':
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="您已经是该作品的协作者"
+                )
+
+    # 添加申请记录
+    collaborator = await work_service.add_collaborator(
+        work_id=work_id,
+        user_id=current_user_id,
+        permission="reader",
+        invited_by=None
+    )
+    
+    return collaborator.to_dict()
+
+
 @router.post("/{work_id}/collaborators", response_model=WorkCollaboratorResponse)
 async def add_collaborator(
     work_id: str,

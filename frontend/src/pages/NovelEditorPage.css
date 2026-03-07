@@ -628,6 +628,19 @@
   transition: background 0.15s, border-color 0.15s, color 0.15s;
   white-space: nowrap;
   flex-shrink: 0;
+  position: relative;
+}
+
+.share-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  background-color: #ff4d4f;
+  border-radius: 50%;
+  border: 1px solid #fff;
+  z-index: 10;
 }
 
 .header-share-btn:hover {

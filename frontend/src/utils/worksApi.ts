@@ -46,7 +46,7 @@ export interface WorkCollaborator {
   id: number;
   work_id: string;
   user_id: string;
-  permission: 'owner' | 'admin' | 'editor' | 'reader';
+  permission: 'owner' | 'admin' | 'editor' | 'reader' | 'pending';
   role?: string;
   invited_by?: string;
   joined_at: string;
@@ -81,7 +81,7 @@ export interface Work {
   };
   collaborators?: Array<{
     user_id: string;
-    permission: 'owner' | 'admin' | 'editor' | 'reader';
+    permission: 'owner' | 'admin' | 'editor' | 'reader' | 'pending';
     role?: string;
     joined_at?: string;
   }>;
@@ -387,6 +387,13 @@ class WorksApiClient extends BaseApiClient {
     await this.cacheWork(work);
     return work;
   }
+  /**
+   * 申请成为协作者
+   */
+  async applyCollaborator(workId: string): Promise<WorkCollaborator> {
+    return this.post<WorkCollaborator>(`/api/v1/works/${workId}/collaborators/apply`, {});
+  }
+
   /**
    * 获取作品协作者列表
    */

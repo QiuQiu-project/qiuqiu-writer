@@ -40,6 +40,7 @@ try:
         get_chapters_router,
         get_works_router,
         get_volumes_router,
+        get_yjs_router,
     )
     
     app.include_router(get_chapters_router())
@@ -50,6 +51,9 @@ try:
     
     app.include_router(get_works_router())
     logger.info("✅ Works router registered successfully")
+
+    app.include_router(get_yjs_router())
+    logger.info("✅ Yjs router registered successfully")
 except Exception as e:
     logger.warning(f"⚠️  Failed to register chapters/works routers: {e}", exc_info=True)
 
