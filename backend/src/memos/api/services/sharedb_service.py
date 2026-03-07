@@ -1875,7 +1875,7 @@ class ShareDBService:
                                         from memos.api.models.chapter import Chapter as ChapterModel
                                         sum_result = await session.execute(
                                             select(func.sum(ChapterModel.word_count)).where(
-                                                ChapterModel.work_id == db_work_id,
+                                                ChapterModel.work_id == work_id,
                                                 ChapterModel.status != "deleted",
                                             )
                                         )
@@ -1888,7 +1888,7 @@ class ShareDBService:
                                                 word_count=new_total_word_count
                                             )
                                             logger.info(f"✅ [字数统计] 章节 {chapter_id} 字数: {old_word_count} -> {chapter_word_count}, 作品 {work_id} 总字数: {work.word_count or 0} -> {new_total_word_count}")
-                                    
+
                                     # 重新获取更新后的章节和作品数据，用于返回给前端
                                     updated_chapter = await chapter_service.get_chapter_by_id(chapter_id)
                                     updated_work = await work_service.get_work_by_id(work_id)

@@ -14,6 +14,8 @@ Protocol:
 
 import asyncio
 import logging
+import re
+import html
 from datetime import datetime
 from typing import Dict, Optional, Set, Tuple
 
@@ -127,8 +129,13 @@ class YjsRoom:
         except Exception as e:
             logger.error(f"[YjsRoom:{self.room_name}] Failed to load from DB: {e}")
 
-    async def save_to_db(self):
-        """Persist document state to database."""
+    async def save_to_db(self, update_word_count: bool = True):
+        """Persist document state to database.
+        
+        Args:
+            update_word_count: Whether to calculate and update word counts in SQL.
+                             Defaults to True.
+        """
         if not self._dirty:
             return
         try:
@@ -200,6 +207,8 @@ class YjsRoom:
                             # Ensure doc is initialized to have access to _XmlFragment and _Text
                             _ = self.doc
                             ydoc_keys = list(self.doc.keys())
+                            
+                            work_word_count_changed = False
 
                             for chapter in chapters:
                                 field = f"chapter_{chapter.id}"
@@ -272,6 +281,25 @@ class YjsRoom:
                                         upsert=True
                                     )
                                     
+                                    # Update word count for chapter in SQL database
+                                    if update_word_count:
+                                        try:
+                                            # Remove HTML tags
+                                            text_content = re.sub(r'<[^>]+>', '', content)
+                                            # Decode HTML entities
+                                            text_content = html.unescape(text_content)
+                                            # Count characters (Chinese, English letters, Numbers)
+                                            matches = re.findall(r'[\u4e00-\u9fff\u3400-\u4dbfa-zA-Z0-9]', text_content)
+                                            current_word_count = len(matches)
+                                            
+                                            if chapter.word_count != current_word_count:
+                                                logger.info(f"[YjsSync] Updating word count for chapter {chapter.id}: {chapter.word_count} -> {current_word_count}")
+                                                chapter.word_count = current_word_count
+                                                session.add(chapter)
+                                                work_word_count_changed = True
+                                        except Exception as wc_err:
+                                            logger.error(f"[YjsSync] Failed to update word count for chapter {chapter.id}: {wc_err}")
+                                    
                                     if result.modified_count > 0 or result.upserted_id:
                                         logger.info(f"✅ [YjsSync] Chapter {chapter.id} synced to MongoDB ({content_type}), len={len(content)}, matched={result.matched_count}, upserted={result.upserted_id is not None}")
                                     else:
@@ -280,6 +308,32 @@ class YjsRoom:
                                 else:
                                     # Log if field is missing or empty in ydoc
                                     logger.debug(f"ℹ️ [YjsSync] Chapter {chapter.id} has no content in Yjs doc (field: {field})")
+                        
+                            if work_word_count_changed and update_word_count:
+                                await session.commit()
+                                
+                                # Recalculate work total word count
+                                try:
+                                    from sqlalchemy import func
+                                    # Use select to calculate sum
+                                    sum_result = await session.execute(
+                                        select(func.sum(Chapter.word_count)).where(
+                                            Chapter.work_id == db_work_id,
+                                            Chapter.status != "deleted",
+                                        )
+                                    )
+                                    new_total = sum_result.scalar() or 0
+                                    
+                                    # Update Work
+                                    work_to_update = await session.get(Work, db_work_id)
+                                    if work_to_update:
+                                        if work_to_update.word_count != new_total:
+                                            logger.info(f"[YjsSync] Updating total word count for work {db_work_id}: {work_to_update.word_count} -> {new_total}")
+                                            work_to_update.word_count = new_total
+                                            session.add(work_to_update)
+                                            await session.commit()
+                                except Exception as work_wc_err:
+                                    logger.error(f"[YjsSync] Failed to update work total word count: {work_wc_err}")
                         
                         # logger.info(f"[YjsRoom:{self.room_name}] Completed MongoDB sync")
             except Exception as mongo_err:
@@ -325,7 +379,8 @@ class YjsRoom:
 
         if not self.connections:
             # Room is empty - persist document and stop background task
-            await self.save_to_db()
+            # Enable word count update for the final save
+            await self.save_to_db(update_word_count=True)
             if self._persist_task and not self._persist_task.done():
                 self._persist_task.cancel()
                 self._persist_task = None
@@ -419,7 +474,8 @@ class YjsRoom:
             while True:
                 await asyncio.sleep(5)
                 if self._dirty and self.connections:
-                    await self.save_to_db()
+                    # Skip word count update for periodic saves to reduce load
+                    await self.save_to_db(update_word_count=False)
         except asyncio.CancelledError:
             pass
 
