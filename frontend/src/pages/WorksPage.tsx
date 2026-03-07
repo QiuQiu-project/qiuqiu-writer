@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Grid, List, Plus, Upload, ChevronDown, Download, Link2, Trash2, RefreshCw } from 'lucide-react';
+import { Grid, List, Plus, Upload, ChevronDown, Download, Link2, Trash2, RefreshCw, Users } from 'lucide-react';
 import { worksApi, type Work } from '../utils/worksApi';
 import { exportAsText, exportAsWord, exportAsPdf } from '../utils/exportUtils';
 import { copyToClipboard } from '../utils/clipboard';
 import ImportWorkModal from '../components/ImportWorkModal';
 import WorkRecoveryModal from '../components/WorkRecoveryModal';
+import ShareWorkModal from '../components/ShareWorkModal';
 import MessageModal from '../components/common/MessageModal';
 import type { MessageType } from '../components/common/MessageModal';
 import { parseError } from '../utils/errorUtils';
@@ -29,6 +30,7 @@ export default function WorksPage() {
   const [total, setTotal] = useState(0);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
+  const [shareWork, setShareWork] = useState<Work | null>(null);
 
   // 消息提示状态
   const [messageState, setMessageState] = useState<{
@@ -479,6 +481,16 @@ export default function WorksPage() {
                     <Link2 size={16} />
                   </button>
                   <button
+                    className="work-action-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShareWork(work);
+                    }}
+                    title="共享作品"
+                  >
+                    <Users size={16} />
+                  </button>
+                  <button
                     className="work-action-btn danger"
                     type="button"
                     onClick={(e) => {
@@ -529,6 +541,13 @@ export default function WorksPage() {
           <span className="pagination-info">共 {total} 条</span>
         </div>
       )}
+
+      <ShareWorkModal
+        isOpen={shareWork !== null}
+        workId={shareWork?.id ?? ''}
+        workTitle={shareWork?.title ?? ''}
+        onClose={() => setShareWork(null)}
+      />
 
       <ImportWorkModal
         isOpen={showImportModal}

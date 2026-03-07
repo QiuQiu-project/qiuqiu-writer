@@ -7,7 +7,7 @@ from typing import Dict, Any, Optional
 
 from sqlalchemy import (
     Column, Integer, String, Boolean, DateTime, Text,
-    Index, ForeignKey, and_
+    Index, ForeignKey, and_, UniqueConstraint
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship, foreign
@@ -144,6 +144,9 @@ class WorkCollaborator(Base):
     """作品协作者表"""
 
     __tablename__ = "work_collaborators"
+    __table_args__ = (
+        UniqueConstraint("work_id", "user_id", name="uq_work_collaborator"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     work_id = Column(String(40), ForeignKey("works.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -170,16 +173,16 @@ class WorkCollaborator(Base):
     @property
     def can_edit(self) -> bool:
         """是否可以编辑"""
-        return self.permission in ["owner", "editor"]
+        return self.permission in ["owner", "admin", "editor"]
 
     @property
     def can_read(self) -> bool:
         """是否可以阅读"""
-        return self.permission in ["owner", "editor", "reader"]
+        return self.permission in ["owner", "admin", "editor", "reader"]
 
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
-        return {
+        data = {
             "id": self.id,
             "work_id": self.work_id,
             "user_id": self.user_id,
@@ -189,6 +192,11 @@ class WorkCollaborator(Base):
             "joined_at": self.joined_at.isoformat() if self.joined_at else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
+        if self.user:
+            data["username"] = self.user.username
+            data["display_name"] = self.user.display_name
+            data["avatar_url"] = self.user.avatar_url
+        return data
 
 
 # 索引

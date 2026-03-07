@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Search, Lightbulb, LightbulbOff, Trash2, MoreVertical, Download } from 'lucide-react';
+import { Search, Lightbulb, LightbulbOff, Trash2, MoreVertical, Download, Users } from 'lucide-react';
 import ThemeSelector from '../ThemeSelector';
 import './HeaderSettingsMenu.css';
 
@@ -9,6 +9,7 @@ interface HeaderSettingsMenuProps {
   onToggleTips: () => void;
   onDeleteWork: () => void;
   onExport: () => void;
+  onShare: () => void;
   isMobile?: boolean;
 }
 
@@ -18,6 +19,7 @@ export default function HeaderSettingsMenu({
   onToggleTips,
   onDeleteWork,
   onExport,
+  onShare,
   isMobile = false
 }: HeaderSettingsMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -99,6 +101,17 @@ export default function HeaderSettingsMenu({
           >
             <Download size={16} />
             <span>导出作品</span>
+          </button>
+
+          <button 
+            className="menu-item" 
+            onClick={() => {
+              onShare();
+              setIsOpen(false);
+            }}
+          >
+            <Users size={16} />
+            <span>添加协作者</span>
           </button>
 
           <button 

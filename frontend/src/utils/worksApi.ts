@@ -42,6 +42,20 @@ function mapWorkTypeToFrontend(backendType: BackendWorkType): FrontendWorkType {
   return REVERSE_WORK_TYPE_MAP[backendType] || 'long';
 }
 
+export interface WorkCollaborator {
+  id: number;
+  work_id: string;
+  user_id: string;
+  permission: 'owner' | 'admin' | 'editor' | 'reader';
+  role?: string;
+  invited_by?: string;
+  joined_at: string;
+  created_at: string;
+  username?: string;
+  display_name?: string;
+  avatar_url?: string;
+}
+
 export interface Work {
   id: string;
   owner_id: string;
@@ -65,6 +79,12 @@ export interface Work {
     }>;
     [key: string]: unknown;
   };
+  collaborators?: Array<{
+    user_id: string;
+    permission: 'owner' | 'admin' | 'editor' | 'reader';
+    role?: string;
+    joined_at?: string;
+  }>;
 }
 
 export interface WorkCreate {
@@ -366,6 +386,37 @@ class WorksApiClient extends BaseApiClient {
     const work = this.mapBackendWork(response);
     await this.cacheWork(work);
     return work;
+  }
+  /**
+   * 获取作品协作者列表
+   */
+  async getCollaborators(workId: string): Promise<WorkCollaborator[]> {
+    return this.get<WorkCollaborator[]>(`/api/v1/works/${workId}/collaborators`);
+  }
+
+  /**
+   * 添加协作者（通过用户名或邮箱）
+   */
+  async addCollaborator(workId: string, usernameOrEmail: string, permission: 'admin' | 'editor' | 'reader', role?: string): Promise<WorkCollaborator> {
+    return this.post<WorkCollaborator>(`/api/v1/works/${workId}/collaborators`, {
+      username_or_email: usernameOrEmail,
+      permission,
+      role,
+    });
+  }
+
+  /**
+   * 更新协作者权限
+   */
+  async updateCollaborator(workId: string, userId: string, updates: { permission?: string; role?: string }): Promise<WorkCollaborator> {
+    return this.put<WorkCollaborator>(`/api/v1/works/${workId}/collaborators/${userId}`, updates);
+  }
+
+  /**
+   * 移除协作者
+   */
+  async removeCollaborator(workId: string, userId: string): Promise<void> {
+    await this.delete(`/api/v1/works/${workId}/collaborators/${userId}`);
   }
 }
 

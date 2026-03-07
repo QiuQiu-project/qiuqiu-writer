@@ -201,9 +201,18 @@ class WorkCollaboratorBase(BaseModel):
         return v
 
 
-class WorkCollaboratorCreate(WorkCollaboratorBase):
+class WorkCollaboratorCreate(BaseModel):
     """作品协作者创建模式"""
-    pass
+    username_or_email: str
+    permission: str = "editor"  # admin/editor/reader
+    role: Optional[str] = None
+
+    @validator("permission")
+    def validate_permission(cls, v):
+        allowed_permissions = ["admin", "editor", "reader"]
+        if v not in allowed_permissions:
+            raise ValueError(f"权限级别必须是: {', '.join(allowed_permissions)}")
+        return v
 
 
 class WorkCollaboratorUpdate(BaseModel):
@@ -214,7 +223,7 @@ class WorkCollaboratorUpdate(BaseModel):
     @validator("permission")
     def validate_permission(cls, v):
         if v is not None:
-            allowed_permissions = ["owner", "editor", "reader"]
+            allowed_permissions = ["admin", "editor", "reader"]
             if v not in allowed_permissions:
                 raise ValueError(f"权限级别必须是: {', '.join(allowed_permissions)}")
         return v
@@ -230,6 +239,9 @@ class WorkCollaboratorResponse(BaseModel):
     invited_by: Optional[str]
     joined_at: datetime
     created_at: datetime
+    username: Optional[str] = None
+    display_name: Optional[str] = None
+    avatar_url: Optional[str] = None
 
     class Config:
         from_attributes = True

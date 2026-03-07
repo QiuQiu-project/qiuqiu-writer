@@ -610,6 +610,32 @@
   width: 100%;
 }
 
+/* 分享按钮（飞书风格） */
+.header-share-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4e6ef2;
+  background: rgba(78, 110, 242, 0.1);
+  border: 1px solid rgba(78, 110, 242, 0.28);
+  border-radius: 7px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.header-share-btn:hover {
+  background: rgba(78, 110, 242, 0.18);
+  border-color: rgba(78, 110, 242, 0.5);
+  color: #6b8ef5;
+}
+
 /* 侧边栏折叠按钮组 */
 .sidebar-toggle-buttons {
   display: flex;
@@ -1202,9 +1228,20 @@
   .header-actions .action-btn span {
     display: none; /* Hide text labels in header actions */
   }
-  
+
   .header-actions .action-btn {
     padding: 8px;
+  }
+
+  .header-share-btn span {
+    display: none;
+  }
+
+  .header-share-btn {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    justify-content: center;
   }
 }
 

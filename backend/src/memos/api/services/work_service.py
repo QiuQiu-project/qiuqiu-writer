@@ -31,9 +31,9 @@ class WorkService:
 
         self.db.add(work)
         await self.db.commit()
-        await self.db.refresh(work)
-
-        return work
+        
+        # 重新加载以确保关系被加载（特别是 collaborators 和 chapters）
+        return await self.get_work_by_id(work_id)
 
     async def get_work_by_id(self, work_id: str) -> Optional[Work]:
         """根据ID获取作品"""
@@ -216,9 +216,9 @@ class WorkService:
                     setattr(work, key, value)
 
         await self.db.commit()
-        await self.db.refresh(work)
-
-        return work
+        
+        # 重新加载以确保关系被加载
+        return await self.get_work_by_id(work_id)
 
     async def delete_work(self, work_id: str) -> bool:
         """删除作品"""
@@ -241,9 +241,8 @@ class WorkService:
         work.published_at = func.now()
 
         await self.db.commit()
-        await self.db.refresh(work)
-
-        return work
+        # 重新加载以确保关系被加载
+        return await self.get_work_by_id(work_id)
 
     async def archive_work(self, work_id: str) -> Work:
         """归档作品"""
@@ -254,9 +253,8 @@ class WorkService:
         work.status = "archived"
 
         await self.db.commit()
-        await self.db.refresh(work)
-
-        return work
+        # 重新加载以确保关系被加载
+        return await self.get_work_by_id(work_id)
 
     # 协作者管理
     async def get_work_collaborators(self, work_id: str) -> List[WorkCollaborator]:
@@ -276,7 +274,32 @@ class WorkService:
         role: str = None,
         invited_by: str = None
     ) -> WorkCollaborator:
-        """添加协作者"""
+        """添加协作者（已存在则更新权限）"""
+        stmt = select(WorkCollaborator).options(
+            selectinload(WorkCollaborator.user)
+        ).where(
+            and_(
+                WorkCollaborator.work_id == work_id,
+                WorkCollaborator.user_id == user_id
+            )
+        )
+        result = await self.db.execute(stmt)
+        existing = result.scalars().first()
+
+        if existing:
+            # 已存在则更新权限和角色
+            existing.permission = permission
+            if role is not None:
+                existing.role = role
+            await self.db.commit()
+            
+            # 重新加载以获取 user 信息
+            stmt = select(WorkCollaborator).options(
+                selectinload(WorkCollaborator.user)
+            ).where(WorkCollaborator.id == existing.id)
+            result = await self.db.execute(stmt)
+            return result.scalars().first()
+
         collaborator = WorkCollaborator(
             work_id=work_id,
             user_id=user_id,
@@ -288,12 +311,19 @@ class WorkService:
         self.db.add(collaborator)
         await self.db.commit()
         await self.db.refresh(collaborator)
-
-        return collaborator
+        
+        # 重新加载以获取 user 信息
+        stmt = select(WorkCollaborator).options(
+            selectinload(WorkCollaborator.user)
+        ).where(WorkCollaborator.id == collaborator.id)
+        result = await self.db.execute(stmt)
+        return result.scalars().first()
 
     async def update_collaborator(self, work_id: str, user_id: str, **kwargs) -> Optional[WorkCollaborator]:
         """更新协作者"""
-        stmt = select(WorkCollaborator).where(
+        stmt = select(WorkCollaborator).options(
+            selectinload(WorkCollaborator.user)
+        ).where(
             and_(
                 WorkCollaborator.work_id == work_id,
                 WorkCollaborator.user_id == user_id
@@ -301,7 +331,7 @@ class WorkService:
         )
 
         result = await self.db.execute(stmt)
-        collaborator = result.scalar_one_or_none()
+        collaborator = result.scalars().first()
 
         if not collaborator:
             return None
@@ -312,12 +342,16 @@ class WorkService:
                 setattr(collaborator, key, value)
 
         await self.db.commit()
-        await self.db.refresh(collaborator)
-
-        return collaborator
+        
+        # 重新加载以获取 user 信息
+        stmt = select(WorkCollaborator).options(
+            selectinload(WorkCollaborator.user)
+        ).where(WorkCollaborator.id == collaborator.id)
+        result = await self.db.execute(stmt)
+        return result.scalars().first()
 
     async def remove_collaborator(self, work_id: str, user_id: str) -> bool:
-        """移除协作者"""
+        """移除协作者（处理可能存在的重复记录）"""
         stmt = select(WorkCollaborator).where(
             and_(
                 WorkCollaborator.work_id == work_id,
@@ -326,12 +360,13 @@ class WorkService:
         )
 
         result = await self.db.execute(stmt)
-        collaborator = result.scalar_one_or_none()
+        collaborators = result.scalars().all()
 
-        if not collaborator:
+        if not collaborators:
             return False
 
-        await self.db.delete(collaborator)
+        for c in collaborators:
+            await self.db.delete(c)
         await self.db.commit()
 
         return True
@@ -347,17 +382,13 @@ class WorkService:
         if work.owner_id == user_id:
             return True
 
-        # 检查是否为协作者
-        collaborator_stmt = select(WorkCollaborator).where(
-            and_(
-                WorkCollaborator.work_id == work_id,
-                WorkCollaborator.user_id == user_id
-            )
-        )
-        collaborator_result = await self.db.execute(collaborator_stmt)
-        collaborator = collaborator_result.scalar_one_or_none()
+        # 检查是否为协作者（使用已加载的 collaborators 关系）
+        # get_work_by_id 已经使用 selectinload 加载了 collaborators
+        for collaborator in work.collaborators:
+            if collaborator.user_id == user_id:
+                return True
 
-        return collaborator is not None or work.is_public
+        return work.is_public
 
     async def can_edit_work(self, user_id: str, work_id: str) -> bool:
         """检查用户是否可以编辑作品"""
@@ -369,18 +400,13 @@ class WorkService:
         if work.owner_id == user_id:
             return True
 
-        # 检查协作者权限
-        collaborator_stmt = select(WorkCollaborator).where(
-            and_(
-                WorkCollaborator.work_id == work_id,
-                WorkCollaborator.user_id == user_id,
-                WorkCollaborator.permission.in_(["owner", "editor"])
-            )
-        )
-        collaborator_result = await self.db.execute(collaborator_stmt)
-        collaborator = collaborator_result.scalar_one_or_none()
+        # 检查协作者权限（使用已加载的 collaborators 关系）
+        for collaborator in work.collaborators:
+            if collaborator.user_id == user_id:
+                if collaborator.permission in ["owner", "admin", "editor"]:
+                    return True
 
-        return collaborator is not None
+        return False
 
     # 用户查询
     async def get_user_by_username_or_email(self, username_or_email: str) -> Optional[User]:

@@ -28,6 +28,7 @@ import OnboardingGuide from '../components/common/OnboardingGuide';
 import HeaderSettingsMenu from '../components/editor/HeaderSettingsMenu';
 import FeedbackModal from '../components/common/FeedbackModal';
 import ExportModal from '../components/editor/ExportModal';
+import ShareWorkModal from '../components/ShareWorkModal';
 
 // HooksExportModal from '../components/editor/ExportModal';
 
@@ -45,7 +46,7 @@ import type { ChapterFullData } from '../types/document';
 
 // API和工具
 import { worksApi, type Work } from '../utils/worksApi';
-import { authApi } from '../utils/authApi';
+import { authApi, type UserInfo } from '../utils/authApi';
 import { countCharacters } from '../utils/textUtils';
 import { generateChapterContent } from '../utils/bookAnalysisApi';
 import { chaptersApi } from '../utils/chaptersApi';
@@ -57,6 +58,7 @@ import '../components/editor/NovelEditor.css';
 import './NovelEditorPage.css';
 
 export default function NovelEditorPage() {
+  // Hook Order Fix: Ensure all hooks are declared at the top level before any conditional returns.
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const workId = searchParams.get('workId');
@@ -64,6 +66,7 @@ export default function NovelEditorPage() {
   
   // ===== 基础状态 =====
   const [work, setWork] = useState<Work | null>(null);
+  const [currentUser, setCurrentUser] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updateTrigger, setUpdateTrigger] = useState(0);
@@ -90,10 +93,24 @@ export default function NovelEditorPage() {
   /** 从编辑器选中发起 AI 对话时，只传章节引用（对话框里显示徽章 @chapter:x第n字-第m字，不显示选中正文） */
   const [initialSelectionRef, setInitialSelectionRef] = useState<{ chapterId: string; startChar: number; endChar: number } | null>(null);
   
+  // 权限检查
+  const canEdit = useMemo(() => {
+    if (!work || !currentUser) return false;
+    if (work.owner_id === currentUser.id) return true;
+    if (work.collaborators) {
+      const collaborator = work.collaborators.find(c => c.user_id === currentUser.id);
+      if (collaborator && ['admin', 'editor'].includes(collaborator.permission)) {
+        return true;
+      }
+    }
+    return false;
+  }, [work, currentUser]);
+  
   // ===== 功能引导状态 =====
   const [tipsEnabled, setTipsEnabled] = useState(true);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   useEffect(() => {
     const checkTipsEnabled = () => {
@@ -356,8 +373,14 @@ export default function NovelEditorPage() {
     const loadWork = async () => {
       try {
         setLoading(true);
-        const workData = await worksApi.getWork(workId, true, true);
+        // 并行加载作品和用户信息
+        const [workData, userData] = await Promise.all([
+          worksApi.getWork(workId, true, true),
+          authApi.getCurrentUser().catch(() => null)
+        ]);
+        
         setWork(workData);
+        setCurrentUser(userData);
         
         if ((workData as { _fromCache?: boolean })._fromCache) {
           setError('使用缓存数据（数据库不可用）');
@@ -365,7 +388,6 @@ export default function NovelEditorPage() {
           setError(null);
         }
       } catch (err) {
-        
         setError(err instanceof Error ? err.message : '加载作品失败');
       } finally {
         setLoading(false);
@@ -813,21 +835,55 @@ export default function NovelEditorPage() {
     );
   }
   
+  // 权限检查逻辑已移至组件顶部
+
+  if (work && !canEdit) {
+    return (
+      <div className="novel-editor-page" style={{ justifyContent: 'center', alignItems: 'center' }}>
+        <div style={{ 
+          textAlign: 'center', 
+          padding: '40px', 
+          background: 'var(--bg-secondary, #252b3b)', 
+          borderRadius: '8px',
+          maxWidth: '500px',
+          width: '90%'
+        }}>
+          <h2 style={{ marginBottom: '16px', color: 'var(--text-primary, #e1e1e1)' }}>{work.title}</h2>
+          <p style={{ marginBottom: '24px', color: 'var(--text-secondary, #a0a0a0)' }}>
+            您没有编辑该作品的权限，无法查看内容。
+          </p>
+          <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
+            <button 
+              className="primary-btn"
+              onClick={() => showMessage('申请已发送，请等待作者批准', 'success')}
+              style={{ padding: '8px 24px' }}
+            >
+              申请编辑权限
+            </button>
+            <button 
+              className="secondary-btn"
+              onClick={() => navigate('/')}
+              style={{ padding: '8px 24px' }}
+            >
+              返回首页
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="novel-editor-page">
       {/* 顶部工具栏 */}
       <header className="novel-editor-header">
         <div className="header-left">
           <button className="exit-btn" onClick={() => {
-            if (work?.owner_id) {
-              const currentUser = authApi.getUserInfo();
-              if (currentUser?.id && work.owner_id === currentUser.id) {
-                navigate(`/users/${currentUser.id}`);
-              } else {
-                navigate(`/users/${work.owner_id}`);
-              }
+            const currentUser = authApi.getUserInfo();
+            if (currentUser?.id) {
+              navigate(`/users/${currentUser.id}`);
             } else {
-              navigate(-1);
+              navigate('/');
             }
           }}>
             <ArrowLeft size={16} />
@@ -917,12 +973,21 @@ export default function NovelEditorPage() {
                 onToggleTips={toggleTips}
                 onDeleteWork={handleDeleteWork}
                 onExport={() => setIsExportModalOpen(true)}
+                onShare={() => setIsShareModalOpen(true)}
                 isMobile={true}
               />
             </>
           ) : (
             <>
               <div className="header-actions">
+              <button
+                className="header-share-btn"
+                onClick={() => setIsShareModalOpen(true)}
+                title="共享作品"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+                <span>分享</span>
+              </button>
               <div className="sidebar-toggle-buttons">
                 <button
                   className={`sidebar-toggle-btn-header left-toggle-header ${leftSidebarCollapsed ? 'collapsed' : ''}`}
@@ -950,6 +1015,7 @@ export default function NovelEditorPage() {
                   onToggleTips={toggleTips}
                   onDeleteWork={handleDeleteWork}
                   onExport={() => setIsExportModalOpen(true)}
+                  onShare={() => setIsShareModalOpen(true)}
                 />
               </div>
 
@@ -1370,6 +1436,13 @@ export default function NovelEditorPage() {
         workId={workId || ''}
         workTitle={work?.title || '未命名作品'}
         volumes={volumes}
+      />
+
+      <ShareWorkModal
+        isOpen={isShareModalOpen}
+        workId={workId || ''}
+        workTitle={work?.title || '未命名作品'}
+        onClose={() => setIsShareModalOpen(false)}
       />
 
       <FeedbackModal
