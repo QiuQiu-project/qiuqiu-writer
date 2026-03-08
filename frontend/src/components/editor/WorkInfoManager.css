@@ -55,6 +55,13 @@
     min-width: 32px;
     width: 32px;
     padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .header-btn svg {
+    flex-shrink: 0;
   }
 
   /* 特殊处理编辑模式按钮，让其保留图标（通常它是纯图标按钮或已有图标） */
