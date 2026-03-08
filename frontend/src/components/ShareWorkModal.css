@@ -397,18 +397,29 @@
 
 /* Toast */
 .swm-toast {
-  position: absolute;
-  bottom: -44px;
+  position: fixed;
+  top: 40px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(30,36,56,0.95);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 100px;
-  padding: 8px 16px;
-  font-size: 12px;
-  color: var(--text-primary, #e2e8f0);
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 10px 20px;
+  font-size: 14px;
+  color: #ffffff;
   white-space: nowrap;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
-  animation: swm-slide-in 0.15s ease;
-  z-index: 10400;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: swm-slide-in-top 0.3s cubic-bezier(0.2, 0, 0, 1);
+  z-index: 99999;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@keyframes swm-slide-in-top {
+  from { opacity: 0; transform: translate(-50%, -10px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
 }

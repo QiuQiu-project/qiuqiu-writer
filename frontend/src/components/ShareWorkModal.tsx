@@ -376,7 +376,10 @@ export default function ShareWorkModal({ isOpen, workId, workTitle, onClose }: S
         </div>
 
         {/* Toast */}
-        {toast && <div className="swm-toast">{toast}</div>}
+        {toast && createPortal(
+          <div className="swm-toast">{toast}</div>,
+          document.body
+        )}
       </div>
     </div>
   );
