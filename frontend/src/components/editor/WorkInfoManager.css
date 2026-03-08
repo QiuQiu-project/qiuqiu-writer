@@ -39,7 +39,7 @@
     display: none;
   }
 
-  .header-btn {
+  .header-actions .header-btn {
     padding: 0 10px;
     height: 30px;
     font-size: 12px;
@@ -47,11 +47,11 @@
 }
 
 @media (max-width: 640px) {
-  .btn-text {
+  .header-actions .btn-text {
     display: none;
   }
 
-  .header-btn {
+  .header-actions .header-btn {
     min-width: 32px;
     width: 32px;
     padding: 0;
@@ -60,12 +60,12 @@
     justify-content: center;
   }
 
-  .header-btn svg {
+  .header-actions .header-btn svg {
     flex-shrink: 0;
   }
 
   /* 特殊处理编辑模式按钮，让其保留图标（通常它是纯图标按钮或已有图标） */
-  .edit-mode-btn {
+  .header-actions .edit-mode-btn {
     width: 32px;
     padding: 0;
   }
