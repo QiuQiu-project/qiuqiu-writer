@@ -1500,6 +1500,101 @@
   background: var(--text-tertiary, #999999);
 }
 
+/* 章节底部导航 - 固定在编辑器底部 */
+.chapter-nav-footer {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px;
+  flex-shrink: 0;
+  width: 100% !important;
+  box-sizing: border-box;
+  padding: 12px 24px;
+  border-top: 1px solid var(--border-light, rgba(0,0,0,0.08));
+  background: var(--bg-primary, #fff);
+}
+
+.chapter-nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 0%; /* Allow buttons to grow/shrink equally */
+  min-width: 0;
+  max-width: 48%;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--text-secondary, #666);
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.chapter-nav-placeholder {
+  flex: 1 1 0%;
+  min-width: 0;
+  max-width: 48%;
+  visibility: hidden;
+}
+
+
+.chapter-nav-btn:hover {
+  background: var(--bg-hover, rgba(0,0,0,0.05));
+  border-color: rgba(37, 99, 235, 0.2);
+  color: var(--accent-primary, #2563eb);
+}
+
+.chapter-nav-btn svg {
+  flex-shrink: 0;
+  opacity: 0.55;
+  transition: opacity 0.12s;
+}
+
+.chapter-nav-btn:hover svg {
+  opacity: 1;
+}
+
+.chapter-nav-btn.next {
+  text-align: right;
+  justify-content: flex-end;
+  /* margin-left: auto; REMOVED to avoid pushing too hard */
+}
+
+.chapter-nav-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.chapter-nav-label {
+  font-size: 10px;
+  color: var(--text-tertiary, #999);
+  letter-spacing: 0.03em;
+}
+
+.chapter-nav-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
+}
+
+@media (max-width: 768px) {
+  .chapter-nav-footer {
+    padding: 6px 12px;
+  }
+  .chapter-nav-title {
+    max-width: 100px;
+  }
+}
+
 /* 章节头部信息 - 作为编辑器的一部分 */
 .editor-with-header .chapter-header-info {
   text-align: center;
@@ -2392,6 +2487,22 @@
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.07);
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.45);
+}
+
+:root[data-theme="dark"] .chapter-nav-footer {
+  border-top-color: rgba(255, 255, 255, 0.07);
+}
+
+:root[data-theme="dark"] .chapter-nav-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.55);
+}
+
+:root[data-theme="dark"] .chapter-nav-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(99, 149, 255, 0.35);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 :root[data-theme="dark"] .novel-editor-page .editor-with-header .ProseMirror {

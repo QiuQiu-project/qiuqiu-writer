@@ -410,6 +410,16 @@ export default function NovelEditorPage() {
     return Array.from(charSet);
   }, [chaptersData]);
 
+  // ===== 章节顺序导航 =====
+  const orderedChapters = useMemo(() => volumes.flatMap(vol => vol.chapters), [volumes]);
+  const currentChapterIndex = useMemo(
+    () => (selectedChapter ? orderedChapters.findIndex(c => c.id === selectedChapter) : -1),
+    [orderedChapters, selectedChapter]
+  );
+  const prevChapter = currentChapterIndex > 0 ? orderedChapters[currentChapterIndex - 1] : null;
+  const nextChapter = currentChapterIndex >= 0 && currentChapterIndex < orderedChapters.length - 1
+    ? orderedChapters[currentChapterIndex + 1] : null;
+
   // 传给章节弹窗的角色列表保持引用稳定，避免弹窗内 useEffect 因依赖变化反复重置选中状态
   const chapterModalAvailableCharacters = useMemo(
     () => availableCharacters.map((char, index) => ({ id: String(index), name: char })),
@@ -1041,11 +1051,13 @@ export default function NovelEditorPage() {
                 onShare={() => setIsShareModalOpen(true)}
                 isMobile={true}
                 hasPendingRequests={hasPendingRequests}
+                readOnly={!canEdit}
               />
             </>
           ) : (
             <>
               <div className="header-actions">
+              {canEdit && (
               <button
                 className="header-share-btn"
                 onClick={() => setIsShareModalOpen(true)}
@@ -1055,6 +1067,7 @@ export default function NovelEditorPage() {
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
                 <span>分享</span>
               </button>
+              )}
               <div className="sidebar-toggle-buttons">
                 <button
                   className={`sidebar-toggle-btn-header left-toggle-header ${leftSidebarCollapsed ? 'collapsed' : ''}`}
@@ -1084,6 +1097,7 @@ export default function NovelEditorPage() {
                   onExport={() => setIsExportModalOpen(true)}
                   onShare={() => setIsShareModalOpen(true)}
                   hasPendingRequests={hasPendingRequests}
+                  readOnly={!canEdit}
                 />
               </div>
 
@@ -1189,7 +1203,7 @@ export default function NovelEditorPage() {
               }}
             />
           )}
-          {activeNav === 'map' && <MapView />}
+          {activeNav === 'map' && <MapView readOnly={!canEdit} />}
           {activeNav === 'characters' && (
             <Characters 
               readOnly={!canEdit}
@@ -1227,6 +1241,7 @@ export default function NovelEditorPage() {
                           onOpenHistory={() => setIsHistoryModalOpen(true)}
                           headingMenuOpen={headingMenuOpen}
                           setHeadingMenuOpen={setHeadingMenuOpen}
+                          readOnly={!canEdit}
                         />
                       </div>
                       
@@ -1236,12 +1251,12 @@ export default function NovelEditorPage() {
                           <div className="chapter-header-info">
                             <div
                               ref={chapterNumberInputRef}
-                              className="chapter-number chapter-number-editable"
-                              contentEditable
+                              className={`chapter-number ${canEdit ? 'chapter-number-editable' : ''}`}
+                              contentEditable={canEdit}
                               suppressContentEditableWarning
                               onBlur={handleSaveChapterNumber}
                               onKeyDown={handleChapterNumberKeyDown}
-                              title="点击编辑章节号"
+                              title={canEdit ? "点击编辑章节号" : undefined}
                               data-placeholder={chaptersData[selectedChapter].volumeTitle || '第1章'}
                             >
                               {getChapterNumberDisplayText(chaptersData[selectedChapter])}
@@ -1249,7 +1264,7 @@ export default function NovelEditorPage() {
                             <h2
                               ref={chapterNameInputRef}
                               className="chapter-title"
-                              contentEditable
+                              contentEditable={canEdit}
                               suppressContentEditableWarning
                               onBlur={handleSaveChapterName}
                               onKeyDown={handleChapterNameKeyDown}
@@ -1264,6 +1279,36 @@ export default function NovelEditorPage() {
                           <EditorContent editor={editor} />
                         </div>
                       </div>
+
+                      {/* 章节导航 - 固定在编辑器底部 */}
+                      {(prevChapter || nextChapter) && (
+                        <div className="chapter-nav-footer">
+                          {prevChapter ? (
+                            <button
+                              className="chapter-nav-btn prev"
+                              onClick={() => handleChapterSelect(prevChapter.id)}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                              <div className="chapter-nav-info">
+                                <span className="chapter-nav-label">上一章</span>
+                                <span className="chapter-nav-title">{prevChapter.title || '未命名章节'}</span>
+                              </div>
+                            </button>
+                          ) : <div className="chapter-nav-placeholder" />}
+                          {nextChapter ? (
+                            <button
+                              className="chapter-nav-btn next"
+                              onClick={() => handleChapterSelect(nextChapter.id)}
+                            >
+                              <div className="chapter-nav-info">
+                                <span className="chapter-nav-label">下一章</span>
+                                <span className="chapter-nav-title">{nextChapter.title || '未命名章节'}</span>
+                              </div>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                            </button>
+                          ) : <div className="chapter-nav-placeholder" />}
+                        </div>
+                      )}
                     </div>
                 </div>
               </div>
@@ -1280,6 +1325,7 @@ export default function NovelEditorPage() {
                 onOptimizeInEditor={handleSelectionOptimize}
                 onClose={() => setSelectionPopup((prev) => ({ ...prev, visible: false }))}
                 optimizing={selectionOptimizing}
+                readOnly={!canEdit}
               />
               {/* 查找替换面板 */}
               {isReplacePanelOpen && (
@@ -1331,6 +1377,7 @@ export default function NovelEditorPage() {
                         </span>
                       )}
                     </div>
+                    {canEdit && (
                     <div className="replace-input-wrapper">
                       <input
                         type="text"
@@ -1367,6 +1414,7 @@ export default function NovelEditorPage() {
                         </button>
                       </div>
                     </div>
+                    )}
                   </div>
                   <div className="find-replace-options">
                     <label className="option-checkbox">
@@ -1469,7 +1517,7 @@ export default function NovelEditorPage() {
         chapterTitle={selectedChapter && chaptersData[selectedChapter] ? chaptersData[selectedChapter].title : undefined}
         onClose={() => setIsHistoryModalOpen(false)}
         getCurrentContent={editor ? () => getTextFromProsemirrorJSON(editor.getJSON()) : undefined}
-        onRestore={editor && selectedChapter ? async (id, type) => {
+        onRestore={canEdit && editor && selectedChapter ? async (id, type) => {
           const chapterIdNum = parseInt(selectedChapter!, 10);
           if (Number.isNaN(chapterIdNum)) return;
           
