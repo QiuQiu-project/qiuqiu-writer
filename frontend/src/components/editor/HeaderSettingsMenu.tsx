@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Search, Lightbulb, LightbulbOff, Trash2, MoreVertical, Download, Users } from 'lucide-react';
+import { Search, Lightbulb, LightbulbOff, Trash2, MoreVertical, Download } from 'lucide-react';
 import ThemeSelector from '../ThemeSelector';
 import './HeaderSettingsMenu.css';
 
@@ -21,7 +21,6 @@ export default function HeaderSettingsMenu({
   onToggleTips,
   onDeleteWork,
   onExport,
-  onShare,
   isMobile = false,
   hasPendingRequests = false,
   readOnly,
