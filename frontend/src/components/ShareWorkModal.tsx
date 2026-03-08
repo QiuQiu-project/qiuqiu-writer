@@ -197,7 +197,42 @@ export default function ShareWorkModal({ isOpen, workId, workTitle, onClose }: S
 
   const handleCopyLink = () => {
     const url = `${window.location.origin}/novel/editor?workId=${workId}`;
-    navigator.clipboard?.writeText(url).then(() => showToast('链接已复制'));
+    
+    // 尝试使用 navigator.clipboard (仅在安全上下文 HTTPS/localhost 可用)
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(url)
+        .then(() => showToast('链接已复制'))
+        .catch(() => fallbackCopy(url));
+    } else {
+      fallbackCopy(url);
+    }
+  };
+
+  const fallbackCopy = (text: string) => {
+    try {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      
+      // 避免滚动到底部
+      textArea.style.position = "fixed";
+      textArea.style.left = "-9999px";
+      textArea.style.top = "0";
+      
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      
+      if (successful) {
+        showToast('链接已复制');
+      } else {
+        showToast('复制失败，请手动复制');
+      }
+    } catch (err) {
+      showToast('复制失败，请手动复制');
+    }
   };
 
   const pendingCollaborators = collaborators.filter(c => c.permission === 'pending');
