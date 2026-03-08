@@ -110,20 +110,6 @@ export default function HeaderSettingsMenu({
 
           {!readOnly && (
             <button 
-              className="menu-item" 
-              onClick={() => {
-                onShare();
-                setIsOpen(false);
-              }}
-            >
-              <Users size={16} />
-              <span>添加协作者</span>
-              {hasPendingRequests && <span className="menu-item-badge" />}
-            </button>
-          )}
-
-          {!readOnly && (
-            <button 
               className="menu-item delete-item" 
               onClick={() => {
                 onDeleteWork();
