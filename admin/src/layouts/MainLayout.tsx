@@ -15,6 +15,7 @@ import {
   ThunderboltOutlined,
   GiftOutlined,
   MessageOutlined,
+  CrownOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 
@@ -59,6 +60,11 @@ const MainLayout: React.FC = () => {
       key: '/users',
       icon: <UserOutlined />,
       label: 'Users',
+    },
+    {
+      key: '/plans',
+      icon: <CrownOutlined />,
+      label: '套餐管理',
     },
     {
       key: '/works',
