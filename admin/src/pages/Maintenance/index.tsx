@@ -48,7 +48,7 @@ const Maintenance: React.FC = () => {
 
       <Row gutter={[16, 16]}>
         <Col span={12}>
-          <Card title="Cache Management" bordered={false}>
+          <Card title="Cache Management" variant="borderless">
             <Alert
               message="Clearing cache may temporarily impact system performance."
               type="warning"
@@ -71,7 +71,7 @@ const Maintenance: React.FC = () => {
         </Col>
         
         <Col span={12}>
-          <Card title="Configuration" bordered={false}>
+          <Card title="Configuration" variant="borderless">
             <Alert
               message="Reloads settings from .env and Nacos (if enabled)."
               type="info"

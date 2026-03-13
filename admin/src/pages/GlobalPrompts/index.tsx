@@ -1,12 +1,13 @@
 import React, { useRef, useState } from 'react';
 import {
-  Button, Modal, Form, Select, Input, Space, Tag, Switch, Tooltip, Badge, message, Popconfirm
+  Button, Form, Select, Input, Space, Tag, Switch, Tooltip, Badge, message, Popconfirm
 } from 'antd';
 import {
   PlusOutlined, EyeOutlined, EditOutlined, DeleteOutlined, CheckCircleOutlined, StopOutlined
 } from '@ant-design/icons';
 import { ProTable, ActionType, ProColumns } from '@ant-design/pro-components';
 import request from '@/utils/request';
+import ResizableModal from '@/components/ResizableModal';
 
 // ─── types ───────────────────────────────────────────────────────────────────
 
@@ -354,7 +355,7 @@ const GlobalPrompts: React.FC = () => {
       />
 
       {/* ── Create / Edit Modal ─────────────────────────────────────────── */}
-      <Modal
+      <ResizableModal
         title={editing ? `编辑 Prompt · ${editing.name}` : '新建全局 Prompt'}
         open={modalOpen}
         onOk={handleSave}
@@ -426,15 +427,16 @@ const GlobalPrompts: React.FC = () => {
             </Form.Item>
           </Space>
         </Form>
-      </Modal>
+      </ResizableModal>
 
       {/* ── Content Preview Modal ───────────────────────────────────────── */}
-      <Modal
+      <ResizableModal
         title={previewTitle}
         open={previewOpen}
         onCancel={() => setPreviewOpen(false)}
         footer={<Button onClick={() => setPreviewOpen(false)}>关闭</Button>}
         width={760}
+        initialHeight={600}
       >
         <pre
           style={{
@@ -443,15 +445,16 @@ const GlobalPrompts: React.FC = () => {
             borderRadius: 6,
             whiteSpace: 'pre-wrap',
             wordBreak: 'break-word',
-            maxHeight: '60vh',
-            overflowY: 'auto',
             fontSize: 13,
             lineHeight: 1.6,
+            margin: 0,
+            height: '100%',
+            overflow: 'auto',
           }}
         >
           {previewContent}
         </pre>
-      </Modal>
+      </ResizableModal>
     </>
   );
 };

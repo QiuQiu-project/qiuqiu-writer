@@ -8,6 +8,7 @@ import {
 } from '@ant-design/icons';
 import { ProTable, ActionType, ProColumns } from '@ant-design/pro-components';
 import request from '@/utils/request';
+import ResizableModal from '@/components/ResizableModal';
 
 /**
  * LLM 模型配置项（存储在 system_settings 表，key='llm_models'，value=数组）
@@ -252,7 +253,7 @@ const LLMConfigs: React.FC = () => {
         pagination={false}
       />
 
-      <Modal
+      <ResizableModal
         title={editing ? '编辑模型' : '添加模型'}
         open={modalOpen}
         onOk={handleModalOk}
@@ -315,7 +316,7 @@ const LLMConfigs: React.FC = () => {
             <Switch />
           </Form.Item>
         </Form>
-      </Modal>
+      </ResizableModal>
     </>
   );
 };

@@ -1,8 +1,9 @@
 import React, { useRef, useState } from 'react';
-import { Button, Tag, Modal, message, Form, Input, Switch } from 'antd';
+import { Button, Tag, message, Form, Input, Switch } from 'antd';
 import { ProTable, ActionType, ProColumns } from '@ant-design/pro-components';
 import { EditOutlined } from '@ant-design/icons';
 import request from '@/utils/request';
+import ResizableModal from '@/components/ResizableModal';
 
 interface SystemSetting {
   id: number;
@@ -149,7 +150,7 @@ const SystemSettings: React.FC = () => {
         }}
       />
       
-      <Modal
+      <ResizableModal
         title={`Edit Setting: ${editingItem?.key}`}
         open={modalVisible}
         onOk={handleUpdate}
@@ -182,7 +183,7 @@ const SystemSettings: React.FC = () => {
             <Switch />
           </Form.Item>
         </Form>
-      </Modal>
+      </ResizableModal>
     </>
   );
 };

@@ -1,0 +1,32 @@
+.react-resizable {
+  position: relative;
+  box-sizing: border-box;
+}
+
+.custom-resize-handle {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  bottom: 0;
+  right: 0;
+  background: transparent;
+  cursor: se-resize;
+  z-index: 9999; /* Ensure it's above modal content */
+  touch-action: none;
+}
+
+.custom-resize-handle::after {
+  content: "";
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid #888;
+  border-bottom: 2px solid #888;
+  border-bottom-right-radius: 2px;
+}
+
+.custom-resize-handle:hover::after {
+  border-color: #1890ff;
+}

@@ -1,9 +1,10 @@
 import React, { useRef, useState } from 'react';
-import { Button, Input, Tag, Modal, Form, Select, message, Popconfirm, Switch } from 'antd';
+import { Button, Input, Tag, Form, Select, message, Popconfirm, Switch } from 'antd';
 import { PlusOutlined, SearchOutlined, DeleteOutlined } from '@ant-design/icons';
 import { ProTable, ActionType, ProColumns } from '@ant-design/pro-components';
 import { useNavigate } from 'react-router-dom';
 import request from '@/utils/request';
+import ResizableModal from '../../components/ResizableModal';
 
 interface WorkTemplate {
   id: number;
@@ -171,7 +172,7 @@ const PromptTemplates: React.FC = () => {
         }}
       />
 
-      <Modal
+      <ResizableModal
         title="Create New Template"
         open={modalOpen}
         onCancel={() => setModalOpen(false)}
@@ -202,7 +203,7 @@ const PromptTemplates: React.FC = () => {
             <Switch />
           </Form.Item>
         </Form>
-      </Modal>
+      </ResizableModal>
     </>
   );
 };

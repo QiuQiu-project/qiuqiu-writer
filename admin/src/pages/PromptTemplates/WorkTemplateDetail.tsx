@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Table, Button, Input, Space, Tag, Modal, Form, Select,
+  Table, Button, Input, Space, Tag, Form, Select,
   message, Popconfirm, Card, Descriptions, Badge, Breadcrumb, Spin,
   Tabs, Collapse, Typography,
 } from 'antd';
@@ -9,6 +9,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import TemplateConfigEditor, { type TemplateConfig } from './TemplateConfigEditor';
+import ResizableModal from '../../components/ResizableModal';
 
 interface WorkTemplate {
   id: number;
@@ -538,7 +539,7 @@ const WorkTemplateDetail: React.FC = () => {
       </Card>
 
       {/* Edit / create modal */}
-      <Modal
+      <ResizableModal
         title={editingId ? '编辑 Prompt 模板' : '新建 Prompt 模板'}
         open={modalOpen}
         onOk={handleModalOk}
@@ -615,10 +616,10 @@ const WorkTemplateDetail: React.FC = () => {
             </Form.Item>
           </Space>
         </Form>
-      </Modal>
+      </ResizableModal>
 
       {/* View prompt content modal */}
-      <Modal
+      <ResizableModal
         title={viewingPrompt?.name}
         open={!!viewingPrompt}
         onCancel={() => setViewingPrompt(null)}
@@ -661,7 +662,7 @@ const WorkTemplateDetail: React.FC = () => {
             </div>
           </div>
         )}
-      </Modal>
+      </ResizableModal>
       {/* Structure editor drawer */}
       <TemplateConfigEditor
         open={editorOpen}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Card, Row, Col, Tag, Typography, Space, Button,
-  Modal, Form, Select, InputNumber, message, Progress,
+  Form, Select, InputNumber, message, Progress,
   DatePicker
 } from 'antd';
 import {
@@ -10,6 +10,7 @@ import {
 } from '@ant-design/icons';
 import { ProTable, EditableProTable, ProColumns, ActionType } from '@ant-design/pro-components';
 import request from '@/utils/request';
+import ResizableModal from '@/components/ResizableModal';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -389,7 +390,7 @@ const Plans: React.FC = () => {
           <Row gutter={16}>
             {planConfigs.map((plan) => (
               <Col span={Math.max(6, Math.floor(24 / Math.max(planConfigs.length, 1)))} key={plan.key} style={{ minWidth: 200, marginBottom: 8 }}>
-                <Card bordered size="small" style={{ borderTop: `3px solid ${plan.highlight ? '#1677ff' : '#d9d9d9'}` }}>
+                <Card size="small" style={{ borderTop: `3px solid ${plan.highlight ? '#1677ff' : '#d9d9d9'}` }}>
                   <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 2 }}>
                     {plan.label}
                     {plan.badge && <Tag color="blue" style={{ marginLeft: 6, fontSize: 11 }}>{plan.badge}</Tag>}
@@ -446,7 +447,7 @@ const Plans: React.FC = () => {
         scroll={{ x: 1000 }}
       />
 
-      <Modal
+      <ResizableModal
         title="Set User Plan"
         open={isPlanModalVisible}
         onCancel={() => setIsPlanModalVisible(false)}
@@ -469,7 +470,7 @@ const Plans: React.FC = () => {
             <DatePicker showTime style={{ width: '100%' }} />
           </Form.Item>
         </Form>
-      </Modal>
+      </ResizableModal>
     </div>
   );
 };

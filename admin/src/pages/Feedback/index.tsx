@@ -1,8 +1,9 @@
 import React, { useRef, useState } from 'react';
-import { Tag, Button, Modal, Form, Select, Input, message } from 'antd';
+import { Tag, Button, Form, Select, Input, message } from 'antd';
 import { EyeOutlined } from '@ant-design/icons';
 import { ProTable, ActionType, ProColumns } from '@ant-design/pro-components';
 import request from '@/utils/request';
+import ResizableModal from '../../components/ResizableModal';
 
 interface FeedbackItem {
   id: number;
@@ -171,7 +172,7 @@ const Feedback: React.FC = () => {
         }}
       />
       
-      <Modal
+      <ResizableModal
         title="Feedback Detail"
         open={detailVisible}
         onCancel={() => setDetailVisible(false)}
@@ -208,7 +209,7 @@ const Feedback: React.FC = () => {
             </Form.Item>
           </Form>
         )}
-      </Modal>
+      </ResizableModal>
     </>
   );
 };

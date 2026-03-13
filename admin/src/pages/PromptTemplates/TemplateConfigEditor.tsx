@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Drawer, Tabs, Button, Input, Select, Space, Tag, Tooltip,
-  Modal, Form, InputNumber, Popconfirm, message,
+  Form, InputNumber, Popconfirm, message,
   Typography, Divider, Alert, Spin, Descriptions,
 } from 'antd';
+import ResizableModal from '@/components/ResizableModal';
 import {
   PlusOutlined, DeleteOutlined, EditOutlined, UpOutlined, DownOutlined,
   AppstoreAddOutlined, SaveOutlined, CodeOutlined, CaretRightOutlined, CaretDownOutlined,
@@ -157,7 +158,7 @@ const PromptQuickEditModal: React.FC<PromptQuickEditProps> = ({ promptId, onClos
   };
 
   return (
-    <Modal
+    <ResizableModal
       title={prompt ? `编辑 Prompt — ${prompt.name}` : '编辑 Prompt'}
       open={!!promptId}
       onCancel={onClose}
@@ -205,7 +206,7 @@ const PromptQuickEditModal: React.FC<PromptQuickEditProps> = ({ promptId, onClos
       {!loading && !prompt && promptId && (
         <div style={{ textAlign: 'center', color: '#999', padding: 32 }}>Prompt ID {promptId} 不存在或加载失败</div>
       )}
-    </Modal>
+    </ResizableModal>
   );
 };
 
@@ -415,13 +416,13 @@ const TabsExpandSection: React.FC<TabsExpandProps> = ({
         </div>
       )}
 
-      <Modal title={editingTab ? '编辑 Tab' : '添加 Tab'} open={tabModal} onOk={handleTabOk}
+      <ResizableModal title={editingTab ? '编辑 Tab' : '添加 Tab'} open={tabModal} onOk={handleTabOk}
         onCancel={() => setTabModal(false)} okText="确认" cancelText="取消" width={400} destroyOnClose>
         <Form form={tabForm} layout="vertical" style={{ marginTop: 12 }}>
           <Form.Item name="id" label="Tab ID" rules={[{ required: true }]}><Input placeholder="如 list" /></Form.Item>
           <Form.Item name="label" label="Tab 标签" rules={[{ required: true }]}><Input placeholder="如 角色列表" /></Form.Item>
         </Form>
-      </Modal>
+      </ResizableModal>
     </div>
   );
 };
@@ -479,7 +480,7 @@ const ComponentEditModal: React.FC<CompModalProps> = ({ open, initial, onOk, onC
   };
 
   return (
-    <Modal title={initial ? '编辑组件' : '添加组件'} open={open} onOk={handleOk} onCancel={onCancel}
+    <ResizableModal title={initial ? '编辑组件' : '添加组件'} open={open} onOk={handleOk} onCancel={onCancel}
       okText="确认" cancelText="取消" width={660} destroyOnClose>
       <Form form={form} layout="vertical" style={{ marginTop: 12 }}>
         <Space style={{ display: 'flex' }} align="start">
@@ -537,7 +538,7 @@ const ComponentEditModal: React.FC<CompModalProps> = ({ open, initial, onOk, onC
           {configError && <Text type="danger" style={{ fontSize: 12 }}>{configError}</Text>}
         </Form.Item>
       </Form>
-    </Modal>
+    </ResizableModal>
   );
 };
 
@@ -562,7 +563,7 @@ const ModuleEditModal: React.FC<ModModalProps> = ({ open, initial, onOk, onCance
     } catch { /* */ }
   };
   return (
-    <Modal title={initial ? '编辑模块' : '添加模块'} open={open} onOk={handleOk} onCancel={onCancel}
+    <ResizableModal title={initial ? '编辑模块' : '添加模块'} open={open} onOk={handleOk} onCancel={onCancel}
       okText="确认" cancelText="取消" width={480} destroyOnClose>
       <Form form={form} layout="vertical" style={{ marginTop: 12 }}>
         <Space style={{ display: 'flex' }} align="start">
@@ -578,7 +579,7 @@ const ModuleEditModal: React.FC<ModModalProps> = ({ open, initial, onOk, onCance
           <Form.Item name="color" label="颜色" style={{ width: 180 }}><Input placeholder="#8b5cf6" /></Form.Item>
         </Space>
       </Form>
-    </Modal>
+    </ResizableModal>
   );
 };
 

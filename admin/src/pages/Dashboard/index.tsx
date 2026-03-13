@@ -66,7 +66,7 @@ const Dashboard: React.FC = () => {
       {/* Overview Stats (Placeholder for now, can be connected to real API later) */}
       <Row gutter={16} style={{ marginBottom: 24 }}>
         <Col span={8}>
-          <Card bordered={false}>
+          <Card variant="borderless">
             <Statistic
               title="Total Users"
               value={1128}
@@ -76,7 +76,7 @@ const Dashboard: React.FC = () => {
           </Card>
         </Col>
         <Col span={8}>
-          <Card bordered={false}>
+          <Card variant="borderless">
             <Statistic
               title="Total Works"
               value={93}
@@ -86,7 +86,7 @@ const Dashboard: React.FC = () => {
           </Card>
         </Col>
         <Col span={8}>
-          <Card bordered={false}>
+          <Card variant="borderless">
             <Statistic
               title="Total Chapters"
               value={2345}
@@ -111,7 +111,7 @@ const Dashboard: React.FC = () => {
             </Card>
           </Col>
           <Col span={8}>
-            <Card title={<span><CloudServerOutlined /> Memory Usage</span>} bordered={false}>
+            <Card title={<span><CloudServerOutlined /> Memory Usage</span>} variant="borderless">
               <div style={{ textAlign: 'center' }}>
                 <Progress type="dashboard" percent={monitorData.memory.percent} status={monitorData.memory.percent > 80 ? 'exception' : 'normal'} />
                 <div style={{ marginTop: 10 }}>
@@ -122,7 +122,7 @@ const Dashboard: React.FC = () => {
             </Card>
           </Col>
           <Col span={8}>
-            <Card title={<span><HddOutlined /> Disk Usage</span>} bordered={false}>
+            <Card title={<span><HddOutlined /> Disk Usage</span>} variant="borderless">
               <div style={{ textAlign: 'center' }}>
                 <Progress type="dashboard" percent={monitorData.disk.percent} status={monitorData.disk.percent > 90 ? 'exception' : 'normal'} />
                 <div style={{ marginTop: 10 }}>

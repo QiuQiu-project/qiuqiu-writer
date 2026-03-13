@@ -10,6 +10,7 @@ import {
   SearchOutlined
 } from '@ant-design/icons';
 import request from '@/utils/request';
+import ResizableModal from '@/components/ResizableModal';
 
 const { confirm } = Modal;
 const { Option } = Select;
@@ -307,7 +308,7 @@ const Users: React.FC = () => {
       />
 
       {/* Edit user info modal */}
-      <Modal
+      <ResizableModal
         title={`编辑用户：${editingUser?.username}`}
         open={isEditModalVisible}
         onOk={handleUpdate}
@@ -329,10 +330,10 @@ const Users: React.FC = () => {
             <Input />
           </Form.Item>
         </Form>
-      </Modal>
+      </ResizableModal>
 
       {/* Set plan modal */}
-      <Modal
+      <ResizableModal
         title={`设置套餐：${planUser?.username}`}
         open={isPlanModalVisible}
         onOk={handleSetPlan}
@@ -381,7 +382,7 @@ const Users: React.FC = () => {
             （{planUser.token_remaining?.toLocaleString()} tokens）
           </div>
         )}
-      </Modal>
+      </ResizableModal>
     </>
   );
 };
