@@ -1454,6 +1454,7 @@ export default function NovelEditorPage() {
               chapters={orderedChapters}
               currentChapterId={selectedChapter ?? undefined}
               onUseContinueRecommendation={handleUseContinueRecommendation}
+              onWriteToEditor={handleGenerateContent}
               currentUserId={currentUser?.id}
             />
           </div>

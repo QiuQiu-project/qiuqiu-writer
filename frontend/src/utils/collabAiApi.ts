@@ -24,6 +24,8 @@ export interface CollabAITask {
   created_at: number;
   /** 当前在队列中的位置（0 = 即将执行） */
   queue_position?: number;
+  /** 该任务的输出需要直接写入编辑器（如 /gen_chapter） */
+  write_to_editor?: boolean;
 }
 
 export interface CollabAIRoomState {
@@ -51,7 +53,7 @@ export type CollabAIServerMessage =
   | { type: 'user_joined'; user_id: string; user_name: string }
   | { type: 'user_left'; user_id: string; user_name: string }
   | { type: 'ai_queued'; task: Omit<CollabAITask, 'streamContent' | 'continueChapterResult'>; queue_position: number }
-  | { type: 'ai_start'; request_id: string; chapter_id: number; chapter_title: string; user_id: string; user_name: string }
+  | { type: 'ai_start'; request_id: string; chapter_id: number; chapter_title: string; user_id: string; user_name: string; write_to_editor?: boolean }
   | { type: 'ai_stream'; request_id: string; event: { type: string; data?: unknown } }
   | { type: 'ai_done'; request_id: string; chapter_id: number }
   | { type: 'ai_error'; request_id: string; error: string }
@@ -259,7 +261,12 @@ export function applyCollabAIMessage(
     case 'ai_start': {
       const existing = next.get(msg.request_id);
       if (existing) {
-        next.set(msg.request_id, { ...existing, status: 'running', queue_position: undefined });
+        next.set(msg.request_id, {
+          ...existing,
+          status: 'running',
+          queue_position: undefined,
+          write_to_editor: msg.write_to_editor ?? existing.write_to_editor,
+        });
       }
       break;
     }

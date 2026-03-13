@@ -41,6 +41,8 @@ interface CollabAIPanelProps {
   }) => void;
   /** 当前登录用户 ID（用于判断是否可以取消某任务） */
   currentUserId?: string;
+  /** /gen_chapter 流式内容写入编辑器的回调（content=累积全文, isDone=流完成） */
+  onWriteToEditor?: (content: string, isDone: boolean) => void;
 }
 
 // ── 小辅助组件 ───────────────────────────────────────────────────────────────
@@ -191,7 +193,7 @@ function ChatBubble({
 
 const SLASH_COMMANDS = [
   { id: 'continue-chapter',        name: '/continue-chapter',        subtitle: '续写章节：可跟章节号与对下一章的语言描述，生成3个推荐大纲细纲' },
-  { id: 'gen_chapter',             name: '/gen_chapter',             subtitle: '根据大纲和细纲生成章节内容' },
+  { id: 'gen_chapter',             name: '/gen_chapter',             subtitle: '根据大纲和细纲生成章节内容，直接写入编辑器' },
   { id: 'analysis-chapter',        name: '/analysis-chapter',        subtitle: '分析指定章节' },
   { id: 'analysis-chapter-info',   name: '/analysis-chapter-info',   subtitle: '分析章节组件信息' },
   { id: 'verification-chapter-info', name: '/verification-chapter-info', subtitle: '校验章节信息' },
@@ -205,6 +207,7 @@ export default function CollabAIPanel({
   currentChapterId,
   onUseContinueRecommendation,
   currentUserId,
+  onWriteToEditor,
 }: CollabAIPanelProps) {
   const [activeTab, setActiveTab] = useState<'chat' | 'tasks'>('chat');
   const [tasks, setTasks] = useState<Map<string, CollabAITask>>(new Map());
@@ -230,6 +233,10 @@ export default function CollabAIPanel({
   const chatTextareaRef = useRef<HTMLTextAreaElement>(null);
   const cmdMenuRef = useRef<HTMLDivElement>(null);
   const chapterDropdownRef = useRef<HTMLDivElement>(null);
+  // write_to_editor 任务的累积内容：request_id -> 累积文本
+  const editorWriteRef = useRef<Map<string, string>>(new Map());
+  const onWriteToEditorRef = useRef(onWriteToEditor);
+  useEffect(() => { onWriteToEditorRef.current = onWriteToEditor; }, [onWriteToEditor]);
 
   // 当 currentChapterId 变化时同步选中章节
   useEffect(() => {
@@ -258,6 +265,32 @@ export default function CollabAIPanel({
         setChatMessages(prev => applyChatMessages(prev, msg));
         return;
       }
+
+      // write_to_editor 任务的编辑器写入
+      if (msg.type === 'ai_start' && msg.write_to_editor) {
+        editorWriteRef.current.set(msg.request_id, '');
+      }
+      if (msg.type === 'ai_stream') {
+        const content = editorWriteRef.current.get(msg.request_id);
+        if (content !== undefined) {
+          const event = msg.event;
+          if (event.type === 'text' && typeof event.data === 'string') {
+            const next = content + event.data;
+            editorWriteRef.current.set(msg.request_id, next);
+            onWriteToEditorRef.current?.(next, false);
+          }
+        }
+      }
+      if (msg.type === 'ai_done' || msg.type === 'ai_cancelled' || msg.type === 'ai_error') {
+        const content = editorWriteRef.current.get(msg.request_id);
+        if (content !== undefined) {
+          editorWriteRef.current.delete(msg.request_id);
+          if (msg.type === 'ai_done') {
+            onWriteToEditorRef.current?.(content, true);
+          }
+        }
+      }
+
       setTasks(prev => applyCollabAIMessage(prev, msg));
     };
 

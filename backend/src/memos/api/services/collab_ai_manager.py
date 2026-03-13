@@ -355,6 +355,134 @@ class CollabAIRoom:
 
     async def _run_ai_task(self, task: CollabAITask):
         """
+        分发 AI 任务：
+        - /gen_chapter  → 调用章节内容生成接口，输出直接写入编辑器
+        - 其他指令     → 调用 /api/v1/product/chat SSE，流式广播给所有用户
+        """
+        is_gen_chapter = task.query.strip().lower().startswith("/gen_chapter")
+
+        await self.broadcast({
+            "type": "ai_start",
+            "request_id": task.request_id,
+            "chapter_id": task.chapter_id,
+            "chapter_title": task.chapter_title,
+            "user_id": task.user_id,
+            "user_name": task.user_name,
+            "write_to_editor": is_gen_chapter,
+        })
+        logger.info(f"[CollabAI:{self.work_id}] Task {task.request_id[:8]} started, "
+                    f"chapter={task.chapter_id}, user={task.user_name}, "
+                    f"write_to_editor={is_gen_chapter}")
+
+        if is_gen_chapter:
+            await self._run_gen_chapter_task(task)
+        else:
+            await self._run_chat_task(task)
+
+    async def _run_gen_chapter_task(self, task: CollabAITask):
+        """
+        /gen_chapter 专用：从 DB 读取章节大纲和细纲，调用 generate_content_stream，
+        将每个文本 chunk 以 ai_stream {type:"text"} 形式广播。
+        """
+        from memos.api.core.database import AsyncSessionLocal
+        from memos.api.models.chapter import Chapter
+        from memos.api.models.work import Work
+        from memos.api.services.ai_service import get_ai_service
+
+        try:
+            # 1. 从 DB 读取章节元数据和作品角色信息
+            async with AsyncSessionLocal() as session:
+                chapter_row = await session.get(Chapter, task.chapter_id)
+                if not chapter_row:
+                    raise ValueError(f"章节 {task.chapter_id} 不存在")
+
+                meta = (chapter_row.chapter_metadata or {}) if hasattr(chapter_row, 'chapter_metadata') else {}
+                outline = str(meta.get("outline", "")).strip()
+                detailed_outline = str(meta.get("detailed_outline", "")).strip()
+                chapter_title = chapter_row.title or ""
+
+                # 读取作品角色
+                work_row = await session.get(Work, self.work_id)
+                work_meta = {}
+                if work_row:
+                    work_meta = (work_row.work_metadata or {}) if hasattr(work_row, 'work_metadata') else {}
+                    if not work_meta:
+                        work_meta = (work_row.metadata or {}) if hasattr(work_row, 'metadata') else {}
+
+            if not outline or not detailed_outline:
+                raise ValueError("当前章节未填写大纲或细纲，请先在章节设置中填写")
+
+            chars_raw = work_meta.get("characters") or work_meta.get("component_data", {}).get("characters", [])
+            character_names = [c.get("name", "") for c in chars_raw if isinstance(c, dict) and c.get("name")]
+
+            # 2. 调用 generate_content_stream
+            ai_service = get_ai_service()
+            if not ai_service.is_healthy():
+                raise ValueError("AI 服务不可用")
+
+            system_prompt = (
+                "你是一位经验丰富的小说创作专家，擅长根据大纲和细纲创作引人入胜的章节内容。"
+                "直接输出章节正文内容，不要添加标题、说明等额外文字。"
+                "使用段落分隔，每个段落之间用空行分隔。"
+            )
+            parts = []
+            if chapter_title:
+                parts.append(f"## 章节标题\n{chapter_title}\n")
+            parts.append(f"## 章节大纲\n{outline}\n")
+            parts.append(f"## 章节细纲\n{detailed_outline}\n")
+            if character_names:
+                parts.append(f"## 出场人物\n{', '.join(character_names)}\n")
+            parts.append("\n请根据以上大纲和细纲，创作完整的章节内容。")
+            user_prompt = "\n".join(parts)
+
+            usage_ref: dict = {}
+            async for chunk in ai_service.generate_content_stream(
+                prompt=user_prompt,
+                system_prompt=system_prompt,
+                temperature=0.7,
+                max_tokens=8000,
+                usage_ref=usage_ref,
+                user_id=str(task.user_id),
+                feature="generate",
+                work_id=str(self.work_id),
+            ):
+                if task.status == "cancelled":
+                    break
+                await self.broadcast({
+                    "type": "ai_stream",
+                    "request_id": task.request_id,
+                    "event": {"type": "text", "data": chunk},
+                })
+
+            if task.status != "cancelled":
+                task.status = "done"
+                await self.broadcast({
+                    "type": "ai_done",
+                    "request_id": task.request_id,
+                    "chapter_id": task.chapter_id,
+                })
+                logger.info(f"[CollabAI:{self.work_id}] gen_chapter task {task.request_id[:8]} done")
+
+        except asyncio.CancelledError:
+            task.status = "cancelled"
+            await self.broadcast({
+                "type": "ai_cancelled",
+                "request_id": task.request_id,
+                "chapter_id": task.chapter_id,
+            })
+            raise
+
+        except Exception as e:
+            task.status = "error"
+            logger.error(f"[CollabAI:{self.work_id}] gen_chapter task {task.request_id[:8]} error: {e}")
+            await self.broadcast({
+                "type": "ai_error",
+                "request_id": task.request_id,
+                "error": str(e),
+            })
+
+    async def _run_chat_task(self, task: CollabAITask):
+        """
         通过内部 httpx 调用 /api/v1/product/chat SSE 端点，
         将流式事件广播给房间内所有用户。
         """
@@ -371,17 +499,6 @@ class CollabAIRoom:
             "moscube": True,
             "session_id": f"collab_{task.chapter_id}",
         }
-
-        await self.broadcast({
-            "type": "ai_start",
-            "request_id": task.request_id,
-            "chapter_id": task.chapter_id,
-            "chapter_title": task.chapter_title,
-            "user_id": task.user_id,
-            "user_name": task.user_name,
-        })
-        logger.info(f"[CollabAI:{self.work_id}] Task {task.request_id[:8]} started, "
-                    f"chapter={task.chapter_id}, user={task.user_name}")
 
         try:
             async with httpx.AsyncClient(timeout=300.0) as client:
