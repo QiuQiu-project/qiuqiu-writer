@@ -12,9 +12,9 @@
 set -euo pipefail
 
 # ---------- 可调整参数 ----------
-PROJECT_DIR="${PROJECT_DIR:-/opt/qiuqiuwriter}"  # 服务器上项目路径
-WWW_DIR="/var/www/qiuqiuwriter"                  # nginx 静态文件目录
-APP_USER="www-data"                               # 后端运行用户
+PROJECT_DIR="${PROJECT_DIR:-/root/xingqiu_writer}"  # 服务器上项目路径
+WWW_DIR="/var/www/xingqiu_writer"                   # nginx 静态文件目录
+APP_USER="root"                                      # 项目在 /root 下，用 root 用户
 SERVICE_NAME="qiuqiuwriter-backend"
 NGINX_CONF_DIR="/etc/nginx/sites-available"
 NGINX_ENABLED_DIR="/etc/nginx/sites-enabled"
@@ -43,7 +43,6 @@ fi
 npm run build
 echo "  复制产物到 $WWW_DIR/frontend ..."
 rsync -a --delete dist/ "$WWW_DIR/frontend/"
-chown -R "$APP_USER:$APP_USER" "$WWW_DIR/frontend"
 
 # ---------- 管理后台构建 ----------
 echo ""
@@ -56,7 +55,6 @@ fi
 npm run build
 echo "  复制产物到 $WWW_DIR/admin ..."
 rsync -a --delete dist/ "$WWW_DIR/admin/"
-chown -R "$APP_USER:$APP_USER" "$WWW_DIR/admin"
 
 # ---------- 后端 Python 依赖 ----------
 echo ""

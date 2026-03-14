@@ -32,13 +32,13 @@ git clone <repo_url> /opt/qiuqiuwriter
 ### 1. 服务器上克隆代码
 
 ```bash
-git clone <repo_url> /opt/qiuqiuwriter
+git clone <repo_url> /root/xingqiu_writer
 ```
 
 ### 2. 安装依赖工具（阿里云镜像加速）
 
 ```bash
-sudo bash /opt/qiuqiuwriter/deploy/server/install.sh
+sudo bash /root/xingqiu_writer/deploy/server/install.sh
 ```
 
 安装内容及使用的镜像源：
@@ -59,15 +59,15 @@ sudo bash /opt/qiuqiuwriter/deploy/server/install.sh
 **数据库（Docker）环境变量：**
 
 ```bash
-cp /opt/qiuqiuwriter/docker/.env.example /opt/qiuqiuwriter/docker/.env
-nano /opt/qiuqiuwriter/docker/.env
+cp /root/xingqiu_writer/docker/.env.example /root/xingqiu_writer/docker/.env
+nano /root/xingqiu_writer/docker/.env
 ```
 
 **后端应用环境变量：**
 
 ```bash
-cp /opt/qiuqiuwriter/backend/.env.example /opt/qiuqiuwriter/backend/.env
-nano /opt/qiuqiuwriter/backend/.env
+cp /root/xingqiu_writer/backend/.env.example /root/xingqiu_writer/backend/.env
+nano /root/xingqiu_writer/backend/.env
 ```
 
 重点修改以下字段（连接本机数据库，不是 Docker 内网服务名）：
@@ -85,7 +85,7 @@ SECRET_KEY=<随机字符串>
 ### 4. 启动数据库（仅基础设施）
 
 ```bash
-cd /opt/qiuqiuwriter/docker
+cd /root/xingqiu_writer/docker
 docker compose -f docker-compose.infra.yml up -d postgres redis mongodb
 ```
 
@@ -94,7 +94,7 @@ docker compose -f docker-compose.infra.yml up -d postgres redis mongodb
 ### 5. 运行部署脚本
 
 ```bash
-sudo PROJECT_DIR=/opt/qiuqiuwriter bash /opt/qiuqiuwriter/deploy/server/deploy.sh
+bash /root/xingqiu_writer/deploy/server/deploy.sh
 ```
 
 ---
@@ -102,9 +102,9 @@ sudo PROJECT_DIR=/opt/qiuqiuwriter bash /opt/qiuqiuwriter/deploy/server/deploy.s
 ## 二、更新部署
 
 ```bash
-cd /opt/qiuqiuwriter
+cd /root/xingqiu_writer
 git pull
-sudo bash deploy/server/deploy.sh
+bash deploy/server/deploy.sh
 ```
 
 ---

@@ -14,9 +14,9 @@
 set -euo pipefail
 
 # ---------- 可调整参数 ----------
-PROJECT_DIR="/opt/qiuqiuwriter"   # 服务器上项目存放路径
-WWW_DIR="/var/www/qiuqiuwriter"   # nginx 静态文件目录
-APP_USER="www-data"               # 运行后端的系统用户（Ubuntu 已内置）
+PROJECT_DIR="/root/xingqiu_writer"  # 服务器上项目存放路径
+WWW_DIR="/var/www/xingqiu_writer"   # nginx 静态文件目录
+APP_USER="root"                      # 项目在 /root 下，直接用 root 用户
 NODE_MAJOR=22                     # Node.js 主版本
 # 阿里云容器镜像服务个人加速地址（登录 cr.console.aliyun.com → 镜像加速器 获取）
 # 不填则使用几个公共镜像，可能不稳定
@@ -149,7 +149,7 @@ fi
 echo ""
 echo "=== [7/7] 创建目录结构 ==="
 mkdir -p "$WWW_DIR/frontend" "$WWW_DIR/admin"
-chown -R "$APP_USER:$APP_USER" "$WWW_DIR"
+# root 用户目录无需 chown
 mkdir -p "$PROJECT_DIR"
 echo "目录创建完成"
 

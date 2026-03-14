@@ -1,35 +1,29 @@
 [Unit]
-Description=QiuQiu Writer Backend (FastAPI + uvicorn)
-# 等数据库 Docker 容器启动后再起（Docker 服务本身就绪即可，容器内健康检查由 deploy.sh 处理）
+Description=XingQiu Writer Backend (FastAPI + uvicorn)
 After=network.target docker.service
 Wants=docker.service
 
 [Service]
 Type=simple
-User=www-data
-Group=www-data
+User=root
+Group=root
 
-# 项目后端目录（与 deploy.sh 中 PROJECT_DIR 保持一致）
-WorkingDirectory=/opt/qiuqiuwriter/backend
+WorkingDirectory=/root/xingqiu_writer/backend
 
-# 从 backend/.env 读取所有环境变量
-EnvironmentFile=/opt/qiuqiuwriter/backend/.env
+EnvironmentFile=/root/xingqiu_writer/backend/.env
 
 # PYTHONPATH 必须指向 src，否则 memos 包找不到
-Environment=PYTHONPATH=/opt/qiuqiuwriter/backend/src
+Environment=PYTHONPATH=/root/xingqiu_writer/backend/src
 
-# 用 uv 创建的 venv 中的 uvicorn 直接启动，生产环境不加 --reload
-ExecStart=/opt/qiuqiuwriter/backend/.venv/bin/uvicorn \
+ExecStart=/root/xingqiu_writer/backend/.venv/bin/uvicorn \
     memos.api.server_api:app \
     --host 127.0.0.1 \
     --port 8001 \
     --workers 2
 
-# 异常退出后 5 秒重启
 Restart=on-failure
 RestartSec=5s
 
-# 日志由 journald 接管，用 `journalctl -u qiuqiuwriter-backend -f` 查看
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=qiuqiuwriter-backend
