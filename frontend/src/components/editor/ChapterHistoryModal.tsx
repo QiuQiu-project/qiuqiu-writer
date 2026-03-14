@@ -247,7 +247,7 @@ export default function ChapterHistoryModal({
       isOpen={isOpen}
       onClose={onClose}
       initialWidth={960}
-      initialHeight={800}
+      initialHeight={600}
       className="chapter-history-modal chapter-history-modal--doc-style"
       handleClassName=".chapter-history-topbar"
     >

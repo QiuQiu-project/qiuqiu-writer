@@ -360,7 +360,7 @@ export default function QuotaExceededModal({ isOpen, onClose, currentPlan = 'fre
       isOpen={isOpen}
       onClose={handleClose}
       initialWidth={960}
-      initialHeight={800}
+      initialHeight={600}
       className="qm-modal"
       handleClassName=".qm-drag-handle"
     >

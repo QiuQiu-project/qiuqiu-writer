@@ -219,7 +219,7 @@ export default function TemplateMarketModal({
       isOpen={isOpen}
       onClose={onClose}
       initialWidth={960}
-      initialHeight={800}
+      initialHeight={600}
       className="template-market-modal-content"
       handleClassName=".template-market-header"
     >
