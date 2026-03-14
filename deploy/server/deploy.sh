@@ -65,7 +65,7 @@ echo ""
 echo "=== [3/5] 安装后端 Python 依赖 (uv sync) ==="
 cd "$PROJECT_DIR/backend"
 UV_INDEX_URL="https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple/" \
-    uv sync --no-dev
+    uv sync --no-dev --no-extras
 echo "  依赖安装完成"
 
 # ---------- systemd service ----------
