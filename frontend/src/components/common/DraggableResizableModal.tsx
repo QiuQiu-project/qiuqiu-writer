@@ -17,8 +17,9 @@ interface DraggableResizableModalProps {
   className?: string;
   overlayClassName?: string;
   handleClassName?: string;
+  /** 整体内容可垂直滚动（适合无内部滚动分区的简单模态框） */
+  scrollable?: boolean;
 }
-
 export default function DraggableResizableModal({
   isOpen,
   onClose,
@@ -32,6 +33,7 @@ export default function DraggableResizableModal({
   className = '',
   overlayClassName = '',
   handleClassName = '.modal-header',
+  scrollable = true,
 }: DraggableResizableModalProps) {
   const nodeRef = useRef<HTMLDivElement>(null);
   
@@ -49,7 +51,11 @@ export default function DraggableResizableModal({
   if (!isOpen) return null;
 
   return (
-    <div className={`draggable-resizable-modal-overlay ${overlayClassName}`} onClick={onClose}>
+    <div
+      className={`draggable-resizable-modal-overlay ${overlayClassName}`}
+      onClick={onClose}
+      onWheel={(e) => e.stopPropagation()}
+    >
       <Draggable
         nodeRef={nodeRef}
         handle={handleClassName}
@@ -71,8 +77,8 @@ export default function DraggableResizableModal({
               <span className="custom-resize-handle" onClick={(e) => e.stopPropagation()} />
             }
           >
-            <div 
-              style={{ width: '100%', height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+            <div
+              style={{ width: '100%', height: '100%', overflow: 'hidden', overflowY: scrollable ? 'auto' : 'hidden', display: 'flex', flexDirection: 'column' }}
               onClick={(e) => e.stopPropagation()}
             >
               {children}

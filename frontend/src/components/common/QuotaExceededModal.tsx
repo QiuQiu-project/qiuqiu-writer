@@ -363,6 +363,7 @@ export default function QuotaExceededModal({ isOpen, onClose, currentPlan = 'fre
       initialHeight={600}
       className="qm-modal"
       handleClassName=".qm-drag-handle"
+      scrollable
     >
       <div className="qm-drag-handle" style={{ height: '30px', width: '100%', position: 'absolute', top: 0, left: 0, cursor: 'move', zIndex: 10 }} />
       <button className="qm-close" onClick={handleClose} type="button" aria-label="关闭" style={{ zIndex: 20 }}>✕</button>

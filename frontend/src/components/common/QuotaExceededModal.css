@@ -17,13 +17,9 @@
   background: var(--bg-primary);
   border-radius: 24px;
   padding: 0 0 28px;
-  /* width: 100%; */
-  /* max-width: 960px; */
-  /* max-height: 92vh; */
-  overflow-y: auto;
+  overflow: hidden; /* 裁剪圆角；滚动由 DraggableResizableModal scrollable 内层 div 处理 */
   box-shadow: 0 32px 80px rgba(0, 0, 0, 0.22);
   border: 1px solid var(--border-color);
-  overflow: hidden;
 }
 
 /* ── Close ── */
