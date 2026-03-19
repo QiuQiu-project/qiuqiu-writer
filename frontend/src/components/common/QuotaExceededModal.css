@@ -1,15 +1,7 @@
 /* ── Overlay ── */
-/* .qm-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-  padding: 16px;
-  backdrop-filter: blur(2px);
-} */
+.qm-overlay {
+  z-index: 11000 !important;
+}
 
 /* ── Modal ── */
 .qm-modal {

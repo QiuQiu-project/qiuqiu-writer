@@ -176,19 +176,41 @@ class CollabAIRoom:
                 api_key=custom_key or os.getenv("OPENAI_API_KEY", ""),
                 base_url=custom_base or os.getenv("OPENAI_API_BASE", "https://api.deepseek.com"),
             )
-            stream = await client.chat.completions.create(
-                model=model_id,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=effective_temp,
-                max_tokens=effective_max,
-                stream=True,
-            )
-            async for chunk in stream:
-                if chunk.choices and chunk.choices[0].delta.content:
-                    yield chunk.choices[0].delta.content
+            
+            char_count = 0
+            input_tok = max(1, int(len(prompt) * 1.5))
+            
+            try:
+                stream = await client.chat.completions.create(
+                    model=model_id,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": prompt},
+                    ],
+                    temperature=effective_temp,
+                    max_tokens=effective_max,
+                    stream=True,
+                )
+                async for chunk in stream:
+                    if chunk.choices and chunk.choices[0].delta.content:
+                        content = chunk.choices[0].delta.content
+                        char_count += len(content)
+                        yield content
+            finally:
+                output_tok = max(0, int(char_count * 1.5))
+                total_tok = input_tok + output_tok
+                if total_tok > 0:
+                    try:
+                        await ai_service._record(
+                            user_id=user_id,
+                            input_tokens=input_tok,
+                            output_tokens=output_tok,
+                            total_tokens=total_tok,
+                            feature="collab_ai",
+                            work_id=work_id,
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to record token usage for custom model: {e}")
         else:
             # 使用全局 ai_service
             ai_service = get_ai_service()
@@ -321,6 +343,26 @@ class CollabAIRoom:
         except Exception as e:
             logger.error(f"[CollabAI:{self.work_id}] AI chat error: {e}")
             await self.broadcast({"type": "chat_stream_done", "message_id": message_id})
+
+    async def delete_chat_message(self, message_id: str, user_id: str):
+        """删除聊天消息（仅允许发送者删除自己的消息）"""
+        from memos.api.core.database import AsyncSessionLocal
+        from memos.api.models.work_chat_message import WorkChatMessage
+        from sqlalchemy import delete
+
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                delete(WorkChatMessage)
+                .where(WorkChatMessage.id == message_id)
+                .where(WorkChatMessage.user_id == user_id)
+            )
+            await session.commit()
+            
+            if result.rowcount > 0:
+                await self.broadcast({
+                    "type": "chat_message_deleted",
+                    "message_id": message_id
+                })
 
     # ── Task management ────────────────────────────────────────────────────────
 
@@ -671,6 +713,8 @@ class CollabAIManager:
                     await room.cancel_task(msg["request_id"], user_id)
                 elif msg_type == "chat_message":
                     await room.handle_chat_message(user_id, user_name, msg.get("content", ""), model=msg.get("model") or None)
+                elif msg_type == "delete_chat_message":
+                    await room.delete_chat_message(msg.get("message_id", ""), user_id)
                 elif msg_type == "ping":
                     await ws.send_text(json.dumps({"type": "pong"}))
 

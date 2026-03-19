@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X, Eye, EyeOff } from 'lucide-react';
 import DraggableResizableModal from '../common/DraggableResizableModal';
 import { authApi, type LoginRequest, type RegisterRequest, type UserInfo } from '../../utils/authApi';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 import './LoginModal.css';
 
 interface LoginModalProps {
@@ -16,6 +17,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const isMobile = useIsMobile();
 
   // 登录表单
   const [loginForm, setLoginForm] = useState<LoginRequest>({
@@ -96,6 +98,194 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     }
   };
 
+  const renderContent = () => (
+    <>
+      <button className="login-modal-close" onClick={onClose}>
+        <X size={20} />
+      </button>
+
+      <div className="login-modal-header">
+        <h2>{mode === 'login' ? '登录' : '注册'}</h2>
+        <div className="login-modal-tabs">
+          <button
+            className={mode === 'login' ? 'active' : ''}
+            onClick={() => {
+              setMode('login');
+              setError(null);
+            }}
+          >
+            登录
+          </button>
+          <button
+            className={mode === 'register' ? 'active' : ''}
+            onClick={() => {
+              setMode('register');
+              setError(null);
+            }}
+          >
+            注册
+          </button>
+        </div>
+      </div>
+
+      {error && <div className="login-modal-error">{error}</div>}
+
+      {mode === 'login' ? (
+        <form className="login-form" onSubmit={handleLogin}>
+          <div className="form-group">
+            <label>用户名或邮箱</label>
+            <input
+              type="text"
+              value={loginForm.username_or_email}
+              onChange={(e) =>
+                setLoginForm({ ...loginForm, username_or_email: e.target.value })
+              }
+              placeholder="请输入用户名或邮箱"
+              required
+              disabled={loading}
+            />
+          </div>
+          <div className="form-group">
+            <label>密码</label>
+            <div className="password-input-wrapper">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={loginForm.password}
+                onChange={(e) =>
+                  setLoginForm({ ...loginForm, password: e.target.value })
+                }
+                placeholder="请输入密码"
+                required
+                disabled={loading}
+              />
+              <button
+                type="button"
+                className="password-toggle-btn"
+                onClick={() => setShowPassword(!showPassword)}
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+          <button type="submit" className="login-submit-btn" disabled={loading}>
+            {loading ? '登录中...' : '登录'}
+          </button>
+        </form>
+      ) : (
+        <form className="login-form" onSubmit={handleRegister}>
+          <div className="form-group">
+            <label>用户名</label>
+            <input
+              type="text"
+              value={registerForm.username}
+              onChange={(e) =>
+                setRegisterForm({ ...registerForm, username: e.target.value })
+              }
+              placeholder="3-50个字符，只能包含字母、数字、下划线和连字符"
+              required
+              disabled={loading}
+            />
+          </div>
+          <div className="form-group">
+            <label>邮箱</label>
+            <input
+              type="email"
+              value={registerForm.email}
+              onChange={(e) =>
+                setRegisterForm({ ...registerForm, email: e.target.value })
+              }
+              placeholder="请输入邮箱"
+              required
+              disabled={loading}
+            />
+          </div>
+          <div className="form-group">
+            <label>密码</label>
+            <div className="password-input-wrapper">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={registerForm.password}
+                onChange={(e) =>
+                  setRegisterForm({ ...registerForm, password: e.target.value })
+                }
+                placeholder="至少8位字符"
+                required
+                disabled={loading}
+              />
+              <button
+                type="button"
+                className="password-toggle-btn"
+                onClick={() => setShowPassword(!showPassword)}
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+          <div className="form-group">
+            <label>确认密码</label>
+            <div className="password-input-wrapper">
+              <input
+                type={showConfirmPassword ? "text" : "password"}
+                value={registerForm.confirm_password}
+                onChange={(e) =>
+                  setRegisterForm({ ...registerForm, confirm_password: e.target.value })
+                }
+                placeholder="请再次输入密码"
+                required
+                disabled={loading}
+              />
+              <button
+                type="button"
+                className="password-toggle-btn"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                tabIndex={-1}
+              >
+                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+          <div className="form-group">
+            <label>昵称（选填）</label>
+            <input
+              type="text"
+              value={registerForm.display_name || ''}
+              onChange={(e) =>
+                setRegisterForm({ ...registerForm, display_name: e.target.value })
+              }
+              placeholder="请输入昵称"
+              disabled={loading}
+            />
+          </div>
+          <div className="form-group">
+            <label>邀请码（选填）</label>
+            <input
+              type="text"
+              value={registerForm.invitation_code || ''}
+              onChange={(e) =>
+                setRegisterForm({ ...registerForm, invitation_code: e.target.value })
+              }
+              placeholder="请输入邀请码"
+              disabled={loading}
+            />
+          </div>
+          <button type="submit" className="login-submit-btn" disabled={loading}>
+            {loading ? '注册中...' : '注册'}
+          </button>
+        </form>
+      )}
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <div className="login-page-mobile">
+        {renderContent()}
+      </div>
+    );
+  }
+
   return (
     <DraggableResizableModal
       isOpen={isOpen}
@@ -105,183 +295,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
       className="login-modal"
       handleClassName=".login-modal-header"
     >
-        <button className="login-modal-close" onClick={onClose}>
-          <X size={20} />
-        </button>
-
-        <div className="login-modal-header">
-          <h2>{mode === 'login' ? '登录' : '注册'}</h2>
-          <div className="login-modal-tabs">
-            <button
-              className={mode === 'login' ? 'active' : ''}
-              onClick={() => {
-                setMode('login');
-                setError(null);
-              }}
-            >
-              登录
-            </button>
-            <button
-              className={mode === 'register' ? 'active' : ''}
-              onClick={() => {
-                setMode('register');
-                setError(null);
-              }}
-            >
-              注册
-            </button>
-          </div>
-        </div>
-
-        {error && <div className="login-modal-error">{error}</div>}
-
-        {mode === 'login' ? (
-          <form className="login-form" onSubmit={handleLogin}>
-            <div className="form-group">
-              <label>用户名或邮箱</label>
-              <input
-                type="text"
-                value={loginForm.username_or_email}
-                onChange={(e) =>
-                  setLoginForm({ ...loginForm, username_or_email: e.target.value })
-                }
-                placeholder="请输入用户名或邮箱"
-                required
-                disabled={loading}
-              />
-            </div>
-            <div className="form-group">
-              <label>密码</label>
-              <div className="password-input-wrapper">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={loginForm.password}
-                  onChange={(e) =>
-                    setLoginForm({ ...loginForm, password: e.target.value })
-                  }
-                  placeholder="请输入密码"
-                  required
-                  disabled={loading}
-                />
-                <button
-                  type="button"
-                  className="password-toggle-btn"
-                  onClick={() => setShowPassword(!showPassword)}
-                  tabIndex={-1}
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-            </div>
-            <button type="submit" className="login-submit-btn" disabled={loading}>
-              {loading ? '登录中...' : '登录'}
-            </button>
-          </form>
-        ) : (
-          <form className="login-form" onSubmit={handleRegister}>
-            <div className="form-group">
-              <label>用户名</label>
-              <input
-                type="text"
-                value={registerForm.username}
-                onChange={(e) =>
-                  setRegisterForm({ ...registerForm, username: e.target.value })
-                }
-                placeholder="3-50个字符，只能包含字母、数字、下划线和连字符"
-                required
-                disabled={loading}
-              />
-            </div>
-            <div className="form-group">
-              <label>邮箱</label>
-              <input
-                type="email"
-                value={registerForm.email}
-                onChange={(e) =>
-                  setRegisterForm({ ...registerForm, email: e.target.value })
-                }
-                placeholder="请输入邮箱地址"
-                required
-                disabled={loading}
-              />
-            </div>
-            <div className="form-group">
-              <label>昵称</label>
-              <input
-                type="text"
-                value={registerForm.display_name}
-                onChange={(e) =>
-                  setRegisterForm({ ...registerForm, display_name: e.target.value })
-                }
-                placeholder="请输入昵称"
-                disabled={loading}
-              />
-            </div>
-            <div className="form-group">
-              <label>密码</label>
-              <div className="password-input-wrapper">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={registerForm.password}
-                  onChange={(e) =>
-                    setRegisterForm({ ...registerForm, password: e.target.value })
-                  }
-                  placeholder="至少8位，包含大小写字母、数字中的至少3种"
-                  required
-                  disabled={loading}
-                />
-                <button
-                  type="button"
-                  className="password-toggle-btn"
-                  onClick={() => setShowPassword(!showPassword)}
-                  tabIndex={-1}
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-            </div>
-            <div className="form-group">
-              <label>确认密码</label>
-              <div className="password-input-wrapper">
-                <input
-                  type={showConfirmPassword ? "text" : "password"}
-                  value={registerForm.confirm_password}
-                  onChange={(e) =>
-                    setRegisterForm({ ...registerForm, confirm_password: e.target.value })
-                  }
-                  placeholder="请再次输入密码"
-                  required
-                  disabled={loading}
-                />
-                <button
-                  type="button"
-                  className="password-toggle-btn"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  tabIndex={-1}
-                >
-                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-            </div>
-            <div className="form-group">
-              <label>邀请码</label>
-              <input
-                type="text"
-                value={registerForm.invitation_code}
-                onChange={(e) =>
-                  setRegisterForm({ ...registerForm, invitation_code: e.target.value.toUpperCase() })
-                }
-                placeholder="请输入邀请码"
-                required
-                disabled={loading}
-                autoComplete="off"
-              />
-            </div>
-            <button type="submit" className="login-submit-btn" disabled={loading}>
-              {loading ? '注册中...' : '注册'}
-            </button>
-          </form>
-        )}
+      {renderContent()}
     </DraggableResizableModal>
   );
 }

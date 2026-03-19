@@ -34,35 +34,90 @@
 }
 
 @media (max-width: 768px) {
-  .login-modal {
+  .login-page-mobile {
+    position: fixed;
+    top: 0;
+    left: 0;
     width: 100%;
-    height: 100%;
-    max-height: 100dvh;
-    border-radius: 0;
+    height: 100dvh;
+    background: var(--bg-primary, #ffffff);
+    z-index: 2000;
     display: flex;
     flex-direction: column;
+    padding: 0;
+    overflow-y: auto;
   }
 
   .login-modal-header {
-    padding: 16px;
+    padding: 24px 20px 0;
     flex-shrink: 0;
   }
 
+  .login-modal-header h2 {
+    font-size: 24px;
+    margin-bottom: 24px;
+    text-align: left;
+  }
+
+  .login-modal-tabs {
+    background: transparent;
+    padding: 0;
+    border-bottom: 1px solid var(--border-color, #eee);
+    gap: 24px;
+    justify-content: flex-start;
+  }
+
+  .login-modal-tabs button {
+    padding: 12px 0;
+    font-size: 16px;
+    background: none;
+    border: none;
+    border-radius: 0;
+    color: var(--text-secondary, #666);
+    position: relative;
+    flex: 0 0 auto;
+  }
+
+  .login-modal-tabs button.active {
+    background: none;
+    color: var(--primary-color, #1890ff);
+    box-shadow: none;
+    font-weight: 600;
+  }
+
+  .login-modal-tabs button.active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--primary-color, #1890ff);
+  }
+
   .login-form {
-    padding: 16px;
+    padding: 24px 20px;
     flex: 1;
     overflow-y: auto;
   }
   
-  .login-modal-tabs button {
-    padding: 10px;
-    font-size: 14px;
-  }
-  
   .login-modal-close {
-    top: 12px;
-    right: 12px;
+    top: 16px;
+    right: 16px;
     z-index: 10;
+    padding: 12px;
+  }
+
+  .form-group input {
+    padding: 12px;
+    font-size: 16px;
+  }
+
+  .login-submit-btn {
+    margin-top: 32px;
+    padding: 14px;
+    font-size: 16px;
+    border-radius: 24px;
   }
 }
 

@@ -362,6 +362,7 @@ export default function QuotaExceededModal({ isOpen, onClose, currentPlan = 'fre
       initialWidth={960}
       initialHeight={600}
       className="qm-modal"
+      overlayClassName="qm-overlay"
       handleClassName=".qm-drag-handle"
       scrollable
     >

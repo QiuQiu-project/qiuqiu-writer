@@ -13,8 +13,8 @@
   border: 1px solid var(--border-color, #e0e0e0);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   border-radius: 8px;
-  padding: 12px;
-  animation: fadeIn 0.3s ease-out;
+  padding: 14px 14px 12px;
+  animation: guideTipIn 0.18s ease-out;
 }
 
 .guide-tip-popover.top {
@@ -42,39 +42,29 @@
 }
 
 /* Arrow */
-.guide-tip-popover::after {
-  content: '';
+/* Arrow intentionally removed (modal-style tip) */
+
+.guide-tip-x {
   position: absolute;
-  border-width: 6px;
-  border-style: solid;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--border-light, #f0f0f0);
+  background: var(--bg-primary, #ffffff);
+  color: var(--text-secondary, #666666);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.guide-tip-popover.top::after {
-  top: 100%;
-  left: 50%;
-  margin-left: -6px;
-  border-color: var(--bg-primary, #ffffff) transparent transparent transparent;
-}
-
-.guide-tip-popover.bottom::after {
-  bottom: 100%;
-  left: 50%;
-  margin-left: -6px;
-  border-color: transparent transparent var(--bg-primary, #ffffff) transparent;
-}
-
-.guide-tip-popover.left::after {
-  left: 100%;
-  top: 50%;
-  margin-top: -6px;
-  border-color: transparent transparent transparent var(--bg-primary, #ffffff);
-}
-
-.guide-tip-popover.right::after {
-  right: 100%;
-  top: 50%;
-  margin-top: -6px;
-  border-color: transparent var(--bg-primary, #ffffff) transparent transparent;
+.guide-tip-x:hover {
+  background: var(--bg-secondary, #f5f5f5);
+  color: var(--text-primary, #333333);
 }
 
 .guide-tip-content {
@@ -120,7 +110,7 @@
   color: var(--text-secondary, #666666);
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translate(-50%, -10px); }
-  to { opacity: 1; transform: translate(-50%, 0); }
+@keyframes guideTipIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }

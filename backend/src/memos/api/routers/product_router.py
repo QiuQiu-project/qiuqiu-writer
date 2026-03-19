@@ -1124,23 +1124,46 @@ async def chat(chat_req: ChatRequest):
                 history_msgs = history[-20:] if history else []
                 messages = [*history_msgs, {"role": "user", "content": query}]
 
-                backend = mos_product.config.chat_model.backend
-                if backend in ["huggingface", "vllm", "openai"]:
-                    response_stream = mos_product.chat_llm.generate_stream(messages)
+                # 优先使用请求中指定的模型（需匹配 MOSProduct 的处理逻辑，或者使用 ai_service 处理自定义模型）
+                if chat_req.model:
+                    ai_service = get_ai_service()
+                    # 将 history 转换为 prompt
+                    system_prompt = "你是一个智能助手。"
+                    prompt_lines = []
+                    for msg in messages:
+                        role = "用户" if msg.get("role") == "user" else "助手"
+                        prompt_lines.append(f"{role}: {msg.get('content')}")
+                    prompt = "\n".join(prompt_lines)
+                    
+                    response_stream = ai_service.generate_content_stream(
+                        prompt=prompt,
+                        system_prompt=system_prompt,
+                        model=chat_req.model,
+                        temperature=0.7,
+                        max_tokens=8000,
+                        user_id=_real_user_id,
+                        feature="chat",
+                        work_id=_parse_work_id_from_user_id(chat_req.user_id),
+                    )
+                    
+                    async for chunk in response_stream:
+                        yield f"data: {json.dumps({'type': 'text', 'data': chunk}, ensure_ascii=False)}\n\n"
                 else:
-                    response_stream = mos_product.chat_llm.generate(messages)
+                    backend = mos_product.config.chat_model.backend
+                    if backend in ["huggingface", "vllm", "openai"]:
+                        response_stream = mos_product.chat_llm.generate_stream(messages)
+                    else:
+                        response_stream = mos_product.chat_llm.generate(messages)
 
-                buffer = ""
-                for chunk in response_stream:
-                    if chunk in ["<think>", "</think>"]:
-                        continue
-                    buffer += chunk
-                    if len(buffer) >= 16:
+                    buffer = ""
+                    for chunk in response_stream:
+                        buffer += chunk
+                        if len(buffer) >= 16:
+                            yield f"data: {json.dumps({'type': 'text', 'data': buffer}, ensure_ascii=False)}\n\n"
+                            buffer = ""
+
+                    if buffer:
                         yield f"data: {json.dumps({'type': 'text', 'data': buffer}, ensure_ascii=False)}\n\n"
-                        buffer = ""
-
-                if buffer:
-                    yield f"data: {json.dumps({'type': 'text', 'data': buffer}, ensure_ascii=False)}\n\n"
                 yield f"data: {json.dumps({'type': 'end'})}\n\n"
             except Exception as e:
                 logger.error(f"Error in simple chat stream: {e}", exc_info=True)
@@ -1728,8 +1751,6 @@ async def chat_complete(chat_req: ChatCompleteRequest):
                     resp_stream = mos_product.chat_llm.generate_stream(messages)
                     content = ""
                     for chunk in resp_stream:
-                        if chunk in ["<think>", "</think>"]:
-                            continue
                         content += chunk
                     return content, []
                 else:

@@ -381,6 +381,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
 
   const activeModuleSafe = template?.modules?.[activeModuleIndex];
   const [dismissedGuides, setDismissedGuides] = useState<Record<string, boolean>>({});
+  const [manualTabSelection, setManualTabSelection] = useState<Record<string, boolean>>({});
   
   const firstEmptyInfo = activeModuleSafe && !isOnboardingActive ? findFirstEmptyComponent(activeModuleSafe.components, dismissedGuides) : null;
   const firstEmptyComponentId = firstEmptyInfo ? firstEmptyInfo.id : '';
@@ -390,10 +391,17 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
     const handleGuideUpdate = () => {
       // Force re-calculation by checking localStorage
       const newDismissed: Record<string, boolean> = {};
+      const safeGet = (key: string) => {
+        try {
+          return localStorage.getItem(key) ?? sessionStorage.getItem(key);
+        } catch {
+          return null;
+        }
+      };
       if (activeModuleSafe) {
         const checkComponents = (components: ComponentConfig[]) => {
           components.forEach(comp => {
-            if (localStorage.getItem(`wawawriter_guide_tip_seen_guide-fill-${comp.id}`) === 'true') {
+            if (safeGet(`wawawriter_guide_tip_seen_guide-fill-${comp.id}`) === 'true') {
               newDismissed[comp.id] = true;
             }
             if (comp.type === 'tabs' && comp.config?.tabs) {
@@ -420,11 +428,13 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
   useEffect(() => {
     if (tipsEnabled && firstEmptyInfo?.parentId && firstEmptyInfo?.tabId) {
       const { parentId, tabId } = firstEmptyInfo;
-      if (activeTabs[parentId] !== tabId) {
-         setActiveTabs(prev => ({ ...prev, [parentId]: tabId }));
+      // 只在用户尚未手动选择过该 Tabs 的情况下，自动切到引导项所在 Tab。
+      // 一旦用户手动切换，则不再强制切回，避免“闪回”影响操作。
+      if (!manualTabSelection[parentId]) {
+        setActiveTabs(prev => (prev[parentId] === tabId ? prev : { ...prev, [parentId]: tabId }));
       }
     }
-  }, [firstEmptyInfo, tipsEnabled, activeTabs]);
+  }, [firstEmptyInfo, manualTabSelection, tipsEnabled]);
 
   if (loading) {
     return <div className="loading-container">加载中...</div>;
@@ -739,7 +749,10 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
             onGenerateComponent={handleGenerateData}
             generatingComponents={generatingComponents}
             activeTabId={activeTabs[comp.id]}
-            onActiveTabChange={(tId) => setActiveTabs(prev => ({ ...prev, [comp.id]: tId }))}
+            onActiveTabChange={(tId) => {
+              setManualTabSelection(prev => ({ ...prev, [comp.id]: true }));
+              setActiveTabs(prev => ({ ...prev, [comp.id]: tId }));
+            }}
             isEditMode={isEditMode}
           />
         );

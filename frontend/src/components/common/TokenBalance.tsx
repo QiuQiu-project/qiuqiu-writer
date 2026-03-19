@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { tokenApi, tokensToDisplay, type TokenInfo } from '../../utils/tokenApi';
+import { tokenApi, type TokenInfo } from '../../utils/tokenApi';
 import './TokenBalance.css';
 
 export default function TokenBalance() {
@@ -45,7 +45,7 @@ export default function TokenBalance() {
       type="button"
     >
       <span className="token-balance__icon">⚡</span>
-      <span className="token-balance__text">{tokensToDisplay(info.token_remaining)}</span>
+      <span className="token-balance__text">升级套餐</span>
     </button>
   );
 }

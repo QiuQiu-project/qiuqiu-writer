@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 import {
   BookOpen,
   Sparkles,
@@ -13,16 +13,16 @@ import {
   Check,
 } from 'lucide-react';
 import { authApi } from '../utils/authApi';
-import { worksApi } from '../utils/worksApi';
 import MessageModal from '../components/common/MessageModal';
 import type { MessageType } from '../components/common/MessageModal';
-import { parseError } from '../utils/errorUtils';
 import './HomePage.css';
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const context = useOutletContext<{ setLoginModalOpen: (open: boolean) => void }>();
+  const setLoginModalOpen = context?.setLoginModalOpen;
+  
   const isAuthenticated = authApi.isAuthenticated();
-  const [creating, setCreating] = useState(false);
 
   const [messageState, setMessageState] = useState<{
     isOpen: boolean;
@@ -37,10 +37,6 @@ export default function HomePage() {
     type: 'info',
     message: '',
   });
-
-  const showMessage = (message: string, type: MessageType = 'info', title?: string, onConfirm?: () => void) => {
-    setMessageState({ isOpen: true, type, message, title, onConfirm });
-  };
 
   const closeMessage = () => {
     setMessageState(prev => ({ ...prev, isOpen: false }));
@@ -79,37 +75,17 @@ export default function HomePage() {
     },
   ];
 
-  const handleGetStarted = async () => {
+  const handleGetStarted = () => {
     if (!isAuthenticated) {
-      navigate('/');
+      if (setLoginModalOpen) {
+        setLoginModalOpen(true);
+      }
       return;
     }
 
-    setCreating(true);
-    try {
-      const response = await worksApi.listWorks({
-        page: 1,
-        size: 1,
-        sort_by: 'updated_at',
-        sort_order: 'desc',
-      });
-
-      if (response.works && response.works.length > 0) {
-        const latestWork = response.works[0];
-        navigate(`/novel/editor?workId=${latestWork.id}`);
-      } else {
-        const newWork = await worksApi.createWork({
-          title: '未命名作品',
-          work_type: 'long' as const,
-          is_public: false,
-        });
-        if (!newWork || !newWork.id) throw new Error('创建作品成功，但未返回作品ID');
-        navigate(`/novel/editor?workId=${newWork.id}`);
-      }
-    } catch (err) {
-      showMessage(parseError(err), 'error', '操作失败');
-    } finally {
-      setCreating(false);
+    const user = authApi.getUserInfo();
+    if (user) {
+      navigate(`/users/${user.id}`);
     }
   };
 
@@ -144,10 +120,9 @@ export default function HomePage() {
             <button
               className="btn-primary"
               onClick={handleGetStarted}
-              disabled={creating}
             >
-              {creating ? '加载中...' : '开始创作'}
-              {!creating && <ArrowRight size={17} />}
+              开始创作
+              <ArrowRight size={17} />
             </button>
             {!isAuthenticated && (
               <button className="btn-secondary" onClick={() => navigate('/')}>
@@ -234,10 +209,9 @@ export default function HomePage() {
           <button
             className="btn-primary cta-btn"
             onClick={handleGetStarted}
-            disabled={creating}
           >
-            {creating ? '加载中...' : '免费开始创作'}
-            {!creating && <ArrowRight size={17} />}
+            免费开始创作
+            <ArrowRight size={17} />
           </button>
         </div>
       </section>

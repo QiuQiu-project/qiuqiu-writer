@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import './GuideTip.css';
 
@@ -13,22 +13,47 @@ interface GuideTipProps {
 const GLOBAL_ENABLED_KEY = 'wawawriter_guide_tips_enabled';
 const TIP_SEEN_PREFIX = 'wawawriter_guide_tip_seen_';
 
+const seenInMemory = new Set<string>();
+
+function safeStorageGet(storage: Storage | undefined, key: string): string | null {
+  if (!storage) return null;
+  try {
+    return storage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function safeStorageSet(storage: Storage | undefined, key: string, value: string) {
+  if (!storage) return;
+  try {
+    storage.setItem(key, value);
+  } catch {
+    // ignore storage failures (e.g. privacy mode / disabled storage)
+  }
+}
+
 export default function GuideTip({ id, content, children, placement = 'top', forceVisible = false }: GuideTipProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0, width: 0, height: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const checkVisibility = () => {
       // Check global setting
-      const globalEnabled = localStorage.getItem(GLOBAL_ENABLED_KEY);
+      const globalEnabled = safeStorageGet(window.localStorage, GLOBAL_ENABLED_KEY);
       // const isGlobalEnabled = globalEnabled === null || globalEnabled === 'true';
 
       // Check if this specific tip has been seen
-      const hasSeen = localStorage.getItem(`${TIP_SEEN_PREFIX}${id}`);
+      const seenKey = `${TIP_SEEN_PREFIX}${id}`;
+      const hasSeen =
+        seenInMemory.has(seenKey) ||
+        safeStorageGet(window.sessionStorage, seenKey) === 'true' ||
+        safeStorageGet(window.localStorage, seenKey) === 'true';
       
       // If the tip has been seen, it should not be visible even if forced
-      if (hasSeen === 'true') {
+      if (hasSeen) {
         setIsVisible(false);
         return;
       }
@@ -81,15 +106,43 @@ export default function GuideTip({ id, content, children, placement = 'top', for
     };
   }, [id, forceVisible, isVisible]);
 
-  const handleDismiss = () => {
+  const handleDismiss = useCallback(() => {
     setIsVisible(false);
-    localStorage.setItem(`${TIP_SEEN_PREFIX}${id}`, 'true');
+    const seenKey = `${TIP_SEEN_PREFIX}${id}`;
+    seenInMemory.add(seenKey);
+    safeStorageSet(window.sessionStorage, seenKey, 'true');
+    safeStorageSet(window.localStorage, seenKey, 'true');
     // Clicking "Got it" only closes the current tip, it should not turn off the global switch
     // Otherwise, other unread tips will also disappear
     
     // Dispatch event to notify other components (like SpotlightOverlay) that a tip has been dismissed
     window.dispatchEvent(new Event('wawawriter_guide_tips_updated'));
-  };
+  }, [id]);
+
+  useEffect(() => {
+    if (!isVisible) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleDismiss();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [handleDismiss, isVisible]);
+
+  // Click outside to dismiss (non-blocking, no backdrop)
+  useEffect(() => {
+    if (!isVisible) return;
+    const onMouseDown = (e: MouseEvent) => {
+      const target = e.target as Node | null;
+      if (!target) return;
+      const pop = popoverRef.current;
+      const anchor = containerRef.current;
+      if (pop?.contains(target)) return;
+      if (anchor?.contains(target)) return;
+      handleDismiss();
+    };
+    document.addEventListener('mousedown', onMouseDown, true);
+    return () => document.removeEventListener('mousedown', onMouseDown, true);
+  }, [handleDismiss, isVisible]);
 
   // Render children normally, but wrap with ref
   // If visible, render popover via Portal
@@ -127,13 +180,22 @@ export default function GuideTip({ id, content, children, placement = 'top', for
         {children}
       </div>
       {isVisible && createPortal(
-        <div className={`guide-tip-popover ${placement}`} style={popoverStyle}>
+        <div
+          ref={popoverRef}
+          className={`guide-tip-popover ${placement}`}
+          style={popoverStyle}
+          role="dialog"
+          aria-label="引导提示"
+        >
+          <button type="button" className="guide-tip-x" onClick={handleDismiss} aria-label="关闭提示">
+            ×
+          </button>
           <div className="guide-tip-content">
             {content}
           </div>
           <div className="guide-tip-footer">
-            <div style={{ flex: 1 }}></div>
-            <button className="guide-tip-close" onClick={handleDismiss}>
+            <div style={{ flex: 1 }} />
+            <button type="button" className="guide-tip-close" onClick={handleDismiss}>
               知道了
             </button>
           </div>

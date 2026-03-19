@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Grid, List, BookOpen, User, Calendar, FileText, Plus, Upload, ArrowUpDown } from 'lucide-react';
+import { Grid, List, BookOpen, Calendar, FileText, Plus, Upload, ArrowUpDown } from 'lucide-react';
 import { worksApi, type Work } from '../utils/worksApi';
-import { authApi, type UserInfo } from '../utils/authApi';
-import { getUserAvatarUrl } from '../utils/avatarUtils';
+import { authApi } from '../utils/authApi';
 import ImportWorkModal from '../components/ImportWorkModal';
 import './UserWorksPage.css';
 
@@ -11,7 +10,6 @@ export default function UserWorksPage() {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
   const [works, setWorks] = useState<Work[]>([]);
-  const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
@@ -19,15 +17,9 @@ export default function UserWorksPage() {
   const [total, setTotal] = useState(0);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showCreateMenu, setShowCreateMenu] = useState(false);
-  const [showEditProfile, setShowEditProfile] = useState(false);
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'updated_desc' | 'updated_asc' | 'words_desc' | 'words_asc' | 'title_asc'>('updated_desc');
-  const [editFormData, setEditFormData] = useState({
-    display_name: '',
-    bio: '',
-  });
-  const [saving, setSaving] = useState(false);
   const itemsPerPage = 10;
   const isCurrentUser = authApi.isAuthenticated() && 
     authApi.getUserInfo()?.id === userId;
@@ -68,51 +60,11 @@ export default function UserWorksPage() {
     }
   }, [userId, currentPage, isCurrentUser, itemsPerPage]);
 
-  const loadUserInfo = useCallback(async () => {
-    if (!userId) return;
-    
-    try {
-      // 如果是当前用户，从API获取最新用户信息
-      if (isCurrentUser) {
-        try {
-          const currentUser = await authApi.getCurrentUser();
-          
-          if (currentUser) {
-            setUserInfo(currentUser);
-            return;
-          }
-        } catch {
-          // ignore
-          // 如果API失败，使用本地存储的用户信息
-          const storedUser = authApi.getUserInfo();
-          
-          if (storedUser) {
-            setUserInfo(storedUser);
-            return;
-          }
-        }
-      }
-      
-      // TODO: 添加获取其他用户信息的API调用
-      // 目前使用占位符
-      setUserInfo({
-        id: userId,
-        username: `user_${userId}`,
-        email: '',
-        display_name: `用户 ${userId}`,
-        status: 'active',
-      });
-    } catch {
-      // ignore
-    }
-  }, [userId, isCurrentUser]);
-
   useEffect(() => {
     if (userId) {
       loadUserWorks();
-      loadUserInfo();
     }
-  }, [userId, currentPage, loadUserWorks, loadUserInfo]);
+  }, [userId, currentPage, loadUserWorks]);
 
 
   const formatDate = (dateString: string) => {
@@ -187,43 +139,6 @@ export default function UserWorksPage() {
     return sorted;
   }, [works, searchQuery, sortBy]);
 
-  // 处理编辑资料
-  const handleEditProfile = () => {
-    if (userInfo) {
-      setEditFormData({
-        display_name: userInfo.display_name || '',
-        bio: userInfo.bio || '',
-      });
-    }
-    setShowEditProfile(true);
-  };
-
-  // 处理取消编辑
-  const handleCancelEdit = () => {
-    setShowEditProfile(false);
-  };
-
-  // 处理保存资料
-  const handleSaveProfile = async () => {
-    if (!userInfo) return;
-    
-    setSaving(true);
-    try {
-      const updatedUser = await authApi.updateProfile(editFormData);
-      
-      // 更新本地状态
-      setUserInfo(updatedUser);
-      // 重新加载用户信息以确保数据同步
-      await loadUserInfo();
-      setShowEditProfile(false);
-    } catch (err) {
-      
-      alert(err instanceof Error ? err.message : '保存资料失败');
-    } finally {
-      setSaving(false);
-    }
-  };
-
   if (loading && works.length === 0) {
     return (
       <div className="user-works-page">
@@ -243,110 +158,6 @@ export default function UserWorksPage() {
   return (
     <div className="user-works-page">
       <div className="user-works-container">
-        {/* 左侧个人信息栏 */}
-        <aside className="user-sidebar">
-          
-          <div className="user-profile-card">
-            <div className="user-avatar-large">
-              {userInfo ? (
-                <img 
-                  src={getUserAvatarUrl(userInfo.avatar_url, userInfo.username, userInfo.display_name)} 
-                  alt={userInfo.display_name || userInfo.username || '用户'}
-                  className="user-avatar-img"
-                />
-              ) : (
-                <User size={80} />
-              )}
-            </div>
-            <h1 className="user-name-large">
-              {userInfo?.display_name || userInfo?.username || `用户 ${userId}`}
-            </h1>
-            {userInfo?.username && (
-              <p className="user-username">@{userInfo.username}</p>
-            )}
-            {isCurrentUser && (
-              <>
-                <button 
-                  className="edit-profile-btn"
-                  onClick={handleEditProfile}
-                >
-                  {showEditProfile ? '取消编辑' : '编辑资料'}
-                </button>
-                {/* 移动端：在个人信息下方显示操作按钮 */}
-                <div className="mobile-actions">
-                  <button 
-                    className="action-btn mobile-action-btn"
-                    onClick={handleCreateWork}
-                  >
-                    <Plus size={16} />
-                    <span>创建作品</span>
-                  </button>
-                  <button 
-                    className="action-btn mobile-action-btn"
-                    onClick={() => setShowImportModal(true)}
-                  >
-                    <Upload size={16} />
-                    <span>导入作品</span>
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-          
-          {/* 编辑资料表单 */}
-          {showEditProfile && isCurrentUser && (
-            <div className="edit-profile-form">
-              <div className="edit-profile-section">
-                <label htmlFor="display_name" className="edit-profile-label">
-                  姓名
-                </label>
-                <input
-                  id="display_name"
-                  type="text"
-                  className="edit-profile-input"
-                  placeholder="姓名"
-                  value={editFormData.display_name}
-                  onChange={(e) => setEditFormData({ ...editFormData, display_name: e.target.value })}
-                />
-              </div>
-
-              <div className="edit-profile-section">
-                <label htmlFor="bio" className="edit-profile-label">
-                  简介
-                </label>
-                <textarea
-                  id="bio"
-                  className="edit-profile-textarea"
-                  placeholder="添加简介"
-                  rows={4}
-                  value={editFormData.bio}
-                  onChange={(e) => setEditFormData({ ...editFormData, bio: e.target.value })}
-                />
-
-              </div>
-
-              <div className="edit-profile-actions">
-                <button
-                  type="button"
-                  className="edit-profile-save-btn"
-                  onClick={handleSaveProfile}
-                  disabled={saving}
-                >
-                  {saving ? '保存中...' : '保存'}
-                </button>
-                <button
-                  type="button"
-                  className="edit-profile-cancel-btn"
-                  onClick={handleCancelEdit}
-                  disabled={saving}
-                >
-                  取消
-                </button>
-              </div>
-            </div>
-          )}
-        </aside>
-
         {/* 右侧作品列表 */}
         <main className="works-main">
           <div className="works-header">

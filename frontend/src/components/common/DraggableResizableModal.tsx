@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import Draggable from 'react-draggable';
 import { ResizableBox } from 'react-resizable';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 import './DraggableResizableModal.css';
 
 interface DraggableResizableModalProps {
@@ -36,6 +37,7 @@ export default function DraggableResizableModal({
   scrollable = true,
 }: DraggableResizableModalProps) {
   const nodeRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
   
   // 使用 state 管理 ResizableBox 的宽高，以便在重新打开时重置或保持
   const [width, setWidth] = useState(initialWidth);
@@ -49,6 +51,35 @@ export default function DraggableResizableModal({
   }, [isOpen]);
 
   if (!isOpen) return null;
+
+  if (isMobile) {
+    return (
+      <div
+        className={`draggable-resizable-modal-overlay ${overlayClassName}`}
+        onClick={onClose}
+        onWheel={(e) => e.stopPropagation()}
+        style={{ padding: 0 }}
+      >
+        <div
+          className={className}
+          style={{
+            width: '100%',
+            height: '100%',
+            maxHeight: '100dvh',
+            borderRadius: 0,
+            overflow: 'hidden',
+            overflowY: scrollable ? 'auto' : 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            backgroundColor: 'var(--bg-primary, #ffffff)', // 默认背景色，避免透明
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {children}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

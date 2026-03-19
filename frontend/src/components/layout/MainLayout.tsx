@@ -1,11 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { User, Plus, Menu, X, Upload, Compass, BookOpen, LogOut } from 'lucide-react';
+import { User, Menu, X, Compass, BookOpen, LogOut, Clapperboard, CreditCard, Receipt } from 'lucide-react';
 import LoginModal from '../auth/LoginModal';
 import MessageModal from '../common/MessageModal';
 import type { MessageType } from '../common/MessageModal';
 import { authApi, type UserInfo } from '../../utils/authApi';
-import { worksApi } from '../../utils/worksApi';
 import { getUserAvatarUrl } from '../../utils/avatarUtils';
 import ImportWorkModal from '../ImportWorkModal';
 import './MainLayout.css';
@@ -20,6 +19,7 @@ export default function MainLayout() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [needLoginPrompt, setNeedLoginPrompt] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const createMenuRef = useRef<HTMLDivElement>(null);
@@ -36,16 +36,6 @@ export default function MainLayout() {
     type: 'info',
     message: '',
   });
-
-  const showMessage = (message: string, type: MessageType = 'info', title?: string, onConfirm?: () => void) => {
-    setMessageState({
-      isOpen: true,
-      type,
-      message,
-      title,
-      onConfirm,
-    });
-  };
 
   const closeMessage = () => {
     setMessageState(prev => ({ ...prev, isOpen: false }));
@@ -80,6 +70,13 @@ export default function MainLayout() {
     checkAuth();
   }, []);
 
+  // 是否需要展示“请先登录”提示条（由路由 state 触发，但登录后要立刻消失）
+  useEffect(() => {
+    const nextNeedLogin =
+      !isAuthenticated && Boolean((location.state as { needLogin?: boolean } | null)?.needLogin);
+    setNeedLoginPrompt(nextNeedLogin);
+  }, [isAuthenticated, location.state]);
+
   // 点击外部关闭菜单
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -106,6 +103,7 @@ export default function MainLayout() {
   const handleLoginSuccess = (user: UserInfo) => {
     setUserInfo(user);
     setIsAuthenticated(true);
+    setNeedLoginPrompt(false);
     setLoginModalOpen(false);
     const from = (location.state as { from?: string })?.from;
     navigate(from || `/users/${user.id}`, { replace: true });
@@ -124,36 +122,6 @@ export default function MainLayout() {
     }
   };
 
-  // 处理创建作品
-  const handleCreateWork = async () => {
-    try {
-      
-      
-      const workData = {
-        title: '未命名作品',
-        work_type: 'long' as const,
-        is_public: false,
-      };
-      
-      
-      
-      const newWork = await worksApi.createWork(workData);
-      
-      
-      
-      if (!newWork || !newWork.id) {
-        throw new Error('创建作品成功，但未返回作品ID');
-      }
-      
-      // 跳转到编辑器
-      navigate(`/novel/editor?workId=${newWork.id}`);
-    } catch (err) {
-      
-      const errorMessage = err instanceof Error ? err.message : '创建作品失败';
-      showMessage(`创建作品失败: ${errorMessage}`, 'error');
-    }
-  };
-
   // 处理导入成功
   const handleImportSuccess = (workId: string) => {
     setShowImportModal(false);
@@ -163,10 +131,9 @@ export default function MainLayout() {
   const isHomePage = location.pathname === '/';
   const isMyProfilePage = userInfo && location.pathname === `/users/${userInfo.id}`;
   const isUserPage = location.pathname.startsWith('/users/');
-  const needLoginPrompt = !isAuthenticated && (location.state as { needLogin?: boolean })?.needLogin;
 
   return (
-    <div className={`qiuqiu-layout${isHomePage ? ' is-homepage' : ''}${isUserPage ? ' is-profile-page' : ''}`}>
+    <div className={`qiuqiu-layout sidebar-layout${isHomePage ? ' is-homepage' : ''}${isUserPage ? ' is-profile-page' : ''}`}>
       {needLoginPrompt && (
         <div className="login-prompt-banner">
           <span>请先登录以继续访问</span>
@@ -175,89 +142,52 @@ export default function MainLayout() {
           </button>
         </div>
       )}
-      {/* GitHub风格的顶部导航栏 */}
-      <header className={`qiuqiu-header${isMyProfilePage ? ' profile-header' : ''}${isHomePage ? ' home-header' : ''}`}>
-        <div className="header-container">
-          <div className="header-left">
+      
+      {/* 侧边栏导航 */}
+      {!isHomePage && (
+        <aside className={`qiuqiu-sidebar${isMyProfilePage ? ' profile-sidebar' : ''}`}>
+          <div className="sidebar-header">
             <Link to="/" className="logo-link">
               <img src="/favicon.png" alt="Logo" className="logo-icon" />
               <span className="logo-text">球球写作</span>
             </Link>
           </div>
-            
-          {!isHomePage && (
-            <nav className="header-nav">
-              <Link 
-                to="/" 
-                className={`nav-link ${location.pathname === '/' ? 'active' : ''}`}
-              >
-                <Compass size={16} />
-                探索
-              </Link>
-              {isAuthenticated && (
+
+          <nav className="sidebar-nav">
+            <Link 
+              to="/" 
+              className={`nav-link ${location.pathname === '/' ? 'active' : ''}`}
+            >
+              <Compass size={20} />
+              <span className="nav-text">探索</span>
+            </Link>
+            {isAuthenticated && (
+              <>
                 <Link 
                   to={userInfo ? `/users/${userInfo.id}` : '/'}
                   className={`nav-link ${isMyProfilePage ? 'active' : ''}`}
                 >
-                  <BookOpen size={16} />
-                  个人主页
+                  <BookOpen size={20} />
+                  <span className="nav-text">小说创作</span>
                 </Link>
-              )}
-            </nav>
-          )}
+                <Link 
+                  to="/script"
+                  className={`nav-link ${location.pathname.startsWith('/script') ? 'active' : ''}`}
+                >
+                  <Clapperboard size={20} />
+                  <span className="nav-text">剧本创作</span>
+                </Link>
+              </>
+            )}
+          </nav>
 
-          <div className="header-right">
+          <div className="sidebar-footer">
             {isAuthenticated ? (
               <>
-                <div className="header-create-menu" ref={createMenuRef}>
-                  <button
-                    className="header-btn create-btn"
-                    onClick={() => setShowCreateMenu(!showCreateMenu)}
-                    title="创建/导入"
-                  >
-                    <Plus size={18} />
-                  </button>
-                  {showCreateMenu && (
-                    <div className="header-create-dropdown">
-                      <button
-                        type="button"
-                        className="header-create-item"
-                        onClick={() => {
-                          setShowCreateMenu(false);
-                          handleCreateWork();
-                        }}
-                      >
-                        <Plus size={16} />
-                        创建作品
-                      </button>
-                      <button
-                        type="button"
-                        className="header-create-item"
-                        onClick={() => {
-                          setShowCreateMenu(false);
-                          setShowImportModal(true);
-                        }}
-                      >
-                        <Upload size={16} />
-                        导入作品
-                      </button>
-                    </div>
-                  )}
-                </div>
                 <div className="user-menu-wrapper" ref={userMenuRef}>
                   <button
                     className="user-avatar-btn"
-                    onClick={() => {
-                      // 移动端：控制移动端菜单
-                      if (window.innerWidth <= 768) {
-                        setMobileMenuOpen(!mobileMenuOpen);
-                        setUserMenuOpen(false);
-                      } else {
-                        // 桌面端：控制用户菜单
-                        setUserMenuOpen(!userMenuOpen);
-                        setMobileMenuOpen(false);
-                      }
-                    }}
+                    onClick={() => setUserMenuOpen(!userMenuOpen)}
                     title="用户菜单"
                   >
                     {userInfo ? (
@@ -269,9 +199,10 @@ export default function MainLayout() {
                     ) : (
                       <User size={20} />
                     )}
+                    <span className="user-name-small">{userInfo?.display_name || userInfo?.username}</span>
                   </button>
                   {userMenuOpen && (
-                    <div className="user-menu-dropdown">
+                    <div className="user-menu-dropdown sidebar-user-dropdown">
                       <div className="user-menu-header">
                         <div className="user-avatar-btn">
                           {userInfo ? (
@@ -297,6 +228,22 @@ export default function MainLayout() {
                         <BookOpen size={16} />
                         个人主页
                       </Link>
+                      <Link
+                        to="/plans"
+                        className="menu-item"
+                        onClick={() => setUserMenuOpen(false)}
+                      >
+                        <CreditCard size={16} />
+                        <span>我的套餐</span>
+                      </Link>
+                      <Link
+                        to="/transactions"
+                        className="menu-item"
+                        onClick={() => setUserMenuOpen(false)}
+                      >
+                        <Receipt size={16} />
+                        交易记录
+                      </Link>
                       <div className="menu-divider"></div>
                       <a
                         href="#"
@@ -314,99 +261,73 @@ export default function MainLayout() {
                 </div>
               </>
             ) : (
-              <>
-                <button
-                  className="header-btn primary"
-                  onClick={() => setLoginModalOpen(true)}
-                >
-                  登录
-                </button>
-                {/* 未登录时显示移动端菜单按钮 */}
-                <button
-                  className="mobile-menu-btn"
-                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                  aria-label="菜单"
-                >
-                  {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* 移动端菜单 */}
-        {mobileMenuOpen && (
-          <div className="mobile-menu" ref={mobileMenuRef}>
-            {isAuthenticated && (
-              <>
-                <div className="mobile-menu-user">
-                  <div className="user-avatar-btn">
-                  {userInfo ? (
-                    <img 
-                      src={getUserAvatarUrl(userInfo.avatar_url, userInfo.username, userInfo.display_name)} 
-                      alt={userInfo.display_name || userInfo.username || '用户'}
-                      className="user-avatar-btn-img"
-                    />
-                  ) : (
-                    <User size={24} />
-                  )}
-                  </div>
-                  <div className="user-name">{userInfo?.display_name || userInfo?.username || '用户'}</div>
-                </div>
-                <div className="menu-divider"></div>
-              </>
-            )}
-            <Link
-              to="/"
-              className="mobile-menu-item"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              <Compass size={16} />
-              探索
-            </Link>
-            {isAuthenticated && (
-              <>
-                <Link
-                  to={userInfo ? `/users/${userInfo.id}` : '/'}
-                  className="mobile-menu-item"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <BookOpen size={16} />
-                  个人主页
-                </Link>
-                <div className="menu-divider"></div>
-                <a
-                  href="#"
-                  className="mobile-menu-item"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleLogout();
-                    setMobileMenuOpen(false);
-                  }}
-                >
-                  <LogOut size={16} />
-                  退出登录
-                </a>
-              </>
-            )}
-            {!isAuthenticated && (
               <button
-                className="mobile-menu-item primary"
-                onClick={() => {
-                  setLoginModalOpen(true);
-                  setMobileMenuOpen(false);
-                }}
+                className="sidebar-btn primary login-btn"
+                onClick={() => setLoginModalOpen(true)}
               >
-                登录
+                <span className="btn-text">登录</span>
               </button>
             )}
           </div>
-        )}
-      </header>
+        </aside>
+      )}
+
+      {/* 移动端菜单按钮 (仅在小屏幕显示) */}
+      <button
+        className="mobile-menu-toggle"
+        onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+      >
+        <Menu size={24} />
+      </button>
+
+      {/* 移动端侧边栏 */}
+      {mobileMenuOpen && (
+        <div className="mobile-sidebar-overlay" onClick={() => setMobileMenuOpen(false)}>
+          <aside className="mobile-sidebar" onClick={e => e.stopPropagation()}>
+             {/* 复用侧边栏内容或简化版 */}
+             <div className="sidebar-header">
+              <span className="logo-text">球球写作</span>
+              <button className="close-btn" onClick={() => setMobileMenuOpen(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <nav className="sidebar-nav">
+              <Link to="/" className="nav-link" onClick={() => setMobileMenuOpen(false)}>
+                <Compass size={20} />
+                <span className="nav-text">探索</span>
+              </Link>
+              {isAuthenticated && (
+                <>
+                  <Link to={userInfo ? `/users/${userInfo.id}` : '/'} className="nav-link" onClick={() => setMobileMenuOpen(false)}>
+                    <BookOpen size={20} />
+                    <span className="nav-text">小说创作</span>
+                  </Link>
+                  <Link to="/script" className="nav-link" onClick={() => setMobileMenuOpen(false)}>
+                    <Clapperboard size={20} />
+                    <span className="nav-text">剧本创作</span>
+                  </Link>
+                </>
+              )}
+            </nav>
+            <div className="sidebar-footer">
+               {isAuthenticated ? (
+                 <button className="sidebar-btn" onClick={handleLogout}>
+                   <LogOut size={20} />
+                   <span className="btn-text">退出登录</span>
+                 </button>
+               ) : (
+                 <button className="sidebar-btn primary" onClick={() => { setLoginModalOpen(true); setMobileMenuOpen(false); }}>
+                   登录
+                 </button>
+               )}
+            </div>
+          </aside>
+        </div>
+      )}
 
       {/* 主内容区域 */}
       <main className="qiuqiu-content">
-        <Outlet />
+        <Outlet context={{ setLoginModalOpen }} />
       </main>
 
       {/* 登录弹窗 */}
