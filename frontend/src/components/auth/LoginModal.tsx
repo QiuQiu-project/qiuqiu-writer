@@ -259,7 +259,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
             />
           </div>
           <div className="form-group">
-            <label>邀请码（选填）</label>
+            <label>邀请码</label>
             <input
               type="text"
               value={registerForm.invitation_code || ''}
