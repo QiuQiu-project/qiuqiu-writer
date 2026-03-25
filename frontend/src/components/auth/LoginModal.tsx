@@ -247,7 +247,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
             </div>
           </div>
           <div className="form-group">
-            <label>昵称（选填）</label>
+            <label>昵称</label>
             <input
               type="text"
               value={registerForm.display_name || ''}

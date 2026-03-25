@@ -3,7 +3,7 @@
  * - 不设置或设为空：请求走相对路径 /api、/ai 等，由 Vite 代理或 Nginx 转发到后端
  * - 设置完整地址：如 http://api.qiuqiuwriter.top:8000，请求直接打该域名
  */
-const FALLBACK_PROD_BASE = 'http://api.qiuqiuwriter.top:8000';
+const FALLBACK_PROD_BASE = '';
 export const API_BASE_URL: string =
   (import.meta.env.VITE_API_BASE_URL as string | undefined)
   ?? (import.meta.env.PROD ? FALLBACK_PROD_BASE : '');
