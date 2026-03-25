@@ -17,8 +17,8 @@ Environment=PYTHONPATH=/root/xingqiu_writer/backend/src
 
 ExecStart=/root/xingqiu_writer/backend/.venv/bin/uvicorn \
     memos.api.ai_api:app \
-    --host 127.0.0.1 \
-    --port 8001 \
+    --host 0.0.0.0 \
+    --port 8000 \
     --workers 2
 
 Restart=on-failure
