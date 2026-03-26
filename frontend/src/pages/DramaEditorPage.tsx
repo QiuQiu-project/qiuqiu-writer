@@ -118,13 +118,10 @@ function DramaSideNav({
   onSelectCharacter,
   scenes,
   onAddScene,
-  onUpdateScene,
   onDeleteScene,
   onGenerateSceneImage,
   generatingSceneImage,
-  imageSizes,
-  selectedImageSize,
-  onImageSizeChange,
+  onSelectScene,
 }: {
   meta: DramaMeta;
   activeEpisodeId: string | null;
@@ -139,15 +136,11 @@ function DramaSideNav({
   onSelectCharacter?: (c: DramaCharacter) => void;
   scenes?: DramaScene[];
   onAddScene?: () => void;
-  onUpdateScene?: (id: string, patch: Partial<DramaScene>) => void;
   onDeleteScene?: (id: string) => void;
   onGenerateSceneImage?: (sceneId: string) => void;
   generatingSceneImage?: string | null;
-  imageSizes?: string[];
-  selectedImageSize?: string;
-  onImageSizeChange?: (sz: string) => void;
+  onSelectScene?: (scene: DramaScene) => void;
 }) {
-  const [expandedSceneId, setExpandedSceneId] = useState<string | null>(null);
   const sceneList = scenes || [];
 
   return (
@@ -331,12 +324,11 @@ function DramaSideNav({
             <div className="drama-scene-sidebar-list">
               {sceneList.map((scene, idx) => {
                 const epTitle = meta.episodes.find(e => e.id === scene.episodeId)?.title;
-                const isExpanded = expandedSceneId === scene.id;
                 return (
-                  <div key={scene.id} className={`drama-scene-sidebar-item ${isExpanded ? 'expanded' : ''}`}>
+                  <div key={scene.id} className="drama-scene-sidebar-item">
                     <div
                       className="drama-scene-sidebar-body"
-                      onClick={() => setExpandedSceneId(isExpanded ? null : scene.id)}
+                      onClick={() => onSelectScene?.(scene)}
                     >
                       <div className="drama-scene-sidebar-num">{idx + 1}</div>
                       <div className="drama-scene-sidebar-info">
@@ -373,37 +365,6 @@ function DramaSideNav({
                         )}
                       </div>
                     </div>
-                    {isExpanded && onUpdateScene && (
-                      <div className="drama-scene-sidebar-edit">
-                        <div className="drama-scene-row">
-                          <input
-                            className="drama-input sm"
-                            placeholder="地点"
-                            value={scene.location}
-                            onChange={e => onUpdateScene(scene.id, { location: e.target.value })}
-                          />
-                          <select
-                            className="drama-select sm"
-                            value={scene.time}
-                            onChange={e => onUpdateScene(scene.id, { time: e.target.value })}
-                          >
-                            {['白天', '夜晚', '清晨', '黄昏', '室内', '室外'].map(t => (
-                              <option key={t} value={t}>{t}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <textarea
-                          className="drama-textarea sm"
-                          placeholder="场景描述..."
-                          value={scene.description}
-                          onChange={e => onUpdateScene(scene.id, { description: e.target.value })}
-                          rows={2}
-                        />
-                        {scene.imageUrl && (
-                          <img src={scene.imageUrl} alt="场景图" className="drama-scene-sidebar-img" />
-                        )}
-                      </div>
-                    )}
                   </div>
                 );
               })}
@@ -578,6 +539,7 @@ export default function DramaEditorPage() {
   const [selectedCharacter, setSelectedCharacter] = useState<DramaCharacter | null>(null);
   const [isEditingCharacter, setIsEditingCharacter] = useState(false);
   const [editingCharacterData, setEditingCharacterData] = useState<DramaCharacter | null>(null);
+  const [selectedScene, setSelectedScene] = useState<DramaScene | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const { messageState, showMessage, closeMessage } = useModalState();
@@ -1122,13 +1084,10 @@ export default function DramaEditorPage() {
               onSelectCharacter={setSelectedCharacter}
               scenes={meta.scenes || []}
               onAddScene={handleAddScene}
-              onUpdateScene={handleUpdateScene}
               onDeleteScene={handleDeleteScene}
               onGenerateSceneImage={openSceneImageModal}
               generatingSceneImage={generatingSceneImage}
-              imageSizes={imageSizes}
-              selectedImageSize={selectedImageSize}
-              onImageSizeChange={setSelectedImageSize}
+              onSelectScene={setSelectedScene}
             />
           </aside>
         )}
@@ -1393,8 +1352,88 @@ export default function DramaEditorPage() {
         </div>
       )}
 
-      {/* 图片预览遮罩 */}
-      {previewImage && (
+      {/* 场景详情模态框 */}
+      {selectedScene && (() => {
+        const scene = meta.scenes?.find(s => s.id === selectedScene.id) ?? selectedScene;
+        const epTitle = meta.episodes.find(e => e.id === scene.episodeId)?.title;
+        return (
+          <div className="drama-modal-overlay" onClick={() => setSelectedScene(null)}>
+            <div className="drama-modal-content" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
+              <div className="drama-modal-header">
+                <h3>场景详情</h3>
+                <button className="drama-modal-close" onClick={() => setSelectedScene(null)}><X size={16} /></button>
+              </div>
+              <div className="drama-modal-body" style={{ gap: 14 }}>
+                {scene.imageUrl ? (
+                  <img
+                    src={scene.imageUrl}
+                    alt="场景图"
+                    style={{ width: '100%', borderRadius: 8, cursor: 'zoom-in', maxHeight: 240, objectFit: 'cover' }}
+                    onClick={() => setPreviewImage(scene.imageUrl!)}
+                  />
+                ) : (
+                  <div style={{ width: '100%', height: 120, borderRadius: 8, background: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-tertiary)' }}>
+                    <MapPin size={28} />
+                  </div>
+                )}
+                {epTitle && (
+                  <span style={{ fontSize: 12, color: 'var(--text-secondary)', background: 'var(--bg-tertiary)', padding: '2px 8px', borderRadius: 4, alignSelf: 'flex-start' }}>
+                    来自 {epTitle}
+                  </span>
+                )}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>地点</label>
+                    <input
+                      className="drama-input"
+                      value={scene.location}
+                      onChange={e => { handleUpdateScene(scene.id, { location: e.target.value }); setSelectedScene(s => s ? { ...s, location: e.target.value } : s); }}
+                      placeholder="场景地点"
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>时间</label>
+                    <select
+                      className="drama-select"
+                      value={scene.time}
+                      onChange={e => { handleUpdateScene(scene.id, { time: e.target.value }); setSelectedScene(s => s ? { ...s, time: e.target.value } : s); }}
+                    >
+                      {['白天', '夜晚', '清晨', '黄昏', '室内', '室外'].map(t => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>场景描述</label>
+                  <textarea
+                    className="drama-textarea"
+                    rows={4}
+                    value={scene.description}
+                    onChange={e => { handleUpdateScene(scene.id, { description: e.target.value }); setSelectedScene(s => s ? { ...s, description: e.target.value } : s); }}
+                    placeholder="场景视觉特征描述..."
+                    style={{ resize: 'vertical' }}
+                  />
+                </div>
+              </div>
+              <div className="drama-modal-footer">
+                <button
+                  className="drama-btn-secondary"
+                  style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+                  onClick={() => { openSceneImageModal(scene.id); setSelectedScene(null); }}
+                  disabled={generatingSceneImage === scene.id}
+                >
+                  <Sparkles size={14} />
+                  生成场景图
+                </button>
+                <button className="drama-btn-primary" onClick={() => setSelectedScene(null)}>完成</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* 图片预览遮罩 */}      {previewImage && (
         <div className="drama-image-preview-overlay" onClick={() => setPreviewImage(null)}>
           <img src={previewImage} alt="Preview" className="drama-image-preview-img" />
           <button className="drama-image-preview-close" onClick={() => setPreviewImage(null)}>×</button>
