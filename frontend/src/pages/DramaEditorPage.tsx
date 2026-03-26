@@ -17,6 +17,8 @@ import { chaptersApi } from '../utils/chaptersApi';
 import { useYjsEditor } from '../hooks/useYjsEditor';
 import { dramaChatStream, dramaGenerateImage, dramaExtractScenes, dramaExtractCharacters, getDramaExtractOptions, type DramaExtractModelOption, type DramaSceneGenerationStyleOption } from '../utils/dramaApi';
 import CollabAIPanel from '../components/editor/CollabAIPanel';
+import MessageModal from '../components/common/MessageModal';
+import { useModalState } from '../hooks/useModalState';
 import ImportFromNovelModal from '../components/drama/ImportFromNovelModal';
 import ImportEpisodeFromChapterModal from '../components/drama/ImportEpisodeFromChapterModal';
 import ShareWorkModal from '../components/ShareWorkModal';
@@ -120,6 +122,9 @@ function DramaSideNav({
   onDeleteScene,
   onGenerateSceneImage,
   generatingSceneImage,
+  imageSizes,
+  selectedImageSize,
+  onImageSizeChange,
 }: {
   meta: DramaMeta;
   activeEpisodeId: string | null;
@@ -138,6 +143,9 @@ function DramaSideNav({
   onDeleteScene?: (id: string) => void;
   onGenerateSceneImage?: (sceneId: string) => void;
   generatingSceneImage?: string | null;
+  imageSizes?: string[];
+  selectedImageSize?: string;
+  onImageSizeChange?: (sz: string) => void;
 }) {
   const [expandedSceneId, setExpandedSceneId] = useState<string | null>(null);
   const sceneList = scenes || [];
@@ -564,13 +572,28 @@ export default function DramaEditorPage() {
   const [selectedModel, setSelectedModel] = useState<string>('');
   const [sceneExtractModels, setSceneExtractModels] = useState<DramaExtractModelOption[]>([]);
   const [sceneExtractStyles, setSceneExtractStyles] = useState<DramaSceneGenerationStyleOption[]>(FALLBACK_SCENE_STYLES);
+  const [imageSizes, setImageSizes] = useState<string[]>([]);
+  const [selectedImageSize, setSelectedImageSize] = useState<string>('1024x1024');
   const [localTasks, setLocalTasks] = useState<LocalDramaTask[]>([]);
   const [selectedCharacter, setSelectedCharacter] = useState<DramaCharacter | null>(null);
   const [isEditingCharacter, setIsEditingCharacter] = useState(false);
   const [editingCharacterData, setEditingCharacterData] = useState<DramaCharacter | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
+  const { messageState, showMessage, closeMessage } = useModalState();
+
+  // 图片生成模态框状态
+  type ImageGenTarget =
+    | { type: 'character'; characterId: string; style: 'portrait' | 'grid4' }
+    | { type: 'scene'; sceneId: string }
+    | null;
+  const [imageGenTarget, setImageGenTarget] = useState<ImageGenTarget>(null);
+  const [imageGenPrompt, setImageGenPrompt] = useState('');
+  const [imageGenSize, setImageGenSize] = useState('1024x1024');
+  const [imageGenExecuting, setImageGenExecuting] = useState(false);
+
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSaveErrorRef = useRef(false);
 
   // 加载作品 + 当前用户
   useEffect(() => {
@@ -598,6 +621,10 @@ export default function DramaEditorPage() {
           ? res.scene_generation_styles
           : FALLBACK_SCENE_STYLES;
         setSceneExtractStyles(styles);
+        if (Array.isArray(res.image_sizes) && res.image_sizes.length > 0) {
+          setImageSizes(res.image_sizes);
+          setSelectedImageSize(res.default_image_size || res.image_sizes[0]);
+        }
       })
       .catch(() => {
         if (!active) return;
@@ -645,8 +672,13 @@ export default function DramaEditorPage() {
       try {
         await worksApi.updateWork(workId, { metadata: newMeta as unknown as Work['metadata'] });
         setSavedAt(new Date());
-      } catch { /* ignore */ }
-      finally { setSaving(false); }
+        lastSaveErrorRef.current = false;
+      } catch {
+        if (!lastSaveErrorRef.current) {
+          lastSaveErrorRef.current = true;
+          showMessage('自动保存失败，请检查网络连接', 'error', undefined, undefined, { toast: true, autoCloseMs: 3000 });
+        }
+      }finally { setSaving(false); }
     }, 1500);
   }, [workId]);
 
@@ -776,7 +808,7 @@ export default function DramaEditorPage() {
         combinedContent += `\n第${episode.number}集：${episode.title}\n${episode.synopsis}\n${episode.script}`;
       }
       if (!combinedContent.trim()) {
-        alert('没有可用的剧本内容用于提取角色');
+        showMessage('没有可用的剧本内容用于提取角色', 'warning', undefined, undefined, { toast: true, autoCloseMs: 3000 });
         return;
       }
       const preferredModelId = sceneExtractModels.length > 0
@@ -817,13 +849,13 @@ export default function DramaEditorPage() {
     }
 
     if (commandId === 'drama-extract-scenes') {
-      if (!ep) { alert('请先选择要提取场景的集数'); return; }
+      if (!ep) { showMessage('请先选择要提取场景的集数', 'warning', undefined, undefined, { toast: true, autoCloseMs: 3000 }); return; }
       // 解析风格参数（命令后的词）
       const parts = fullQuery.trim().split(/\s+/).slice(1);
       const validStyles = sceneExtractStyles.map(s => s.id);
       const style = parts.find(p => validStyles.includes(p)) ?? 'balanced';
       const content = editor ? editor.getText() : ep.script;
-      if (!content.trim()) { alert('当前集没有剧本内容，请先生成剧本'); return; }
+      if (!content.trim()) { showMessage('当前集没有剧本内容，请先生成剧本', 'warning', undefined, undefined, { toast: true, autoCloseMs: 3000 }); return; }
 
       const task: LocalDramaTask = {
         local_id: localId, type: 'extract-scenes',
@@ -856,8 +888,8 @@ export default function DramaEditorPage() {
     }
 
     if (commandId === 'drama-gen-script') {
-      if (!ep) { alert('请先选择要生成剧本的集数'); return; }
-      if (!ep.synopsis.trim()) { alert('请先填写剧情简介再生成剧本'); return; }
+      if (!ep) { showMessage('请先选择要生成剧本的集数', 'warning', undefined, undefined, { toast: true, autoCloseMs: 3000 }); return; }
+      if (!ep.synopsis.trim()) { showMessage('请先填写剧情简介再生成剧本', 'warning', undefined, undefined, { toast: true, autoCloseMs: 3000 }); return; }
 
       const characters = meta.characters.map(c => `${c.name}（${c.role}）`).join('、');
       const prompt = [
@@ -932,55 +964,70 @@ export default function DramaEditorPage() {
     // 模拟生成过程（实际对接后替换）
     setTimeout(() => {
       setGeneratingVideo(null);
-      alert('视频生成功能即将上线，敬请期待！');
+      showMessage('视频生成功能即将上线，敬请期待！', 'info', undefined, undefined, { toast: true, autoCloseMs: 3000 });
     }, 1500);
   };
 
 
-  const handleGenerateCharacterImage = async (characterId: string, style: 'portrait' | 'grid4' = 'portrait') => {
+  // 打开图片生成模态框
+  const openCharacterImageModal = (characterId: string, style: 'portrait' | 'grid4' = 'portrait') => {
     const char = meta.characters.find(c => c.id === characterId);
-    if (!char || !workId) return;
+    if (!char) return;
+    const prompt = style === 'grid4'
+      ? `为剧本角色生成一张【角色设定集】图片。要求：必须在一张图片上以 2x2 网格排版的形式，展示该角色的4个不同角度、姿势或表情（如正面、侧面、全身、特写）。确保4个格子里是同一个人的不同视图，背景保持干净。\n角色信息 -> 角色名：${char.name}，身份：${char.role}，外貌特征：${char.appearance}，性格：${char.personality}，描述：${char.description}`
+      : `为剧本角色生成一张肖像照片。角色名：${char.name}，身份：${char.role}，外貌特征：${char.appearance}，性格：${char.personality}，描述：${char.description}`;
+    setImageGenPrompt(prompt);
+    setImageGenSize(selectedImageSize);
+    setImageGenTarget({ type: 'character', characterId, style });
+  };
 
-    setGeneratingCharacterImage(characterId);
+  const openSceneImageModal = (sceneId: string) => {
+    const scene = (meta.scenes || []).find(s => s.id === sceneId);
+    if (!scene) return;
+    const prompt = `为剧本生成一张场景概念图。场景地点：${scene.location}，时间：${scene.time}，描述：${scene.description}`;
+    setImageGenPrompt(prompt);
+    setImageGenSize(selectedImageSize);
+    setImageGenTarget({ type: 'scene', sceneId });
+  };
+
+  // 执行图片生成（模态框确认后调用）
+  const executeGenerateImage = async () => {
+    if (!imageGenTarget || !workId) return;
+    setImageGenExecuting(true);
+    if (imageGenTarget.type === 'character') setGeneratingCharacterImage(imageGenTarget.characterId);
+    else setGeneratingSceneImage(imageGenTarget.sceneId);
     try {
-      let prompt = `为剧本角色生成一张肖像照片。角色名：${char.name}，身份：${char.role}，外貌特征：${char.appearance}，性格：${char.personality}，描述：${char.description}`;
-      
-      if (style === 'grid4') {
-        prompt = `为剧本角色生成一张【角色设定集】图片。要求：必须在一张图片上以 2x2 网格排版的形式，展示该角色的4个不同角度、姿势或表情（如正面、侧面、全身、特写）。确保4个格子里是同一个人的不同视图，背景保持干净。\n角色信息 -> 角色名：${char.name}，身份：${char.role}，外貌特征：${char.appearance}，性格：${char.personality}，描述：${char.description}`;
-      }
-
-      const imageUrl = await dramaGenerateImage(prompt, workId);
+      const imageUrl = await dramaGenerateImage(imageGenPrompt, workId, { size: imageGenSize });
       if (imageUrl) {
-        const newCharacters = meta.characters.map(c =>
-          c.id === characterId ? { ...c, imageUrl } : c
-        );
-        handleMetaChange({ characters: newCharacters });
+        if (imageGenTarget.type === 'character') {
+          const newCharacters = meta.characters.map(c =>
+            c.id === imageGenTarget.characterId ? { ...c, imageUrl } : c
+          );
+          handleMetaChange({ characters: newCharacters });
+        } else {
+          handleUpdateScene(imageGenTarget.sceneId, { imageUrl });
+        }
       }
+      setImageGenTarget(null);
     } catch (e) {
-      console.error('Failed to generate character image:', e);
-      alert(e instanceof Error ? e.message : '生成角色照片失败，请重试');
+      showMessage(e instanceof Error ? e.message : '图片生成失败，请重试', 'error', undefined, undefined, { toast: true, autoCloseMs: 4000 });
     } finally {
+      setImageGenExecuting(false);
       setGeneratingCharacterImage(null);
+      setGeneratingSceneImage(null);
     }
   };
 
-  const handleGenerateSceneImage = async (sceneId: string) => {
-    const scene = (meta.scenes || []).find(s => s.id === sceneId);
-    if (!scene || !workId) return;
-
-    setGeneratingSceneImage(sceneId);
-    try {
-      const prompt = `为剧本生成一张场景概念图。场景地点：${scene.location}，时间：${scene.time}，描述：${scene.description}`;
-      const imageUrl = await dramaGenerateImage(prompt, workId);
-      if (imageUrl) {
-        handleUpdateScene(sceneId, { imageUrl });
-      }
-    } catch (e) {
-      console.error('Failed to generate scene image:', e);
-      alert(e instanceof Error ? e.message : '生成场景照片失败，请重试');
-    } finally {
-      setGeneratingSceneImage(null);
-    }
+  // 在模态框内切换角色生成风格时重建提示词
+  const handleImageGenStyleChange = (style: 'portrait' | 'grid4') => {
+    if (!imageGenTarget || imageGenTarget.type !== 'character') return;
+    const char = meta.characters.find(c => c.id === imageGenTarget.characterId);
+    if (!char) return;
+    const prompt = style === 'grid4'
+      ? `为剧本角色生成一张【角色设定集】图片。要求：必须在一张图片上以 2x2 网格排版的形式，展示该角色的4个不同角度、姿势或表情（如正面、侧面、全身、特写）。确保4个格子里是同一个人的不同视图，背景保持干净。\n角色信息 -> 角色名：${char.name}，身份：${char.role}，外貌特征：${char.appearance}，性格：${char.personality}，描述：${char.description}`
+      : `为剧本角色生成一张肖像照片。角色名：${char.name}，身份：${char.role}，外貌特征：${char.appearance}，性格：${char.personality}，描述：${char.description}`;
+    setImageGenPrompt(prompt);
+    setImageGenTarget({ ...imageGenTarget, style });
   };
 
 
@@ -1070,15 +1117,18 @@ export default function DramaEditorPage() {
               onAddEpisode={handleAddEpisode}
               onAddEpisodeFromNovel={() => setEpisodeImportModalOpen(true)}
               onDeleteEpisode={handleDeleteEpisode}
-              onGenerateCharacterImage={handleGenerateCharacterImage}
+              onGenerateCharacterImage={openCharacterImageModal}
               generatingCharacterImage={generatingCharacterImage}
               onSelectCharacter={setSelectedCharacter}
               scenes={meta.scenes || []}
               onAddScene={handleAddScene}
               onUpdateScene={handleUpdateScene}
               onDeleteScene={handleDeleteScene}
-              onGenerateSceneImage={handleGenerateSceneImage}
+              onGenerateSceneImage={openSceneImageModal}
               generatingSceneImage={generatingSceneImage}
+              imageSizes={imageSizes}
+              selectedImageSize={selectedImageSize}
+              onImageSizeChange={setSelectedImageSize}
             />
           </aside>
         )}
@@ -1279,20 +1329,39 @@ export default function DramaEditorPage() {
                       
                       <div className="character-detail-actions" style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>重新生成图片：</span>
+                        {imageSizes.length > 1 && (
+                          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                            {imageSizes.map(sz => (
+                              <button
+                                key={sz}
+                                onClick={() => setSelectedImageSize(sz)}
+                                style={{
+                                  padding: '2px 8px', fontSize: '11px', borderRadius: 4, border: '1px solid',
+                                  cursor: 'pointer', fontFamily: 'monospace',
+                                  background: selectedImageSize === sz ? 'var(--accent-primary)' : 'transparent',
+                                  color: selectedImageSize === sz ? '#fff' : 'var(--text-secondary)',
+                                  borderColor: selectedImageSize === sz ? 'var(--accent-primary)' : 'var(--border-light)',
+                                }}
+                              >
+                                {sz}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                         <div style={{ display: 'flex', gap: '8px' }}>
                           <button 
                             className="drama-btn-secondary" 
                             style={{ padding: '6px 12px', fontSize: '13px', display: 'flex', alignItems: 'center' }}
-                            onClick={() => handleGenerateCharacterImage(selectedCharacter.id, 'portrait')}
+                            onClick={() => openCharacterImageModal(selectedCharacter.id, 'portrait')}
                             disabled={generatingCharacterImage === selectedCharacter.id}
                           >
                             <Sparkles size={14} style={{ marginRight: '4px' }} />
                             单人肖像
                           </button>
-                          <button 
-                            className="drama-btn-secondary" 
+                          <button
+                            className="drama-btn-secondary"
                             style={{ padding: '6px 12px', fontSize: '13px', display: 'flex', alignItems: 'center' }}
-                            onClick={() => handleGenerateCharacterImage(selectedCharacter.id, 'grid4')}
+                            onClick={() => openCharacterImageModal(selectedCharacter.id, 'grid4')}
                             disabled={generatingCharacterImage === selectedCharacter.id}
                           >
                             <Layers size={14} style={{ marginRight: '4px' }} />
@@ -1338,6 +1407,100 @@ export default function DramaEditorPage() {
         workTitle={workTitle || work?.title || '剧本'}
         editorPath="/drama/editor"
         onClose={() => setShareModalOpen(false)}
+      />
+
+      {/* 图片生成模态框 */}
+      {imageGenTarget !== null && (
+        <div className="drama-modal-overlay" onClick={() => !imageGenExecuting && setImageGenTarget(null)}>
+          <div className="drama-modal-content" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
+            <div className="drama-modal-header">
+              <h3>生成图片</h3>
+              <button className="drama-modal-close" onClick={() => !imageGenExecuting && setImageGenTarget(null)}>
+                <X size={16} />
+              </button>
+            </div>
+            <div className="drama-modal-body">
+              {imageGenTarget.type === 'character' && (
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>生成风格</label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {(['portrait', 'grid4'] as const).map(s => (
+                      <button
+                        key={s}
+                        onClick={() => handleImageGenStyleChange(s)}
+                        style={{
+                          padding: '5px 14px', fontSize: 13, borderRadius: 6, border: '1px solid',
+                          cursor: 'pointer',
+                          background: imageGenTarget.style === s ? 'var(--accent-primary)' : 'transparent',
+                          color: imageGenTarget.style === s ? '#fff' : 'var(--text-primary)',
+                          borderColor: imageGenTarget.style === s ? 'var(--accent-primary)' : 'var(--border-light)',
+                        }}
+                      >
+                        {s === 'portrait' ? '单人肖像' : '四视图设定集'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {imageSizes.length > 1 && (
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>图片尺寸</label>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {imageSizes.map(sz => (
+                      <button
+                        key={sz}
+                        onClick={() => setImageGenSize(sz)}
+                        style={{
+                          padding: '3px 10px', fontSize: 12, borderRadius: 4, border: '1px solid',
+                          cursor: 'pointer', fontFamily: 'monospace',
+                          background: imageGenSize === sz ? 'var(--accent-primary)' : 'transparent',
+                          color: imageGenSize === sz ? '#fff' : 'var(--text-secondary)',
+                          borderColor: imageGenSize === sz ? 'var(--accent-primary)' : 'var(--border-light)',
+                        }}
+                      >
+                        {sz}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div>
+                <label style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>生成提示词（可编辑）</label>
+                <textarea
+                  className="drama-textarea"
+                  rows={5}
+                  value={imageGenPrompt}
+                  onChange={e => setImageGenPrompt(e.target.value)}
+                  style={{ fontSize: 13, resize: 'vertical' }}
+                />
+              </div>
+            </div>
+            <div className="drama-modal-footer">
+              <button className="drama-btn-secondary" onClick={() => setImageGenTarget(null)} disabled={imageGenExecuting}>
+                取消
+              </button>
+              <button className="drama-btn-primary" onClick={executeGenerateImage} disabled={imageGenExecuting || !imageGenPrompt.trim()}>
+                {imageGenExecuting ? (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span className="drama-spinner" style={{ width: 14, height: 14 }} />
+                    生成中...
+                  </span>
+                ) : '开始生成'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <MessageModal
+        isOpen={messageState.isOpen}
+        onClose={closeMessage}
+        title={messageState.title}
+        message={messageState.message}
+        type={messageState.type}
+        toast={messageState.toast}
+        autoCloseMs={messageState.autoCloseMs}
+        onConfirm={messageState.onConfirm}
       />
     </div>
   );

@@ -1582,6 +1582,27 @@
   gap: 20px;
 }
 
+.drama-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--glass-border, rgba(255, 255, 255, 0.07));
+  flex-shrink: 0;
+}
+
+.drama-spinner {
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  animation: drama-spin 0.6s linear infinite;
+  display: inline-block;
+}
+
+@keyframes drama-spin {
+  to { transform: rotate(360deg); }
+}
+
 /* ── Character Detail Modal ── */
 .character-detail-top {
   display: flex;

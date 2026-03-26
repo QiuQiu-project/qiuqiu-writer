@@ -19,13 +19,17 @@ interface LLMModel {
   id: string;
   name: string;
   model_id: string;
-  model_type?: 'text' | 'image' | 'video' | 'audio'; // 模型类型：文本生成、图片生成、视频生成、语音生成
-  api_base_url?: string;   // 自定义 API Base URL，空则使用全局配置
-  api_key?: string;        // 自定义 API Key，空则使用全局配置
+  model_type?: 'text' | 'image' | 'video' | 'audio';
+  api_base_url?: string;
+  api_key?: string;
   description?: string;
   enabled: boolean;
-  temperature?: number;    // 0.0~2.0，默认 0.7
-  max_tokens?: number;     // 默认 8000
+  temperature?: number;
+  max_tokens?: number;
+  /** 图片模型专用：默认生成尺寸，如 1024*1024 */
+  default_image_size?: string;
+  /** 图片模型专用：支持的尺寸列表（供前端展示选择） */
+  image_sizes?: string[];
 }
 
 interface SystemSetting {
@@ -46,6 +50,7 @@ const LLMConfigs: React.FC = () => {
   const [editing, setEditing] = useState<LLMModel | null>(null);
   const [copyingFrom, setCopyingFrom] = useState<LLMModel | null>(null);
   const [form] = Form.useForm();
+  const watchedModelType = Form.useWatch('model_type', form);
 
   // Helper to save models array to backend
   const saveModels = async (newModels: LLMModel[]) => {
@@ -84,8 +89,9 @@ const LLMConfigs: React.FC = () => {
     form.setFieldsValue({
       ...record,
       model_type: record.model_type || 'text',
-      // api_key 用占位符代替，避免回传明文
       api_key: record.api_key ? PLACEHOLDER_KEY : '',
+      default_image_size: record.default_image_size || '',
+      image_sizes: record.image_sizes || [],
     });
     setModalOpen(true);
   };
@@ -99,6 +105,8 @@ const LLMConfigs: React.FC = () => {
       name: `${record.name} (副本)`,
       model_type: record.model_type || 'text',
       api_key: record.api_key ? PLACEHOLDER_KEY : '',
+      default_image_size: record.default_image_size || '',
+      image_sizes: record.image_sizes || [],
     });
     setModalOpen(true);
   };
@@ -140,6 +148,8 @@ const LLMConfigs: React.FC = () => {
         enabled: values.enabled ?? true,
         temperature: values.temperature ?? undefined,
         max_tokens: values.max_tokens ?? undefined,
+        default_image_size: values.model_type === 'image' ? (values.default_image_size?.trim() || undefined) : undefined,
+        image_sizes: values.model_type === 'image' ? (values.image_sizes?.length ? values.image_sizes : undefined) : undefined,
       };
 
       if (editing) {
@@ -355,6 +365,42 @@ const LLMConfigs: React.FC = () => {
               <InputNumber min={256} max={128000} step={1000} placeholder="8000" style={{ width: '100%' }} />
             </Form.Item>
           </Space>
+
+          {watchedModelType === 'image' && (
+            <>
+              <Divider orientation="left" plain style={{ fontSize: 12, color: '#888' }}>图片生成配置</Divider>
+              <Form.Item
+                name="default_image_size"
+                label="默认生成尺寸"
+                extra="调用图片生成时使用的尺寸，格式如 1024*1024 或 2048*2048（注意用 * 而非 x）"
+              >
+                <Input placeholder="1024*1024" style={{ fontFamily: 'monospace' }} />
+              </Form.Item>
+              <Form.Item
+                name="image_sizes"
+                label="可用尺寸列表"
+                extra="供前端选择的尺寸选项，输入后按 Enter 添加"
+              >
+                <Select
+                  mode="tags"
+                  placeholder="输入尺寸后按 Enter，如 1024*1024"
+                  style={{ fontFamily: 'monospace' }}
+                  options={[
+                    { value: '512*512', label: '512×512' },
+                    { value: '768*768', label: '768×768' },
+                    { value: '1024*1024', label: '1024×1024' },
+                    { value: '1280*720', label: '1280×720（16:9）' },
+                    { value: '720*1280', label: '720×1280（9:16）' },
+                    { value: '1280*1024', label: '1280×1024' },
+                    { value: '1024*1280', label: '1024×1280' },
+                    { value: '768*1152', label: '768×1152（2:3）' },
+                    { value: '1152*768', label: '1152×768（3:2）' },
+                    { value: '2048*2048', label: '2048×2048' },
+                  ]}
+                />
+              </Form.Item>
+            </>
+          )}
 
           <Divider />
 

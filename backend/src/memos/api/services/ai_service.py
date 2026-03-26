@@ -150,6 +150,10 @@ class AIService:
                                     api_key=custom_key or self.api_key,
                                     base_url=custom_base or self.base_url,
                                 )
+                            # 如果模型配置了默认图片尺寸，使用配置值覆盖请求默认值
+                            configured_size = matched_model.get("default_image_size")
+                            if configured_size:
+                                size = configured_size
             except Exception as db_e:
                 logger.warning(f"Failed to lookup custom image model config: {db_e}")
 
@@ -195,40 +199,48 @@ class AIService:
                     resp.raise_for_status()
                     data = resp.json()
                     output = data.get("output", {})
-                    task_id = output.get("task_id")
-                    task_status = output.get("task_status", "")
 
-                    # 同步返回（极少见）
+                    def _extract_dashscope_url(out: dict) -> str | None:
+                        # 格式一：qwen-image-2.0 multimodal chat 格式
+                        # output.choices[0].message.content[0].image
+                        for choice in out.get("choices", []):
+                            for item in choice.get("message", {}).get("content", []):
+                                if isinstance(item, dict) and item.get("image"):
+                                    return item["image"]
+                        # 格式二：wanx text2image 任务格式
+                        # output.results[0].url
+                        results = out.get("results", [])
+                        if results:
+                            return results[0].get("url")
+                        return None
+
+                    task_status = output.get("task_status", "")
+                    task_id = output.get("task_id")
+
                     if task_status == "SUCCEEDED":
-                        results = output.get("results", [])
-                        image_url = results[0].get("url") if results else None
+                        image_url = _extract_dashscope_url(output)
                     elif task_id:
-                        # 轮询任务结果
+                        # 异步任务：轮询结果
                         poll_url = f"https://dashscope.aliyuncs.com/api/v1/tasks/{task_id}"
-                        poll_headers = {
-                            "Authorization": f"Bearer {client.api_key}",
-                        }
-                        for _ in range(40):  # 最多等待 120 秒
+                        poll_headers = {"Authorization": f"Bearer {client.api_key}"}
+                        for _ in range(40):  # 最多 120 秒
                             await asyncio.sleep(3)
-                            poll_resp = await httpx_client.get(
-                                poll_url, headers=poll_headers, timeout=30.0
-                            )
+                            poll_resp = await httpx_client.get(poll_url, headers=poll_headers, timeout=30.0)
                             poll_resp.raise_for_status()
                             poll_data = poll_resp.json()
                             poll_output = poll_data.get("output", {})
-                            poll_status = poll_output.get("task_status", "")
-                            if poll_status == "SUCCEEDED":
-                                results = poll_output.get("results", [])
-                                image_url = results[0].get("url") if results else None
+                            if poll_output.get("task_status") == "SUCCEEDED":
+                                image_url = _extract_dashscope_url(poll_output)
                                 break
-                            elif poll_status == "FAILED":
-                                raise ValueError(
-                                    f"DashScope 图片生成失败: {poll_output.get('message', '未知错误')}"
-                                )
+                            elif poll_output.get("task_status") == "FAILED":
+                                raise ValueError(f"DashScope 图片生成失败: {poll_output.get('message', '未知错误')}")
                         else:
                             raise ValueError("DashScope 图片生成超时，请稍后重试")
                     else:
-                        raise ValueError(f"DashScope 返回格式异常: {data}")
+                        # 同步直接返回（无 task_status 字段）
+                        image_url = _extract_dashscope_url(output)
+                        if not image_url:
+                            raise ValueError(f"DashScope 返回格式异常: {data}")
 
                     if not image_url:
                         raise ValueError("DashScope 返回的图片 URL 为空")

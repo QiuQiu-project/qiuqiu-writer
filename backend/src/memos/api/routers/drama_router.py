@@ -355,7 +355,34 @@ async def get_drama_extract_options(
         {"id": "concise", "label": "简洁", "description": SCENE_GENERATION_STYLE_HINTS["concise"]},
         {"id": "detailed", "label": "细节丰富", "description": SCENE_GENERATION_STYLE_HINTS["detailed"]},
     ]
-    return {"models": models, "scene_generation_styles": styles}
+
+    # 读取图片模型配置，返回可用尺寸列表和默认尺寸
+    image_sizes: list[str] = []
+    default_image_size: str = "1024x1024"
+    stmt = select(SystemSetting).where(SystemSetting.key == "llm_models")
+    result = await db.execute(stmt)
+    row = result.scalar_one_or_none()
+    if row and isinstance(row.value, list):
+        image_model = next(
+            (m for m in row.value if isinstance(m, dict)
+             and str(m.get("model_type", "")).strip().lower() == "image"
+             and m.get("enabled", True)),
+            None,
+        )
+        if image_model:
+            image_sizes = [s for s in (image_model.get("image_sizes") or []) if s]
+            configured_default = image_model.get("default_image_size", "")
+            if configured_default:
+                default_image_size = configured_default
+            elif image_sizes:
+                default_image_size = image_sizes[0]
+
+    return {
+        "models": models,
+        "scene_generation_styles": styles,
+        "image_sizes": image_sizes,
+        "default_image_size": default_image_size,
+    }
 
 
 @router.post("/extract/scenes")

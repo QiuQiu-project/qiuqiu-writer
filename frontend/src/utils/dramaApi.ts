@@ -92,14 +92,20 @@ export async function dramaExtractScenes(
 export async function getDramaExtractOptions(): Promise<{
   models: DramaExtractModelOption[];
   scene_generation_styles: DramaSceneGenerationStyleOption[];
+  image_sizes: string[];
+  default_image_size: string;
 }> {
   const res = await client.get<{
     models?: DramaExtractModelOption[];
     scene_generation_styles?: DramaSceneGenerationStyleOption[];
+    image_sizes?: string[];
+    default_image_size?: string;
   }>('/api/v1/drama/extract/options');
   return {
     models: Array.isArray(res.models) ? res.models : [],
     scene_generation_styles: Array.isArray(res.scene_generation_styles) ? res.scene_generation_styles : [],
+    image_sizes: Array.isArray(res.image_sizes) ? res.image_sizes : [],
+    default_image_size: res.default_image_size || '1024x1024',
   };
 }
 
