@@ -22,8 +22,36 @@ interface StoryboardViewProps {
   meta: DramaMeta;
   workId: string | null;
   selectedImageSize?: string;
+  allEpisodes?: DramaEpisode[];
   onUpdateStoryboard: (storyboard: DramaStoryboard) => void;
   onRegenerateStoryboard: () => void;
+}
+
+interface PanelWithEpisode {
+  episodeId: string;
+  episodeNumber: number;
+  episodeTitle: string;
+  panel: DramaPanel;
+}
+
+function collectAllPanelsWithImages(allEpisodes: DramaEpisode[]): PanelWithEpisode[] {
+  const result: PanelWithEpisode[] = [];
+  for (const ep of allEpisodes) {
+    for (const p of (ep.storyboard?.panels ?? [])) {
+      if (p.imageUrl) {
+        result.push({ episodeId: ep.id, episodeNumber: ep.number, episodeTitle: ep.title, panel: p });
+      }
+    }
+  }
+  return result;
+}
+
+function resolvePanelById(id: string, allEpisodes: DramaEpisode[]): DramaPanel | undefined {
+  for (const ep of allEpisodes) {
+    const found = ep.storyboard?.panels.find(p => p.id === id);
+    if (found) return found;
+  }
+  return undefined;
 }
 
 interface ActGroup {
@@ -75,9 +103,14 @@ export default function StoryboardView({
   meta,
   workId,
   selectedImageSize = '1024x1024',
+  allEpisodes = [],
   onUpdateStoryboard,
   onRegenerateStoryboard,
 }: StoryboardViewProps) {
+  // 确保当前集也在 allEpisodes 中（用于跨集面板解析）
+  const allEpisodesWithCurrent = allEpisodes.some(e => e.id === episode.id)
+    ? allEpisodes
+    : [episode, ...allEpisodes];
   const storyboard = episode.storyboard;
   const [generatingPanelId, setGeneratingPanelId] = useState<string | null>(null);
   const [batchGenerating, setBatchGenerating] = useState(false);
@@ -105,53 +138,75 @@ export default function StoryboardView({
     onUpdateStoryboard({ ...storyboard, panels: newPanels });
   };
 
-  const handleGeneratePanelImage = async (panel: DramaPanel) => {
-    if (!workId) return;
+  const handleGeneratePanelImage = async (
+    panel: DramaPanel,
+  ): Promise<string | null> => {
+    if (!workId) return null;
     setGeneratingPanelId(panel.id);
     try {
-      const sceneInfo = `场次：${panel.actTitle || ''}，镜头：${SHOT_TYPE_LABELS[panel.shotType] || panel.shotType}`;
-      const charInfo = panel.characters.length > 0 ? `出场角色：${panel.characters.join('、')}` : '';
+      const shotLabel = SHOT_TYPE_LABELS[panel.shotType] || panel.shotType;
       const dialogueInfo = panel.dialogue ? `台词："${panel.dialogue}"` : '';
 
-      // 从 meta 查找角色外貌描述，丰富生成效果
+      // 从 meta 查找角色外貌描述，格式：角色名（外貌描述），逐个明确关联
       const linkedCharsForGen = panel.characters
         .map(name => meta.characters.find(c => c.name === name))
         .filter((c): c is DramaCharacter => !!c);
-      const charAppearances = linkedCharsForGen.map(c => c.appearance).filter(Boolean);
-      const appearanceInfo = charAppearances.length > 0
-        ? `角色外貌：${charAppearances.join('；')}`
-        : '';
+      // 精确格式：[名字]（[外貌]），让模型明确关联角色名与外貌
+      const charAppearanceInfos = linkedCharsForGen
+        .filter(c => c.appearance)
+        .map(c => `${c.name}（${c.appearance}）`);
+      // 外貌放最前（权重最高），无外貌则降级为角色名列表
+      const charAppearanceStr = charAppearanceInfos.length > 0
+        ? `画面人物：${charAppearanceInfos.join('；')}`
+        : panel.characters.length > 0
+          ? `出场角色：${panel.characters.join('、')}`
+          : '';
 
       // 从 meta 查找关联场景描述
       const linkedScene = panel.sceneId ? meta.scenes?.find(s => s.id === panel.sceneId) : undefined;
       const sceneDesc = linkedScene
-        ? `场景：${linkedScene.location} · ${linkedScene.time}，${linkedScene.description}`
+        ? `${linkedScene.location}·${linkedScene.time}，${linkedScene.description}`
+        : '';
+
+      // 用户手选上文参考（跨集，多选），优先级最高
+      const contextRefUrls: string[] = (panel.contextRefPanelIds ?? [])
+        .map(id => resolvePanelById(id, allEpisodesWithCurrent)?.imageUrl)
+        .filter((u): u is string => !!u);
+
+      // 有上文参考时：prompt 加一致性提示（对不支持图片输入的模型也有效）
+      const contextHint = contextRefUrls.length > 0
+        ? '与参考画面保持相同的角色造型、服装配色和画风'
         : '';
 
       const prompt = panel.imagePrompt || [
-        '横版漫剧情节，完整独立画面，电影感宽幅构图，高质量细节。',
-        sceneInfo,
-        sceneDesc,
-        panel.action,
-        charInfo,
-        appearanceInfo,
+        '单张横版插画，完整场景，无分格无边框，电影感构图，高质量细节。',
+        contextHint,                 // 上文一致性提示（有上文参考时）
+        charAppearanceStr,           // 角色外貌
+        sceneDesc,                   // 场景描述
+        panel.action,                // 动作
+        `${shotLabel}构图`,          // 镜头类型
+        panel.emotion ? `情绪：${panel.emotion}` : '',
         dialogueInfo,
-        `情绪基调：${panel.emotion || ''}`,
       ].filter(Boolean).join('，');
 
-      // 收集所有有图片的角色参考图 + 场景参考图
-      const referenceImageUrls: string[] = [
-        ...linkedCharsForGen.map(c => c.imageUrl).filter((u): u is string => !!u),
-        ...(linkedScene?.imageUrl ? [linkedScene.imageUrl] : []),
-      ];
+      // 参考图策略：
+      // - 有上文参考 → 专门用上文参考图（用户明确选择，不混入角色/场景图）
+      // - 无上文参考 → 使用角色图 + 场景图作为外貌/场景引导
+      const referenceImageUrls: string[] = contextRefUrls.length > 0
+        ? contextRefUrls
+        : [
+            ...linkedCharsForGen.map(c => c.imageUrl).filter((u): u is string => !!u),
+            ...(linkedScene?.imageUrl ? [linkedScene.imageUrl] : []),
+          ];
 
       const imageUrl = await dramaGenerateImage(prompt, workId, {
         size: selectedImageSize,
         referenceImageUrls: referenceImageUrls.length > 0 ? referenceImageUrls : undefined,
       });
       if (imageUrl) updatePanel(panel.id, { imageUrl });
+      return imageUrl ?? null;
     } catch {
-      // 图片生成失败不弹错误，允许重试
+      return null;
     } finally {
       setGeneratingPanelId(null);
     }
@@ -227,6 +282,11 @@ export default function StoryboardView({
                   : undefined;
                 const hasRefs = linkedChars.length > 0 || !!linkedScene;
 
+                  // 解析上文参考面板
+                const contextRefPanels = (panel.contextRefPanelIds ?? [])
+                  .map(id => resolvePanelById(id, allEpisodesWithCurrent))
+                  .filter((p): p is DramaPanel => !!p && !!p.imageUrl);
+
                 return (
                   <div key={panel.id} className="storyboard-panel-card">
                     {/* 图片区 */}
@@ -274,6 +334,27 @@ export default function StoryboardView({
                           )}
                         </div>
                       )}
+
+                      {/* 上文参考图行 */}
+                      {contextRefPanels.length > 0 && (
+                        <div className="storyboard-panel-context-refs">
+                          <span className="storyboard-context-refs-badge">上文</span>
+                          {contextRefPanels.slice(0, 4).map(rp => (
+                            <div
+                              key={rp.id}
+                              className="storyboard-context-ref-thumb"
+                              title={`#${rp.index}`}
+                            >
+                              <img src={rp.imageUrl} alt={`#${rp.index}`} />
+                            </div>
+                          ))}
+                          {contextRefPanels.length > 4 && (
+                            <div className="storyboard-ref-more" title={`还有 ${contextRefPanels.length - 4} 张`}>
+                              +{contextRefPanels.length - 4}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* 操作按钮 */}
@@ -311,6 +392,8 @@ export default function StoryboardView({
         <PanelEditModal
           panel={editingPanel}
           meta={meta}
+          allEpisodes={allEpisodesWithCurrent}
+          currentPanelId={editingPanel.id}
           onChange={setEditingPanel}
           onSave={() => {
             updatePanel(editingPanel.id, editingPanel);
@@ -327,17 +410,24 @@ export default function StoryboardView({
 function PanelEditModal({
   panel,
   meta,
+  allEpisodes,
+  currentPanelId,
   onChange,
   onSave,
   onClose,
 }: {
   panel: DramaPanel;
   meta: DramaMeta;
+  allEpisodes: DramaEpisode[];
+  currentPanelId: string;
   onChange: (p: DramaPanel) => void;
   onSave: () => void;
   onClose: () => void;
 }) {
   const scenes = meta.scenes ?? [];
+  // 收集所有已生成图片的面板（排除自身）
+  const allPanelsWithImages = collectAllPanelsWithImages(allEpisodes)
+    .filter(x => x.panel.id !== currentPanelId);
 
   const toggleCharacter = (name: string) => {
     const next = panel.characters.includes(name)
@@ -487,8 +577,47 @@ function PanelEditModal({
               value={panel.imagePrompt || ''}
               onChange={e => onChange({ ...panel, imagePrompt: e.target.value || undefined })}
               rows={2}
-              placeholder="留空则自动构建提示词（含角色外貌 & 场景描述）"
+              placeholder="留空则自动构建（单张横版插画，无分格，含角色外貌 & 场景描述）"
             />
+          </div>
+
+          {/* 上文参考图（跨集多选） */}
+          <div className="storyboard-edit-field">
+            <label>上文参考图</label>
+            {allPanelsWithImages.length === 0 ? (
+              <p className="storyboard-context-empty">暂无已生成的分镜图可供参考</p>
+            ) : (
+              <div className="storyboard-context-picker">
+                {allPanelsWithImages.map(({ episodeNumber, episodeTitle, panel: rp }) => {
+                  const selected = (panel.contextRefPanelIds ?? []).includes(rp.id);
+                  return (
+                    <button
+                      key={rp.id}
+                      type="button"
+                      className={`storyboard-context-option${selected ? ' selected' : ''}`}
+                      onClick={() => {
+                        const ids = panel.contextRefPanelIds ?? [];
+                        const next = ids.includes(rp.id)
+                          ? ids.filter(i => i !== rp.id)
+                          : [...ids, rp.id];
+                        onChange({ ...panel, contextRefPanelIds: next.length > 0 ? next : undefined });
+                      }}
+                      title={`第${episodeNumber}集 ${episodeTitle} · #${rp.index}`}
+                    >
+                      <div className="storyboard-context-thumb">
+                        <img src={rp.imageUrl} alt={`#${rp.index}`} />
+                        {selected && (
+                          <div className="storyboard-context-selected-mark">
+                            <Check size={9} />
+                          </div>
+                        )}
+                      </div>
+                      <span className="storyboard-context-label">E{episodeNumber}·#{rp.index}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
         <div className="drama-modal-footer">

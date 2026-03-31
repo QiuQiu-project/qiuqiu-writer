@@ -4,6 +4,7 @@ AI服务层
 """
 
 import asyncio
+import base64
 import json
 import os
 from datetime import datetime, timezone
@@ -182,13 +183,24 @@ class AIService:
                         "Content-Type": "application/json",
                     }
                     ref_urls = [u for u in (reference_image_urls or []) if u]
-                    if "qwen-image" in actual_model.lower():
-                        # qwen-image-2.0 多模态格式：支持多张参考图
-                        content: list[dict] = [{"image": u} for u in ref_urls]
-                        content.append({"text": prompt})
-                    else:
-                        # wanx 系列：仅 text，参考图通过 input.ref_img 传入（下方处理）
-                        content = [{"text": prompt}]
+
+                    # ── qwen-image：将参考图转为 base64 内嵌传入 ────────────────
+                    # 直接传 URL 会 400（DashScope 服务器可能无法访问外部/过期 URL）
+                    # 下载后 base64 编码，绕过 URL 可访问性限制
+                    content: list[dict] = []
+                    if "qwen-image" in actual_model.lower() and ref_urls:
+                        for ref_url in ref_urls[:2]:  # 最多 2 张，避免 payload 过大
+                            try:
+                                img_resp = await httpx_client.get(ref_url, timeout=15.0)
+                                if img_resp.status_code == 200:
+                                    ctype = img_resp.headers.get(
+                                        "content-type", "image/jpeg"
+                                    ).split(";")[0]
+                                    b64data = base64.b64encode(img_resp.content).decode("utf-8")
+                                    content.append({"image": f"data:{ctype};base64,{b64data}"})
+                            except Exception as img_err:
+                                logger.warning(f"Skipping ref image (download failed): {img_err}")
+                    content.append({"text": prompt})
 
                     payload = {
                         "model": actual_model,

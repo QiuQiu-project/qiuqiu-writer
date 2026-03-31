@@ -36,6 +36,7 @@ export interface DramaPanel {
   emotion?: string;        // 情绪基调
   imageUrl?: string;       // 生成的分镜图URL
   imagePrompt?: string;    // 图片生成提示词（可手动编辑）
+  contextRefPanelIds?: string[];  // 上文参考分镜格 ID（跨集，多选，生图时作为参考）
 }
 
 // 分镜脚本（整集）

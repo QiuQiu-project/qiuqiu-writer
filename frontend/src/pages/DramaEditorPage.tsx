@@ -733,6 +733,7 @@ function EpisodeEditor({
           meta={meta}
           workId={workId}
           selectedImageSize={selectedImageSize}
+          allEpisodes={meta.episodes}
           onUpdateStoryboard={storyboard => onChange({ storyboard })}
           onRegenerateStoryboard={() => onGenerateStoryboard?.(episode.id)}
         />
