@@ -9,14 +9,14 @@ import {
   Plus, Trash2, Save, Sparkles, Edit2, X, Wifi, WifiOff,
   Download, ChevronLeft, ChevronRight as ChevronRightIcon,
   PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Settings,
-  Clapperboard, Check
+  Clapperboard, Check, Upload, Star, Image as ImageIcon
 } from 'lucide-react';
 import type { Editor } from '@tiptap/react';
 import { worksApi, type Work } from '../utils/worksApi';
 import { authApi } from '../utils/authApi';
 import { chaptersApi } from '../utils/chaptersApi';
 import { useYjsEditor } from '../hooks/useYjsEditor';
-import { dramaChatStream, dramaGenerateImage, dramaExtractScenes, dramaExtractCharacters, getDramaExtractOptions, dramaGenerateStoryboard, type DramaExtractModelOption, type DramaSceneGenerationStyleOption } from '../utils/dramaApi';
+import { dramaChatStream, dramaGenerateImage, dramaUploadImage, dramaExtractScenes, dramaExtractCharacters, getDramaExtractOptions, dramaGenerateStoryboard, type DramaExtractModelOption, type DramaSceneGenerationStyleOption } from '../utils/dramaApi';
 import CollabAIPanel from '../components/editor/CollabAIPanel';
 import MessageModal from '../components/common/MessageModal';
 import { useModalState } from '../hooks/useModalState';
@@ -27,10 +27,10 @@ import WorkInfoManager from '../components/editor/WorkInfoManager';
 import DramaScriptEditor from '../components/editor/DramaScriptEditor';
 import StoryboardView from '../components/drama/StoryboardView';
 import type { WorkData } from '../components/editor/work-info/types';
-import type { DramaCharacter, DramaEpisode, DramaMeta, DramaScene, DramaStoryboard, LocalDramaTask, EpisodeProductionStatus } from '../components/drama/dramaTypes';
+import type { DramaCharacter, DramaEpisode, DramaMeta, DramaScene, DramaStoryboard, LocalDramaTask, EpisodeProductionStatus, SubjectType } from '../components/drama/dramaTypes';
 import './DramaEditorPage.css';
 
-type LeftTab = 'work-info' | 'episodes' | 'characters' | 'scenes' | 'production';
+type LeftTab = 'work-info' | 'episodes' | 'subjects' | 'production';
 
 const FALLBACK_SCENE_STYLES: DramaSceneGenerationStyleOption[] = [
   { id: 'balanced', label: '平衡', description: '镜头感与信息量均衡，适合通用场景提取。' },
@@ -135,6 +135,7 @@ function DramaSideNav({
   generatingSceneImage,
   onSelectScene,
   onGenerateStoryboard,
+  onAddSubject,
 }: {
   meta: DramaMeta;
   activeEpisodeId: string | null;
@@ -154,6 +155,7 @@ function DramaSideNav({
   generatingSceneImage?: string | null;
   onSelectScene?: (scene: DramaScene) => void;
   onGenerateStoryboard?: (episodeId: string) => void;
+  onAddSubject?: (type: SubjectType) => void;
 }) {
   const sceneList = scenes || [];
 
@@ -178,20 +180,12 @@ function DramaSideNav({
           <span>集数</span>
         </button>
         <button
-          className={`drama-sidenav-tab ${activeTab === 'characters' ? 'active' : ''}`}
-          onClick={() => onTabChange('characters')}
-          title="角色"
+          className={`drama-sidenav-tab ${activeTab === 'subjects' ? 'active' : ''}`}
+          onClick={() => onTabChange('subjects')}
+          title="主体"
         >
           <Users size={16} />
-          <span>角色</span>
-        </button>
-        <button
-          className={`drama-sidenav-tab ${activeTab === 'scenes' ? 'active' : ''}`}
-          onClick={() => onTabChange('scenes')}
-          title="场景库"
-        >
-          <MapPin size={16} />
-          <span>场景</span>
+          <span>主体</span>
         </button>
         <button
           className={`drama-sidenav-tab ${activeTab === 'production' ? 'active production-tab-active' : ''}`}
@@ -283,119 +277,57 @@ function DramaSideNav({
         </div>
       )}
 
-      {/* 角色列表 */}
-      {activeTab === 'characters' && (
+      {/* 主体列表（角色 + 场景合并） */}
+      {activeTab === 'subjects' && (
         <div className="drama-sidenav-content">
           <div className="drama-sidenav-header">
-            <span className="drama-sidenav-count">{meta.characters.length} 个角色</span>
+            <span className="drama-sidenav-count">{meta.characters.length + sceneList.length} 个主体</span>
+            <button className="drama-sidenav-add" onClick={() => onAddSubject?.('角色')} title="添加主体">
+              <Plus size={14} />
+            </button>
           </div>
-          <div className="drama-char-nav-list">
-            {meta.characters.length === 0 ? (
-              <div className="drama-sidenav-empty">
-                <p>还没有角色</p>
-                <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>在聊天面板输入 /drama-extract-characters 提取</p>
-              </div>
-            ) : (
-              meta.characters.map(c => (
-                <div
-                  key={c.id}
-                  className="drama-char-nav-item"
-                  onClick={() => onSelectCharacter?.(c)}
-                  style={{ cursor: 'pointer' }}
-                >
-                  <div className="drama-char-nav-avatar-wrapper">
-                    {c.imageUrl ? (
-                      <img src={c.imageUrl} alt={c.name} className="drama-char-nav-avatar img" />
-                    ) : (
-                      <div className="drama-char-nav-avatar">{c.name.slice(0, 1)}</div>
-                    )}
-                    {onGenerateCharacterImage && (
-                      <button
-                        className="drama-char-nav-avatar-btn"
-                        onClick={(e) => { e.stopPropagation(); onGenerateCharacterImage(c.id); }}
-                        disabled={generatingCharacterImage === c.id}
-                        title="生成角色照片"
-                      >
-                        <Sparkles size={12} />
-                      </button>
-                    )}
-                  </div>
-                  <div className="drama-char-nav-info">
-                    <span className="drama-char-nav-name">{c.name}</span>
-                    <span className="drama-char-nav-role">{c.role}</span>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* 场景库 */}
-      {activeTab === 'scenes' && (
-        <div className="drama-sidenav-content">
-          <div className="drama-sidenav-header">
-            <span className="drama-sidenav-count">{sceneList.length} 个场景</span>
-            {onAddScene && (
-              <button className="drama-sidenav-add" onClick={onAddScene} title="添加场景">
-                <Plus size={14} />
-              </button>
-            )}
-          </div>
-          {sceneList.length === 0 ? (
+          {meta.characters.length === 0 && sceneList.length === 0 ? (
             <div className="drama-sidenav-empty">
-              <MapPin size={24} />
-              <p>还没有场景</p>
-              <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>在聊天面板输入 /drama-extract-scenes 提取</p>
+              <Users size={24} />
+              <p>还没有主体</p>
+              <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>点击 + 手动添加，或用 /drama-extract-characters 提取</p>
             </div>
           ) : (
-            <div className="drama-scene-sidebar-list">
-              {sceneList.map((scene, idx) => {
-                const epTitle = meta.episodes.find(e => e.id === scene.episodeId)?.title;
-                return (
-                  <div key={scene.id} className="drama-scene-sidebar-item">
-                    <div
-                      className="drama-scene-sidebar-body"
-                      onClick={() => onSelectScene?.(scene)}
-                    >
-                      <div className="drama-scene-sidebar-num">{idx + 1}</div>
-                      <div className="drama-scene-sidebar-info">
-                        <div className="drama-scene-sidebar-loc">
-                          {scene.location}
-                          <span className="drama-scene-sidebar-time">· {scene.time}</span>
-                        </div>
-                        {epTitle && <span className="drama-scene-sidebar-ep">来自 {epTitle}</span>}
-                        {scene.description && (
-                          <p className="drama-scene-sidebar-desc">{scene.description}</p>
-                        )}
-                      </div>
-                      <div className="drama-scene-sidebar-actions" onClick={e => e.stopPropagation()}>
-                        {onGenerateSceneImage && (
-                          <button
-                            className="drama-icon-btn"
-                            title="生成场景图"
-                            onClick={() => onGenerateSceneImage(scene.id)}
-                            disabled={generatingSceneImage === scene.id}
-                          >
-                            {generatingSceneImage === scene.id
-                              ? <span className="drama-spinner" style={{ width: 12, height: 12 }} />
-                              : <Sparkles size={12} />}
-                          </button>
-                        )}
-                        {onDeleteScene && (
-                          <button
-                            className="drama-icon-btn danger"
-                            title="删除场景"
-                            onClick={() => onDeleteScene(scene.id)}
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        )}
-                      </div>
-                    </div>
+            <div className="drama-subject-list">
+              {meta.characters.map(c => (
+                <div key={c.id} className="drama-subject-item" onClick={() => onSelectCharacter?.(c)}>
+                  <div className="drama-subject-thumb">
+                    {c.imageUrl
+                      ? <img src={c.imageUrl} alt={c.name} />
+                      : <span>{c.name.slice(0, 1)}</span>}
+                    {generatingCharacterImage === c.id && (
+                      <span className="drama-spinner drama-subject-thumb-spinner" />
+                    )}
                   </div>
-                );
-              })}
+                  <div className="drama-subject-info">
+                    <span className="drama-subject-name">{c.name}</span>
+                    <span className="drama-subject-sub">{c.role}</span>
+                  </div>
+                  <span className={`drama-subject-badge ${c.subjectType === '宠物' ? 'pet' : 'char'}`}>{c.subjectType || '角色'}</span>
+                </div>
+              ))}
+              {sceneList.map(s => (
+                <div key={s.id} className="drama-subject-item" onClick={() => onSelectScene?.(s)}>
+                  <div className="drama-subject-thumb scene">
+                    {s.imageUrl
+                      ? <img src={s.imageUrl} alt={s.location} />
+                      : <MapPin size={14} />}
+                    {generatingSceneImage === s.id && (
+                      <span className="drama-spinner drama-subject-thumb-spinner" />
+                    )}
+                  </div>
+                  <div className="drama-subject-info">
+                    <span className="drama-subject-name">{s.location}</span>
+                    <span className="drama-subject-sub">{s.time}</span>
+                  </div>
+                  <span className="drama-subject-badge scene">场景</span>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -790,6 +722,13 @@ export default function DramaEditorPage() {
   const [editingCharacterData, setEditingCharacterData] = useState<DramaCharacter | null>(null);
   const [selectedScene, setSelectedScene] = useState<DramaScene | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  // 主体创建弹窗
+  const [subjectCreateOpen, setSubjectCreateOpen] = useState(false);
+  const [subjectCreateForm, setSubjectCreateForm] = useState({
+    id: '', type: '角色' as SubjectType,
+    name: '', role: '', description: '', appearance: '', personality: '',
+    time: '白天', imageUrl: '', imageUrls: [] as string[],
+  });
 
   const { messageState, showMessage, closeMessage } = useModalState();
 
@@ -983,6 +922,71 @@ export default function DramaEditorPage() {
     scheduleSave(updated);
   };
 
+  const handleUpdateCharacter = (id: string, patch: Partial<DramaCharacter>) => {
+    const updated = { ...meta, characters: meta.characters.map(c => c.id === id ? { ...c, ...patch } : c) };
+    setMeta(updated);
+    scheduleSave(updated);
+  };
+
+  // 打开创建主体弹窗
+  const openCreateSubject = (type: SubjectType = '角色') => {
+    setSubjectCreateForm({ id: genId(), type, name: '', role: '', description: '', appearance: '', personality: '', time: '白天', imageUrl: '', imageUrls: [] });
+    setSubjectCreateOpen(true);
+  };
+
+  // 保存新主体
+  const saveSubjectCreate = () => {
+    if (!subjectCreateForm.name.trim()) {
+      showMessage('请输入名称', 'warning', undefined, undefined, { toast: true, autoCloseMs: 2000 });
+      return;
+    }
+    if (subjectCreateForm.type === '角色' || subjectCreateForm.type === '宠物') {
+      const char: DramaCharacter = {
+        id: subjectCreateForm.id, name: subjectCreateForm.name, role: subjectCreateForm.role,
+        description: subjectCreateForm.description, appearance: subjectCreateForm.appearance,
+        personality: subjectCreateForm.personality,
+        imageUrl: subjectCreateForm.imageUrl || undefined,
+        imageUrls: subjectCreateForm.imageUrls.length > 0 ? subjectCreateForm.imageUrls : undefined,
+        subjectType: subjectCreateForm.type === '宠物' ? '宠物' : undefined,
+      };
+      const updated = { ...meta, characters: [...meta.characters, char] };
+      setMeta(updated); scheduleSave(updated);
+    } else {
+      const scene: DramaScene = {
+        id: subjectCreateForm.id, location: subjectCreateForm.name, time: subjectCreateForm.time,
+        description: subjectCreateForm.description,
+        imageUrl: subjectCreateForm.imageUrl || undefined,
+        imageUrls: subjectCreateForm.imageUrls.length > 0 ? subjectCreateForm.imageUrls : undefined,
+        episodeId: activeEpisodeId || undefined,
+      };
+      const updated = { ...meta, scenes: [...(meta.scenes || []), scene] };
+      setMeta(updated); scheduleSave(updated);
+    }
+    setSubjectCreateOpen(false);
+  };
+
+  // 新主体上传图片（创建模式）
+  const handleUploadNewSubjectImage = async (target: 'primary' | 'extra') => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/jpeg,image/png,image/webp,image/gif';
+    input.onchange = async (evt) => {
+      const file = (evt.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      try {
+        const url = await dramaUploadImage(file);
+        setSubjectCreateForm(f => {
+          const newUrls = f.imageUrls.includes(url) ? f.imageUrls : [...f.imageUrls, url];
+          const newPrimary = target === 'primary' ? url : (f.imageUrl || url);
+          return { ...f, imageUrl: newPrimary, imageUrls: newUrls };
+        });
+      } catch (e) {
+        showMessage(e instanceof Error ? e.message : '上传失败，请重试', 'error', undefined, undefined, { toast: true, autoCloseMs: 4000 });
+      }
+    };
+    input.click();
+  };
+
   // 集数导航
   const episodeIndex = meta.episodes.findIndex(e => e.id === activeEpisodeId);
   const prevEpisode = episodeIndex > 0 ? meta.episodes[episodeIndex - 1] : null;
@@ -1045,7 +1049,7 @@ export default function DramaEditorPage() {
             const toAdd = newChars.filter(c => !existingNames.has(c.name));
             const merged = toAdd.length > 0 ? [...meta.characters, ...toAdd] : (meta.characters.length === 0 ? newChars : meta.characters);
             handleMetaChange({ characters: merged });
-            setLeftTab('characters');
+            setLeftTab('subjects');
           }
           setLocalTasks(prev => prev.map(t =>
             t.local_id === localId ? { ...t, status: 'done', result } : t
@@ -1084,7 +1088,7 @@ export default function DramaEditorPage() {
             }));
             const otherScenes = (meta.scenes || []).filter(sc => sc.episodeId !== ep.id);
             handleMetaChange({ scenes: [...otherScenes, ...newScenes] });
-            setLeftTab('scenes');
+            setLeftTab('subjects');
           }
           setLocalTasks(prev => prev.map(t =>
             t.local_id === localId ? { ...t, status: 'done', result } : t
@@ -1228,10 +1232,11 @@ export default function DramaEditorPage() {
     setImageGenTarget({ type: 'character', characterId, style });
   };
 
-  const openSceneImageModal = (sceneId: string) => {
+  const openSceneImageModal = (sceneId: string, angleHint?: string) => {
     const scene = (meta.scenes || []).find(s => s.id === sceneId);
     if (!scene) return;
-    const prompt = `为剧本生成一张场景概念图。场景地点：${scene.location}，时间：${scene.time}，描述：${scene.description}`;
+    const basePrompt = `为剧本生成一张场景概念图。场景地点：${scene.location}，时间：${scene.time}，描述：${scene.description}`;
+    const prompt = angleHint ? `${basePrompt}，视角要求：${angleHint}` : basePrompt;
     setImageGenPrompt(prompt);
     setImageGenSize(selectedImageSize);
     setImageGenTarget({ type: 'scene', sceneId });
@@ -1247,12 +1252,30 @@ export default function DramaEditorPage() {
       const imageUrl = await dramaGenerateImage(imageGenPrompt, workId, { size: imageGenSize });
       if (imageUrl) {
         if (imageGenTarget.type === 'character') {
-          const newCharacters = meta.characters.map(c =>
-            c.id === imageGenTarget.characterId ? { ...c, imageUrl } : c
-          );
+          const newCharacters = meta.characters.map(c => {
+            if (c.id !== imageGenTarget.characterId) return c;
+            const existingUrls = c.imageUrls || (c.imageUrl ? [c.imageUrl] : []);
+            return { ...c, imageUrl: c.imageUrl || imageUrl, imageUrls: [...existingUrls, imageUrl] };
+          });
           handleMetaChange({ characters: newCharacters });
+          // 更新 selectedCharacter 以实时刷新画廊
+          setSelectedCharacter(prev => {
+            if (!prev || prev.id !== imageGenTarget.characterId) return prev;
+            const existingUrls = prev.imageUrls || (prev.imageUrl ? [prev.imageUrl] : []);
+            return { ...prev, imageUrl: prev.imageUrl || imageUrl, imageUrls: [...existingUrls, imageUrl] };
+          });
         } else {
-          handleUpdateScene(imageGenTarget.sceneId, { imageUrl });
+          const scene = (meta.scenes || []).find(s => s.id === imageGenTarget.sceneId);
+          const existingUrls = scene?.imageUrls || (scene?.imageUrl ? [scene.imageUrl] : []);
+          handleUpdateScene(imageGenTarget.sceneId, {
+            imageUrl: scene?.imageUrl || imageUrl,
+            imageUrls: [...existingUrls, imageUrl],
+          });
+          setSelectedScene(prev => {
+            if (!prev || prev.id !== imageGenTarget.sceneId) return prev;
+            const existingUrls2 = prev.imageUrls || (prev.imageUrl ? [prev.imageUrl] : []);
+            return { ...prev, imageUrl: prev.imageUrl || imageUrl, imageUrls: [...existingUrls2, imageUrl] };
+          });
         }
       }
       setImageGenTarget(null);
@@ -1263,6 +1286,97 @@ export default function DramaEditorPage() {
       setGeneratingCharacterImage(null);
       setGeneratingSceneImage(null);
     }
+  };
+
+  // 角色图片：设为主图
+  const handleSetCharacterPrimaryImage = (characterId: string, url: string) => {
+    const newCharacters = meta.characters.map(c =>
+      c.id === characterId ? { ...c, imageUrl: url } : c
+    );
+    handleMetaChange({ characters: newCharacters });
+    setSelectedCharacter(prev => prev?.id === characterId ? { ...prev, imageUrl: url } : prev);
+  };
+
+  // 角色图片：从画廊删除
+  const handleDeleteCharacterImage = (characterId: string, url: string) => {
+    const newCharacters = meta.characters.map(c => {
+      if (c.id !== characterId) return c;
+      const newUrls = (c.imageUrls || []).filter(u => u !== url);
+      const newPrimary = c.imageUrl === url ? (newUrls[0] ?? undefined) : c.imageUrl;
+      return { ...c, imageUrl: newPrimary, imageUrls: newUrls };
+    });
+    handleMetaChange({ characters: newCharacters });
+    setSelectedCharacter(prev => {
+      if (!prev || prev.id !== characterId) return prev;
+      const newUrls = (prev.imageUrls || []).filter(u => u !== url);
+      const newPrimary = prev.imageUrl === url ? (newUrls[0] ?? undefined) : prev.imageUrl;
+      return { ...prev, imageUrl: newPrimary, imageUrls: newUrls };
+    });
+  };
+
+  // 场景图片：设为主图
+  const handleSetScenePrimaryImage = (sceneId: string, url: string) => {
+    handleUpdateScene(sceneId, { imageUrl: url });
+    setSelectedScene(prev => prev?.id === sceneId ? { ...prev, imageUrl: url } : prev);
+  };
+
+  // 场景图片：从画廊删除
+  const handleDeleteSceneImage = (sceneId: string, url: string) => {
+    const scene = (meta.scenes || []).find(s => s.id === sceneId);
+    if (!scene) return;
+    const newUrls = (scene.imageUrls || []).filter(u => u !== url);
+    const newPrimary = scene.imageUrl === url ? (newUrls[0] ?? undefined) : scene.imageUrl;
+    handleUpdateScene(sceneId, { imageUrl: newPrimary, imageUrls: newUrls });
+    setSelectedScene(prev => {
+      if (!prev || prev.id !== sceneId) return prev;
+      const newUrls2 = (prev.imageUrls || []).filter(u => u !== url);
+      const newPrimary2 = prev.imageUrl === url ? (newUrls2[0] ?? undefined) : prev.imageUrl;
+      return { ...prev, imageUrl: newPrimary2, imageUrls: newUrls2 };
+    });
+  };
+
+  // 上传图片（角色或场景）
+  const handleUploadImage = (type: 'character' | 'scene', id: string) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/jpeg,image/png,image/webp,image/gif';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      if (type === 'character') setGeneratingCharacterImage(id);
+      else setGeneratingSceneImage(id);
+      try {
+        const imageUrl = await dramaUploadImage(file);
+        if (type === 'character') {
+          const newCharacters = meta.characters.map(c => {
+            if (c.id !== id) return c;
+            const existingUrls = c.imageUrls || (c.imageUrl ? [c.imageUrl] : []);
+            return { ...c, imageUrl: c.imageUrl || imageUrl, imageUrls: [...existingUrls, imageUrl] };
+          });
+          handleMetaChange({ characters: newCharacters });
+          setSelectedCharacter(prev => {
+            if (!prev || prev.id !== id) return prev;
+            const existingUrls = prev.imageUrls || (prev.imageUrl ? [prev.imageUrl] : []);
+            return { ...prev, imageUrl: prev.imageUrl || imageUrl, imageUrls: [...existingUrls, imageUrl] };
+          });
+        } else {
+          const scene = (meta.scenes || []).find(s => s.id === id);
+          const existingUrls = scene?.imageUrls || (scene?.imageUrl ? [scene.imageUrl] : []);
+          handleUpdateScene(id, { imageUrl: scene?.imageUrl || imageUrl, imageUrls: [...existingUrls, imageUrl] });
+          setSelectedScene(prev => {
+            if (!prev || prev.id !== id) return prev;
+            const existingUrls2 = prev.imageUrls || (prev.imageUrl ? [prev.imageUrl] : []);
+            return { ...prev, imageUrl: prev.imageUrl || imageUrl, imageUrls: [...existingUrls2, imageUrl] };
+          });
+        }
+      } catch (e) {
+        showMessage(e instanceof Error ? e.message : '上传失败，请重试', 'error', undefined, undefined, { toast: true, autoCloseMs: 4000 });
+      } finally {
+        setGeneratingCharacterImage(null);
+        setGeneratingSceneImage(null);
+      }
+    };
+    input.click();
   };
 
   // 在模态框内切换角色生成风格时重建提示词
@@ -1367,7 +1481,7 @@ export default function DramaEditorPage() {
               onDeleteEpisode={handleDeleteEpisode}
               onGenerateCharacterImage={openCharacterImageModal}
               generatingCharacterImage={generatingCharacterImage}
-              onSelectCharacter={setSelectedCharacter}
+              onSelectCharacter={c => { setSelectedCharacter(c); setEditingCharacterData(c); setIsEditingCharacter(true); }}
               scenes={meta.scenes || []}
               onAddScene={handleAddScene}
               onDeleteScene={handleDeleteScene}
@@ -1375,6 +1489,7 @@ export default function DramaEditorPage() {
               generatingSceneImage={generatingSceneImage}
               onSelectScene={setSelectedScene}
               onGenerateStoryboard={handleGenerateStoryboard}
+              onAddSubject={openCreateSubject}
             />
           </aside>
         )}
@@ -1482,246 +1597,280 @@ export default function DramaEditorPage() {
         episodeNumber={meta.episodes.length + 1}
       />
 
-      {/* 角色详情/编辑弹窗 */}
-      {selectedCharacter && (
-        <div className="drama-modal-overlay" onClick={() => {
-          setSelectedCharacter(null);
-          setIsEditingCharacter(false);
-        }}>
-          <div className="drama-modal-content character-detail-modal" onClick={e => e.stopPropagation()}>
-            <div className="drama-modal-header">
-              <h3>{isEditingCharacter ? '编辑角色' : '角色详情'}</h3>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                {!isEditingCharacter && (
-                  <>
-                    <button className="drama-modal-action-btn" onClick={() => {
-                      setEditingCharacterData(selectedCharacter);
-                      setIsEditingCharacter(true);
-                    }} title="编辑">
-                      <Edit2 size={16} />
-                    </button>
-                    <button className="drama-modal-action-btn" onClick={() => {
-                      if (window.confirm(`确定要删除角色「${selectedCharacter.name}」吗？`)) {
-                        const newCharacters = meta.characters.filter(c => c.id !== selectedCharacter.id);
-                        handleMetaChange({ characters: newCharacters });
-                        setSelectedCharacter(null);
+      {/* 统一主体弹窗（角色/场景 创建 & 编辑） */}
+      {(selectedCharacter || selectedScene || subjectCreateOpen) && (() => {
+        const isCreating = subjectCreateOpen && !selectedCharacter && !selectedScene;
+        const isChar = !!selectedCharacter || (isCreating && (subjectCreateForm.type === '角色' || subjectCreateForm.type === '宠物'));
+        // Live data from meta for editing
+        const liveChar = selectedCharacter ? (meta.characters.find(c => c.id === selectedCharacter.id) ?? selectedCharacter) : null;
+        const liveScene = selectedScene ? ((meta.scenes || []).find(s => s.id === selectedScene.id) ?? selectedScene) : null;
+        // Images
+        const primaryImg = isCreating ? subjectCreateForm.imageUrl : (isChar ? liveChar?.imageUrl : liveScene?.imageUrl);
+        const allImgs = isCreating
+          ? subjectCreateForm.imageUrls
+          : isChar
+            ? (liveChar?.imageUrls && liveChar.imageUrls.length > 0 ? liveChar.imageUrls : (liveChar?.imageUrl ? [liveChar.imageUrl] : []))
+            : (liveScene?.imageUrls && liveScene.imageUrls.length > 0 ? liveScene.imageUrls : (liveScene?.imageUrl ? [liveScene.imageUrl] : []));
+        const extraImgs = allImgs.filter(u => u !== primaryImg);
+        const subjectId = isCreating ? subjectCreateForm.id : (isChar ? liveChar?.id ?? '' : liveScene?.id ?? '');
+
+        const closeModal = () => {
+          setSelectedCharacter(null); setIsEditingCharacter(false); setEditingCharacterData(null);
+          setSelectedScene(null); setSubjectCreateOpen(false);
+        };
+
+        const handleSave = () => {
+          if (isCreating) { saveSubjectCreate(); return; }
+          if (isChar && editingCharacterData) {
+            const updated = { ...meta, characters: meta.characters.map(c => c.id === editingCharacterData.id ? editingCharacterData : c) };
+            setMeta(updated); scheduleSave(updated);
+            setSelectedCharacter(editingCharacterData);
+          }
+          closeModal();
+        };
+
+        // 编辑角色时优先读 editingCharacterData（未保存的变更），再读 liveChar
+        const currentType = isCreating
+          ? subjectCreateForm.type
+          : isChar
+            ? (editingCharacterData?.subjectType || liveChar?.subjectType || '角色')
+            : '场景';
+        const isGenerating = isChar ? generatingCharacterImage === subjectId : generatingSceneImage === subjectId;
+
+        return (
+          <div className="drama-modal-overlay" onClick={closeModal}>
+            <div className="subject-modal" onClick={e => e.stopPropagation()}>
+
+              {/* Header */}
+              <div className="subject-modal-header">
+                <h3>{isCreating ? '创建主体' : currentType === '场景' ? '编辑场景' : currentType === '宠物' ? '编辑宠物' : '编辑角色'}</h3>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  {!isCreating && (
+                    <button className="drama-modal-action-btn" title="删除" onClick={() => {
+                      const name = isChar ? liveChar?.name : liveScene?.location;
+                      if (window.confirm(`确定要删除「${name}」吗？`)) {
+                        if (isChar) { handleMetaChange({ characters: meta.characters.filter(c => c.id !== subjectId) }); }
+                        else { handleDeleteScene(subjectId); }
+                        closeModal();
                       }
-                    }} title="删除">
-                      <Trash2 size={16} />
+                    }}><Trash2 size={14} /></button>
+                  )}
+                  <button className="drama-modal-close" onClick={closeModal}><X size={16} /></button>
+                </div>
+              </div>
+
+              {/* Images section */}
+              <div className="subject-modal-images">
+                {/* Primary image */}
+                <div className="subject-primary-wrap">
+                  <div className="subject-primary-img" onClick={() => primaryImg && setPreviewImage(primaryImg)}>
+                    {primaryImg
+                      ? <img src={primaryImg} alt="" />
+                      : <div className="subject-primary-empty"><ImageIcon size={28} /><span>主图</span></div>}
+                    <div className="subject-primary-overlay">
+                      <button onClick={e => { e.stopPropagation(); isCreating ? handleUploadNewSubjectImage('primary') : handleUploadImage(isChar ? 'character' : 'scene', subjectId); }}>
+                        <Upload size={11} /> 上传
+                      </button>
+                      {!isCreating && (
+                        <button onClick={e => { e.stopPropagation(); isChar ? openCharacterImageModal(subjectId, 'portrait') : openSceneImageModal(subjectId); closeModal(); }}>
+                          <Sparkles size={11} /> 生成
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {/* Generate style chips */}
+                  {!isCreating && isChar && (
+                    <div className="subject-gen-chips">
+                      <button className="subject-gen-chip" onClick={() => { openCharacterImageModal(subjectId, 'portrait'); closeModal(); }}>
+                        <Sparkles size={10} /> 肖像
+                      </button>
+                      <button className="subject-gen-chip" onClick={() => { openCharacterImageModal(subjectId, 'grid4'); closeModal(); }}>
+                        <Layers size={10} /> 四视图
+                      </button>
+                    </div>
+                  )}
+                  {!isCreating && !isChar && (
+                    <div className="subject-gen-chips">
+                      <button className="subject-gen-chip" onClick={() => { openSceneImageModal(subjectId); closeModal(); }}>
+                        <Sparkles size={10} /> 生成图
+                      </button>
+                    </div>
+                  )}
+                  {isGenerating && (
+                    <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-secondary)', marginTop: 4 }}>
+                      <span className="drama-spinner" style={{ width: 10, height: 10, display: 'inline-block', marginRight: 3 }} />生成中...
+                    </div>
+                  )}
+                </div>
+
+                {/* Extra images */}
+                <div className="subject-extra-wrap">
+                  <div className="subject-extra-label">其他视角</div>
+                  <div className="subject-extra-grid">
+                    {extraImgs.map(url => (
+                      <div key={url} className="subject-extra-item" onClick={() => setPreviewImage(url)}>
+                        <img src={url} alt="" />
+                        {!isCreating && primaryImg !== url && (
+                          <div className="subject-extra-badge"><Star size={8} fill="currentColor" /></div>
+                        )}
+                        <div className="char-gallery-overlay">
+                          <button className="char-gallery-overlay-btn" title="设为主图" onClick={e => {
+                            e.stopPropagation();
+                            if (isCreating) { setSubjectCreateForm(f => ({ ...f, imageUrl: url })); }
+                            else if (isChar) { handleSetCharacterPrimaryImage(subjectId, url); }
+                            else { handleSetScenePrimaryImage(subjectId, url); }
+                          }}><Star size={9} /></button>
+                          <button className="char-gallery-overlay-btn char-gallery-overlay-del" title="删除" onClick={e => {
+                            e.stopPropagation();
+                            if (isCreating) { setSubjectCreateForm(f => { const nu = f.imageUrls.filter(u => u !== url); return { ...f, imageUrls: nu, imageUrl: f.imageUrl === url ? (nu[0] ?? '') : f.imageUrl }; }); }
+                            else if (isChar) { handleDeleteCharacterImage(subjectId, url); }
+                            else { handleDeleteSceneImage(subjectId, url); }
+                          }}><Trash2 size={9} /></button>
+                        </div>
+                      </div>
+                    ))}
+                    <button className="subject-extra-add" title="添加" onClick={() => isCreating ? handleUploadNewSubjectImage('extra') : handleUploadImage(isChar ? 'character' : 'scene', subjectId)}>
+                      <Plus size={14} />
                     </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Type selector */}
+              <div className="subject-type-row">
+                <label className="subject-type-label">分类</label>
+                <select
+                  className="subject-type-select"
+                  value={currentType}
+                  disabled={!isCreating && !isChar}
+                  onChange={e => {
+                    const t = e.target.value as SubjectType;
+                    if (isCreating) {
+                      setSubjectCreateForm(f => ({ ...f, type: t }));
+                    } else if (isChar && editingCharacterData) {
+                      setEditingCharacterData(d => d ? { ...d, subjectType: t === '宠物' ? '宠物' : undefined } : d);
+                    }
+                  }}
+                >
+                  {isCreating ? (
+                    <>
+                      <option value="角色">角色</option>
+                      <option value="场景">场景</option>
+                      <option value="宠物">宠物</option>
+                    </>
+                  ) : isChar ? (
+                    <>
+                      <option value="角色">角色</option>
+                      <option value="宠物">宠物</option>
+                    </>
+                  ) : (
+                    <option value="场景">场景</option>
+                  )}
+                </select>
+              </div>
+
+              {/* Form */}
+              <div className="subject-modal-form">
+                {/* Character fields */}
+                {(isChar && !isCreating) && editingCharacterData && (
+                  <>
+                    <div className="drama-input-group">
+                      <label>名称</label>
+                      <input className="drama-input" placeholder="角色名称" value={editingCharacterData.name}
+                        onChange={e => setEditingCharacterData(d => d ? { ...d, name: e.target.value } : d)} />
+                    </div>
+                    <div className="drama-input-group">
+                      <label>角色身份</label>
+                      <input className="drama-input" placeholder="主角、反派、配角..." value={editingCharacterData.role}
+                        onChange={e => setEditingCharacterData(d => d ? { ...d, role: e.target.value } : d)} />
+                    </div>
+                    <div className="drama-input-group">
+                      <label>描述</label>
+                      <textarea className="drama-textarea" rows={2} placeholder="角色背景故事..." value={editingCharacterData.description}
+                        onChange={e => setEditingCharacterData(d => d ? { ...d, description: e.target.value } : d)} />
+                    </div>
+                    <div className="drama-input-group">
+                      <label>外貌</label>
+                      <textarea className="drama-textarea" rows={2} placeholder="外貌特征（用于图片生成）..." value={editingCharacterData.appearance}
+                        onChange={e => setEditingCharacterData(d => d ? { ...d, appearance: e.target.value } : d)} />
+                    </div>
+                    <div className="drama-input-group">
+                      <label>性格</label>
+                      <textarea className="drama-textarea" rows={2} placeholder="性格特征..." value={editingCharacterData.personality}
+                        onChange={e => setEditingCharacterData(d => d ? { ...d, personality: e.target.value } : d)} />
+                    </div>
                   </>
                 )}
-                <button className="drama-modal-close" onClick={() => {
-                  setSelectedCharacter(null);
-                  setIsEditingCharacter(false);
-                }}><X size={20} /></button>
+                {isCreating && (subjectCreateForm.type === '角色' || subjectCreateForm.type === '宠物') && (
+                  <>
+                    <div className="drama-input-group">
+                      <label>名称</label>
+                      <input className="drama-input" placeholder="角色名称" value={subjectCreateForm.name} onChange={e => setSubjectCreateForm(f => ({ ...f, name: e.target.value }))} />
+                    </div>
+                    <div className="drama-input-group">
+                      <label>角色身份</label>
+                      <input className="drama-input" placeholder="主角、反派、配角..." value={subjectCreateForm.role} onChange={e => setSubjectCreateForm(f => ({ ...f, role: e.target.value }))} />
+                    </div>
+                    <div className="drama-input-group">
+                      <label>描述</label>
+                      <textarea className="drama-textarea" rows={2} value={subjectCreateForm.description} onChange={e => setSubjectCreateForm(f => ({ ...f, description: e.target.value }))} />
+                    </div>
+                    <div className="drama-input-group">
+                      <label>外貌</label>
+                      <textarea className="drama-textarea" rows={2} value={subjectCreateForm.appearance} onChange={e => setSubjectCreateForm(f => ({ ...f, appearance: e.target.value }))} />
+                    </div>
+                    <div className="drama-input-group">
+                      <label>性格</label>
+                      <textarea className="drama-textarea" rows={2} value={subjectCreateForm.personality} onChange={e => setSubjectCreateForm(f => ({ ...f, personality: e.target.value }))} />
+                    </div>
+                  </>
+                )}
+                {/* Scene fields */}
+                {(!isChar && !isCreating && liveScene) && (
+                  <>
+                    <div className="drama-input-group">
+                      <label>地点</label>
+                      <input className="drama-input" placeholder="场景地点" value={liveScene.location}
+                        onChange={e => { handleUpdateScene(liveScene.id, { location: e.target.value }); setSelectedScene(s => s ? { ...s, location: e.target.value } : s); }} />
+                    </div>
+                    <div className="drama-input-group">
+                      <label>时间</label>
+                      <select className="drama-select" value={liveScene.time}
+                        onChange={e => { handleUpdateScene(liveScene.id, { time: e.target.value }); setSelectedScene(s => s ? { ...s, time: e.target.value } : s); }}>
+                        {['白天', '夜晚', '清晨', '黄昏', '室内', '室外'].map(t => <option key={t}>{t}</option>)}
+                      </select>
+                    </div>
+                    <div className="drama-input-group">
+                      <label>场景描述</label>
+                      <textarea className="drama-textarea" rows={3} placeholder="场景视觉特征描述..." value={liveScene.description}
+                        onChange={e => { handleUpdateScene(liveScene.id, { description: e.target.value }); setSelectedScene(s => s ? { ...s, description: e.target.value } : s); }} />
+                    </div>
+                  </>
+                )}
+                {isCreating && subjectCreateForm.type === '场景' && (
+                  <>
+                    <div className="drama-input-group">
+                      <label>地点</label>
+                      <input className="drama-input" placeholder="场景地点" value={subjectCreateForm.name} onChange={e => setSubjectCreateForm(f => ({ ...f, name: e.target.value }))} />
+                    </div>
+                    <div className="drama-input-group">
+                      <label>时间</label>
+                      <select className="drama-select" value={subjectCreateForm.time} onChange={e => setSubjectCreateForm(f => ({ ...f, time: e.target.value }))}>
+                        {['白天', '夜晚', '清晨', '黄昏', '室内', '室外'].map(t => <option key={t}>{t}</option>)}
+                      </select>
+                    </div>
+                    <div className="drama-input-group">
+                      <label>场景描述</label>
+                      <textarea className="drama-textarea" rows={3} value={subjectCreateForm.description} onChange={e => setSubjectCreateForm(f => ({ ...f, description: e.target.value }))} />
+                    </div>
+                  </>
+                )}
               </div>
-            </div>
-            <div className="drama-modal-body">
-              {isEditingCharacter && editingCharacterData ? (
-                <div className="character-edit-form">
-                  <div className="drama-input-group">
-                    <label>角色名</label>
-                    <input className="drama-input" value={editingCharacterData.name} onChange={e => setEditingCharacterData({...editingCharacterData, name: e.target.value})} />
-                  </div>
-                  <div className="drama-input-group">
-                    <label>角色身份</label>
-                    <input className="drama-input" value={editingCharacterData.role} onChange={e => setEditingCharacterData({...editingCharacterData, role: e.target.value})} />
-                  </div>
-                  <div className="drama-input-group">
-                    <label>描述</label>
-                    <textarea className="drama-textarea" rows={3} value={editingCharacterData.description} onChange={e => setEditingCharacterData({...editingCharacterData, description: e.target.value})} />
-                  </div>
-                  <div className="drama-input-group">
-                    <label>外貌</label>
-                    <textarea className="drama-textarea" rows={3} value={editingCharacterData.appearance} onChange={e => setEditingCharacterData({...editingCharacterData, appearance: e.target.value})} />
-                  </div>
-                  <div className="drama-input-group">
-                    <label>性格</label>
-                    <textarea className="drama-textarea" rows={3} value={editingCharacterData.personality} onChange={e => setEditingCharacterData({...editingCharacterData, personality: e.target.value})} />
-                  </div>
-                  <div className="character-edit-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '16px' }}>
-                    <button className="drama-btn-secondary" onClick={() => setIsEditingCharacter(false)}>取消</button>
-                    <button className="drama-btn-primary" onClick={() => {
-                      const newCharacters = meta.characters.map(c => c.id === editingCharacterData.id ? editingCharacterData : c);
-                      handleMetaChange({ characters: newCharacters });
-                      setSelectedCharacter(editingCharacterData);
-                      setIsEditingCharacter(false);
-                    }} style={{ display: 'flex', alignItems: 'center' }}>
-                      <Save size={14} style={{ marginRight: '4px' }} />
-                      保存
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="character-detail-top">
-                    <div 
-                      className="character-detail-avatar-wrapper"
-                      onClick={() => {
-                        if (selectedCharacter.imageUrl) {
-                          setPreviewImage(selectedCharacter.imageUrl);
-                        }
-                      }}
-                      style={{ cursor: selectedCharacter.imageUrl ? 'pointer' : 'default' }}
-                    >
-                      {selectedCharacter.imageUrl ? (
-                        <img src={selectedCharacter.imageUrl} alt={selectedCharacter.name} className="character-detail-avatar" />
-                      ) : (
-                        <div className="character-detail-avatar-placeholder">{selectedCharacter.name.slice(0, 1)}</div>
-                      )}
-                      {selectedCharacter.imageUrl && (
-                        <div className="character-detail-avatar-hover">
-                          <Sparkles size={16} />
-                          <span>查看大图</span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="character-detail-info">
-                      <div className="character-detail-name">{selectedCharacter.name}</div>
-                      <div className="character-detail-role">{selectedCharacter.role}</div>
-                      
-                      <div className="character-detail-actions" style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>重新生成图片：</span>
-                        {imageSizes.length > 1 && (
-                          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                            {imageSizes.map(sz => (
-                              <button
-                                key={sz}
-                                onClick={() => setSelectedImageSize(sz)}
-                                style={{
-                                  padding: '2px 8px', fontSize: '11px', borderRadius: 4, border: '1px solid',
-                                  cursor: 'pointer', fontFamily: 'monospace',
-                                  background: selectedImageSize === sz ? 'var(--accent-primary)' : 'transparent',
-                                  color: selectedImageSize === sz ? '#fff' : 'var(--text-secondary)',
-                                  borderColor: selectedImageSize === sz ? 'var(--accent-primary)' : 'var(--border-light)',
-                                }}
-                              >
-                                {sz}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <button 
-                            className="drama-btn-secondary" 
-                            style={{ padding: '6px 12px', fontSize: '13px', display: 'flex', alignItems: 'center' }}
-                            onClick={() => openCharacterImageModal(selectedCharacter.id, 'portrait')}
-                            disabled={generatingCharacterImage === selectedCharacter.id}
-                          >
-                            <Sparkles size={14} style={{ marginRight: '4px' }} />
-                            单人肖像
-                          </button>
-                          <button
-                            className="drama-btn-secondary"
-                            style={{ padding: '6px 12px', fontSize: '13px', display: 'flex', alignItems: 'center' }}
-                            onClick={() => openCharacterImageModal(selectedCharacter.id, 'grid4')}
-                            disabled={generatingCharacterImage === selectedCharacter.id}
-                          >
-                            <Layers size={14} style={{ marginRight: '4px' }} />
-                            四视图设定集
-                          </button>
-                        </div>
-                        {generatingCharacterImage === selectedCharacter.id && (
-                          <span style={{ fontSize: '12px', color: 'var(--primary-color)' }}>正在生成中，请稍候...</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="character-detail-section">
-                    <h4>描述</h4>
-                    <p>{selectedCharacter.description || '暂无描述'}</p>
-                  </div>
-                  <div className="character-detail-section">
-                    <h4>外貌</h4>
-                    <p>{selectedCharacter.appearance || '暂无描述'}</p>
-                  </div>
-                  <div className="character-detail-section">
-                    <h4>性格</h4>
-                    <p>{selectedCharacter.personality || '暂无描述'}</p>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* 场景详情模态框 */}
-      {selectedScene && (() => {
-        const scene = meta.scenes?.find(s => s.id === selectedScene.id) ?? selectedScene;
-        const epTitle = meta.episodes.find(e => e.id === scene.episodeId)?.title;
-        return (
-          <div className="drama-modal-overlay" onClick={() => setSelectedScene(null)}>
-            <div className="drama-modal-content" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
-              <div className="drama-modal-header">
-                <h3>场景详情</h3>
-                <button className="drama-modal-close" onClick={() => setSelectedScene(null)}><X size={16} /></button>
-              </div>
-              <div className="drama-modal-body" style={{ gap: 14 }}>
-                {scene.imageUrl ? (
-                  <img
-                    src={scene.imageUrl}
-                    alt="场景图"
-                    style={{ width: '100%', borderRadius: 8, cursor: 'zoom-in', maxHeight: 240, objectFit: 'cover' }}
-                    onClick={() => setPreviewImage(scene.imageUrl!)}
-                  />
-                ) : (
-                  <div style={{ width: '100%', height: 120, borderRadius: 8, background: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-tertiary)' }}>
-                    <MapPin size={28} />
-                  </div>
-                )}
-                {epTitle && (
-                  <span style={{ fontSize: 12, color: 'var(--text-secondary)', background: 'var(--bg-tertiary)', padding: '2px 8px', borderRadius: 4, alignSelf: 'flex-start' }}>
-                    来自 {epTitle}
-                  </span>
-                )}
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <div style={{ flex: 1 }}>
-                    <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>地点</label>
-                    <input
-                      className="drama-input"
-                      value={scene.location}
-                      onChange={e => { handleUpdateScene(scene.id, { location: e.target.value }); setSelectedScene(s => s ? { ...s, location: e.target.value } : s); }}
-                      placeholder="场景地点"
-                    />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>时间</label>
-                    <select
-                      className="drama-select"
-                      value={scene.time}
-                      onChange={e => { handleUpdateScene(scene.id, { time: e.target.value }); setSelectedScene(s => s ? { ...s, time: e.target.value } : s); }}
-                    >
-                      {['白天', '夜晚', '清晨', '黄昏', '室内', '室外'].map(t => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>场景描述</label>
-                  <textarea
-                    className="drama-textarea"
-                    rows={4}
-                    value={scene.description}
-                    onChange={e => { handleUpdateScene(scene.id, { description: e.target.value }); setSelectedScene(s => s ? { ...s, description: e.target.value } : s); }}
-                    placeholder="场景视觉特征描述..."
-                    style={{ resize: 'vertical' }}
-                  />
-                </div>
-              </div>
-              <div className="drama-modal-footer">
-                <button
-                  className="drama-btn-secondary"
-                  style={{ display: 'flex', alignItems: 'center', gap: 4 }}
-                  onClick={() => { openSceneImageModal(scene.id); setSelectedScene(null); }}
-                  disabled={generatingSceneImage === scene.id}
-                >
-                  <Sparkles size={14} />
-                  生成场景图
-                </button>
-                <button className="drama-btn-primary" onClick={() => setSelectedScene(null)}>完成</button>
+              {/* Footer */}
+              <div className="subject-modal-footer">
+                <button className="drama-btn-secondary" onClick={closeModal}>取消</button>
+                <button className="drama-btn-primary" onClick={handleSave}>{isCreating ? '创建' : '保存'}</button>
               </div>
             </div>
           </div>
@@ -1754,28 +1903,92 @@ export default function DramaEditorPage() {
               </button>
             </div>
             <div className="drama-modal-body">
-              {imageGenTarget.type === 'character' && (
-                <div style={{ marginBottom: 14 }}>
-                  <label style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>生成风格</label>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    {(['portrait', 'grid4'] as const).map(s => (
-                      <button
-                        key={s}
-                        onClick={() => handleImageGenStyleChange(s)}
-                        style={{
-                          padding: '5px 14px', fontSize: 13, borderRadius: 6, border: '1px solid',
-                          cursor: 'pointer',
-                          background: imageGenTarget.style === s ? 'var(--accent-primary)' : 'transparent',
-                          color: imageGenTarget.style === s ? '#fff' : 'var(--text-primary)',
-                          borderColor: imageGenTarget.style === s ? 'var(--accent-primary)' : 'var(--border-light)',
-                        }}
-                      >
-                        {s === 'portrait' ? '单人肖像' : '四视图设定集'}
-                      </button>
-                    ))}
+              {imageGenTarget.type === 'character' && (() => {
+                const char = meta.characters.find(c => c.id === imageGenTarget.characterId);
+                const anglePresets = [
+                  { label: '正面肖像', hint: '正面特写肖像，清晰面部细节' },
+                  { label: '3/4视角', hint: '3/4侧面视角，展示面部轮廓' },
+                  { label: '侧面', hint: '侧面全侧脸视角，轮廓清晰' },
+                  { label: '全身正面', hint: '全身站立，正面展示服装与体型' },
+                  { label: '全身背面', hint: '全身背面视角，展示发型与服装背面' },
+                ];
+                return (
+                  <div style={{ marginBottom: 14 }}>
+                    <label style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>生成风格</label>
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                      {(['portrait', 'grid4'] as const).map(s => (
+                        <button
+                          key={s}
+                          onClick={() => handleImageGenStyleChange(s)}
+                          style={{
+                            padding: '5px 14px', fontSize: 13, borderRadius: 6, border: '1px solid',
+                            cursor: 'pointer',
+                            background: imageGenTarget.style === s ? 'var(--accent-primary)' : 'transparent',
+                            color: imageGenTarget.style === s ? '#fff' : 'var(--text-primary)',
+                            borderColor: imageGenTarget.style === s ? 'var(--accent-primary)' : 'var(--border-light)',
+                          }}
+                        >
+                          {s === 'portrait' ? '单人肖像' : '四视图设定集'}
+                        </button>
+                      ))}
+                    </div>
+                    {imageGenTarget.style === 'portrait' && char && (
+                      <>
+                        <label style={{ fontSize: 12, color: 'var(--text-tertiary)', display: 'block', marginBottom: 6 }}>快速视角（点击填入提示词）</label>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {anglePresets.map(p => (
+                            <button
+                              key={p.label}
+                              onClick={() => setImageGenPrompt(
+                                `为剧本角色生成一张${p.label}图片，${p.hint}。角色名：${char.name}，身份：${char.role}，外貌特征：${char.appearance}，性格：${char.personality}，描述：${char.description}`
+                              )}
+                              style={{
+                                padding: '3px 10px', fontSize: 12, borderRadius: 4, border: '1px solid var(--border-light)',
+                                cursor: 'pointer', background: 'var(--bg-secondary)', color: 'var(--text-secondary)',
+                              }}
+                            >
+                              {p.label}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </div>
-                </div>
-              )}
+                );
+              })()}
+              {imageGenTarget.type === 'scene' && (() => {
+                const scene = (meta.scenes || []).find(s => s.id === imageGenTarget.sceneId);
+                if (!scene) return null;
+                const scenePresets = [
+                  { label: '白天', hint: '白天自然光，明亮清晰' },
+                  { label: '夜晚', hint: '夜间场景，人工光源或月光' },
+                  { label: '清晨', hint: '清晨薄雾，柔和光线' },
+                  { label: '黄昏', hint: '黄昏夕阳，橙红暖调' },
+                  { label: '全景远景', hint: '远景宽画幅，展示整体环境' },
+                  { label: '近景特写', hint: '近景特写，突出场景细节' },
+                ];
+                return (
+                  <div style={{ marginBottom: 14 }}>
+                    <label style={{ fontSize: 12, color: 'var(--text-tertiary)', display: 'block', marginBottom: 6 }}>快速变体（点击填入提示词）</label>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {scenePresets.map(p => (
+                        <button
+                          key={p.label}
+                          onClick={() => setImageGenPrompt(
+                            `为剧本生成一张场景概念图，${p.hint}。场景地点：${scene.location}，时间：${scene.time}，描述：${scene.description}`
+                          )}
+                          style={{
+                            padding: '3px 10px', fontSize: 12, borderRadius: 4, border: '1px solid var(--border-light)',
+                            cursor: 'pointer', background: 'var(--bg-secondary)', color: 'var(--text-secondary)',
+                          }}
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
               {imageSizes.length > 1 && (
                 <div style={{ marginBottom: 14 }}>
                   <label style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>图片尺寸</label>

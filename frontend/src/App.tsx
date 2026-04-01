@@ -6,6 +6,7 @@ import LoadingSpinner from './components/common/LoadingSpinner';
 import RequireAuth from './components/auth/RequireAuth';
 import LoginModal from './components/auth/LoginModal';
 import QuotaExceededModal from './components/common/QuotaExceededModal';
+import ImageLightbox from './components/common/ImageLightbox';
 import { authApi } from './utils/authApi';
 import { tokenApi } from './utils/tokenApi';
 
@@ -130,6 +131,7 @@ function App() {
         onClose={() => setQuotaExceededOpen(false)}
         currentPlan={currentPlan}
       />
+      <ImageLightbox />
     </Router>
   );
 }

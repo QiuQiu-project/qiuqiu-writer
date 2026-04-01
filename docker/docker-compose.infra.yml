@@ -1,5 +1,5 @@
 # qiuqiuwriter 基础设施部署
-# 包含：PostgreSQL, Redis, MongoDB, Qdrant, Neo4j
+# 包含：PostgreSQL, Redis, MongoDB, Qdrant, Neo4j, MinIO
 # 启动命令：docker compose -f docker-compose.infra.yml -p qiuqiuwriter up -d
 
 name: qiuqiuwriter-infra
@@ -65,6 +65,29 @@ services:
     networks:
       - qiuqiuwriter_net
 
+  # ---------- 对象存储 ----------
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: qiuqiuwriter-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - qiuqiuwriter_net
+
   # ---------- 可选：向量库与图库 ----------
   qdrant:
     image: qdrant/qdrant:v1.15.3
@@ -110,6 +133,7 @@ volumes:
   qdrant_data:
   neo4j_data:
   neo4j_logs:
+  minio_data:
 
 networks:
   qiuqiuwriter_net:

@@ -3,9 +3,10 @@
 直接调用 AIService，不依赖 MemOS/向量数据库
 """
 import json
+import uuid
 from typing import AsyncGenerator, Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import and_, desc
@@ -354,6 +355,99 @@ async def drama_generate_image(
     except Exception as e:
         logger.error(f"drama_generate_image error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+def _minio_upload(endpoint: str, access_key: str, secret_key: str, secure: bool,
+                  bucket: str, filename: str, content: bytes, content_type: str) -> None:
+    """同步 MinIO 上传（在线程池中调用）"""
+    import io
+    import json as _json
+    from minio import Minio
+
+    client = Minio(endpoint, access_key=access_key, secret_key=secret_key, secure=secure)
+
+    if not client.bucket_exists(bucket):
+        client.make_bucket(bucket)
+
+    client.put_object(bucket, filename, io.BytesIO(content), len(content), content_type=content_type)
+
+
+def _minio_get(endpoint: str, access_key: str, secret_key: str, secure: bool,
+               bucket: str, filename: str) -> tuple[bytes, str]:
+    """同步从 MinIO 读取对象（在线程池中调用），返回 (content, content_type)"""
+    from minio import Minio
+
+    client = Minio(endpoint, access_key=access_key, secret_key=secret_key, secure=secure)
+    resp = client.get_object(bucket, filename)
+    try:
+        return resp.read(), resp.headers.get("Content-Type", "image/jpeg")
+    finally:
+        resp.close()
+        resp.release_conn()
+
+
+@router.post("/image/upload")
+async def drama_upload_image(
+    file: UploadFile = File(...),
+    current_user_id: str = Depends(get_current_user_id),
+):
+    """上传本地图片到剧本图片库（MinIO 存储，通过后端代理访问）"""
+    import asyncio
+    allowed_types = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="仅支持 JPEG/PNG/WEBP/GIF 格式")
+
+    content = await file.read()
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="图片大小不能超过 10MB")
+
+    ext_map = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "image/gif": ".gif"}
+    ext = ext_map.get(file.content_type or "", ".jpg")
+    filename = f"{uuid.uuid4().hex}{ext}"
+
+    from memos.api.core.config import get_settings
+    cfg = get_settings()
+
+    try:
+        await asyncio.to_thread(
+            _minio_upload,
+            cfg.MINIO_ENDPOINT, cfg.MINIO_ACCESS_KEY, cfg.MINIO_SECRET_KEY,
+            cfg.MINIO_SECURE, cfg.MINIO_BUCKET_DRAMA,
+            filename, content, file.content_type or "image/jpeg",
+        )
+    except Exception as e:
+        logger.error(f"MinIO upload error: {e}")
+        raise HTTPException(status_code=500, detail=f"图片上传失败：{e}")
+
+    return {"imageUrl": f"/api/v1/drama/uploads/{filename}"}
+
+
+@router.get("/uploads/{filename}")
+async def drama_proxy_upload(filename: str):
+    """代理从 MinIO 返回已上传的图片（无需暴露 MinIO 端口）"""
+    import asyncio
+    import re
+    from fastapi.responses import Response
+
+    # 只允许 hex + 扩展名，防止路径穿越
+    if not re.fullmatch(r"[0-9a-f]{32}\.(jpg|jpeg|png|webp|gif)", filename, re.IGNORECASE):
+        raise HTTPException(status_code=400, detail="无效的文件名")
+
+    from memos.api.core.config import get_settings
+    cfg = get_settings()
+
+    try:
+        content, content_type = await asyncio.to_thread(
+            _minio_get,
+            cfg.MINIO_ENDPOINT, cfg.MINIO_ACCESS_KEY, cfg.MINIO_SECRET_KEY,
+            cfg.MINIO_SECURE, cfg.MINIO_BUCKET_DRAMA, filename,
+        )
+    except Exception as e:
+        logger.warning(f"MinIO get error [{filename}]: {e}")
+        raise HTTPException(status_code=404, detail="图片不存在")
+
+    return Response(content=content, media_type=content_type,
+                    headers={"Cache-Control": "public, max-age=31536000, immutable"})
 
 
 @router.get("/extract/options")

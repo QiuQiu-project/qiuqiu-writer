@@ -111,6 +111,15 @@ class Settings(BaseSettings):
     MAX_FILE_SIZE: int = 100 * 1024 * 1024  # 100MB
     ALLOWED_FILE_EXTENSIONS: List[str] = [".txt", ".docx", ".pdf", ".md"]
 
+    # MinIO 对象存储配置
+    MINIO_ENDPOINT: str = os.getenv("MINIO_ENDPOINT", "localhost:9000")
+    MINIO_ACCESS_KEY: str = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
+    MINIO_SECRET_KEY: str = os.getenv("MINIO_SECRET_KEY", "minioadmin")
+    MINIO_SECURE: bool = os.getenv("MINIO_SECURE", "false").lower() == "true"
+    MINIO_BUCKET_DRAMA: str = os.getenv("MINIO_BUCKET_DRAMA", "drama-images")
+    # 用于生成公开访问 URL 的基础地址（默认与 MINIO_ENDPOINT 相同）
+    MINIO_PUBLIC_URL: str = os.getenv("MINIO_PUBLIC_URL", "")
+
     # 邮件配置
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587

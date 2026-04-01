@@ -4,6 +4,17 @@
   box-sizing: border-box;
 }
 
+/* 全站图片放大查看 — 鼠标提示 */
+img:not([data-no-lightbox]) {
+  cursor: zoom-in;
+}
+/* 按钮/链接内的图片不显示放大手势 */
+button img,
+a img,
+.no-lightbox img {
+  cursor: default;
+}
+
 /* 全局文字横向排列规则 */
 button,
 .btn,

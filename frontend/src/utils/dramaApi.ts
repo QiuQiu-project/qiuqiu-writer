@@ -85,6 +85,26 @@ export async function dramaGenerateImage(
   return res.imageUrl;
 }
 
+/**
+ * 上传本地图片到剧本图片库
+ */
+export async function dramaUploadImage(file: File): Promise<string> {
+  const token = localStorage.getItem('access_token');
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await fetch('/api/v1/drama/image/upload', {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `上传失败 (${res.status})`);
+  }
+  const data = await res.json();
+  return data.imageUrl as string;
+}
+
 export async function dramaExtractScenes(
   content: string,
   workId?: string | null,

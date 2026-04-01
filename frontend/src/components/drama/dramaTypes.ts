@@ -1,5 +1,7 @@
 // 剧本模块共享类型定义
 
+export type SubjectType = '角色' | '场景' | '宠物';
+
 export interface DramaCharacter {
   id: string;
   name: string;
@@ -8,6 +10,8 @@ export interface DramaCharacter {
   appearance: string;
   personality: string;
   imageUrl?: string;
+  imageUrls?: string[];  // 多视角图片库
+  subjectType?: '角色' | '宠物';  // 主体分类（默认角色）
 }
 
 export interface DramaScene {
@@ -16,6 +20,7 @@ export interface DramaScene {
   time: string;
   description: string;
   imageUrl?: string;
+  imageUrls?: string[];  // 多视角图片库
   episodeId?: string; // 全局场景库 — 记录来源集数
 }
 
