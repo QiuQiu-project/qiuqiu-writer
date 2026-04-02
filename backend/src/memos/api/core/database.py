@@ -91,7 +91,7 @@ async def init_db():
             user, work, chapter, template, volume,
             characters, writing, system, document, prompt_template,
             admin, yjs_document, invitation_code, feedback,
-            work_chat_message,  # Register all models
+            work_chat_message, prompt_experiment, prompt_rating,
         )
 
         # 创建所有表

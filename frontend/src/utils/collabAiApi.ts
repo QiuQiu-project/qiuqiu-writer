@@ -51,6 +51,12 @@ export interface CollabAITask {
   write_to_editor?: boolean;
   /** 用户选择的模型 model_id */
   model?: string;
+  /** 本次任务使用的 prompt 模板 ID（用于打分关联） */
+  prompt_template_id?: number;
+  /** 本次任务命中的实验 ID */
+  experiment_id?: number;
+  /** 本次任务命中的实验变体 ID */
+  variant_id?: number;
 }
 
 export interface CollabAIRoomState {

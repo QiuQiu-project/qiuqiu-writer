@@ -33,7 +33,7 @@ const PromptTemplates: React.FC = () => {
     try {
       const values = await form.validateFields();
       setSaving(true);
-      await request.post('/api/v1/admin/work-templates', values);
+      await request.post('/admin/work-templates', values);
       message.success('Created successfully');
       setModalOpen(false);
       form.resetFields();
@@ -47,7 +47,7 @@ const PromptTemplates: React.FC = () => {
 
   const handleDelete = async (id: number) => {
     try {
-      await request.delete(`/api/v1/admin/work-templates/${id}`);
+      await request.delete(`/admin/work-templates/${id}`);
       message.success('Deleted successfully');
       actionRef.current?.reload();
     } catch {

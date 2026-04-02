@@ -91,6 +91,7 @@ register_router('memos.api.routers.volumes_router')
 register_router('memos.api.routers.templates_router')
 register_router('memos.api.routers.works_router')
 register_router('memos.api.routers.prompt_template_router')
+register_router('memos.api.routers.prompt_experiment_router')
 register_router('memos.api.routers.feedback_router')
 register_router('memos.api.routers.payment_router')
 register_router('memos.api.routers.drama_router')
@@ -228,4 +229,3 @@ if __name__ == "__main__":
         workers=args.workers,
         reload=False,
     )
-

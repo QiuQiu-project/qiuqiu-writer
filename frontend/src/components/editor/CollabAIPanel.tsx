@@ -20,6 +20,7 @@ import {
 } from '../../utils/collabAiApi';
 import { formatOutlineSummary } from '../../utils/outlineFormat';
 import type { LocalDramaTask } from '../drama/dramaTypes';
+import RatingWidget from '../common/RatingWidget';
 import './CollabAIPanel.css';
 
 /** 面板只需要章节的最基本字段 */
@@ -197,6 +198,17 @@ function TaskCard({ task, canCancel, onCancel, onUseContinueRecommendation }: Ta
         </div>
       )}
 
+      {/* 完成后评分 */}
+      {task.status === 'done' && (
+        <RatingWidget
+          promptTemplateId={task.prompt_template_id}
+          experimentId={task.experiment_id}
+          variantId={task.variant_id}
+          context={{ chapter_id: task.chapter_id, generation_type: 'collab_ai' }}
+          compact
+        />
+      )}
+
       {/* 续写推荐卡片 */}
       {task.continueChapterResult && onUseContinueRecommendation && (
         <div className="task-recommendation-cards">
@@ -278,6 +290,14 @@ function LocalTaskCard({
         <div className="task-result-summary" style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 6 }}>
           提取完成
         </div>
+      )}
+
+      {/* 完成后评分（仅 gen-script） */}
+      {task.status === 'done' && task.type === 'gen-script' && (
+        <RatingWidget
+          context={{ generation_type: 'drama_gen_script' }}
+          compact
+        />
       )}
 
       {task.status === 'error' && (

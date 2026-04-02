@@ -55,3 +55,7 @@ def get_collab_ai_router():
 def get_drama_router():
     from memos.api.routers.drama_router import router
     return router
+
+def get_prompt_experiment_router():
+    from memos.api.routers.prompt_experiment_router import router
+    return router
