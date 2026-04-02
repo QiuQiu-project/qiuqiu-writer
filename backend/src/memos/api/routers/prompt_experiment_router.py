@@ -8,7 +8,7 @@ from typing import Optional, List, Any, Dict
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, case
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -259,13 +259,27 @@ async def delete_experiment(
 async def list_ratings(
     prompt_template_id: Optional[int] = Query(None),
     experiment_id: Optional[int] = Query(None),
+    template_type: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_async_db),
     admin_id: str = Depends(require_admin),
 ):
     """查看评分列表"""
-    q = select(PromptRating)
+    q = (
+        select(
+            PromptRating,
+            PromptTemplate.name.label("prompt_template_name"),
+            PromptTemplate.version.label("prompt_template_version"),
+            PromptTemplate.template_type.label("prompt_template_type"),
+            PromptExperiment.name.label("experiment_name"),
+            PromptExperimentVariant.label.label("variant_label"),
+        )
+        .select_from(PromptRating)
+        .outerjoin(PromptTemplate, PromptTemplate.id == PromptRating.prompt_template_id)
+        .outerjoin(PromptExperiment, PromptExperiment.id == PromptRating.experiment_id)
+        .outerjoin(PromptExperimentVariant, PromptExperimentVariant.id == PromptRating.variant_id)
+    )
     count_q = select(func.count()).select_from(PromptRating)
 
     filters = []
@@ -273,6 +287,8 @@ async def list_ratings(
         filters.append(PromptRating.prompt_template_id == prompt_template_id)
     if experiment_id:
         filters.append(PromptRating.experiment_id == experiment_id)
+    if template_type:
+        filters.append(PromptTemplate.template_type == template_type)
     if filters:
         q = q.where(and_(*filters))
         count_q = count_q.where(and_(*filters))
@@ -281,13 +297,173 @@ async def list_ratings(
     result = await db.execute(
         q.order_by(PromptRating.created_at.desc()).offset((page - 1) * size).limit(size)
     )
-    items = result.scalars().all()
+    rows = result.all()
 
     return {
-        "items": [r.to_dict() for r in items],
+        "items": [
+            {
+                **rating.to_dict(),
+                "prompt_template_name": prompt_template_name,
+                "prompt_template_version": prompt_template_version,
+                "prompt_template_type": prompt_template_type,
+                "experiment_name": experiment_name,
+                "variant_label": variant_label,
+            }
+            for rating, prompt_template_name, prompt_template_version, prompt_template_type, experiment_name, variant_label in rows
+        ],
         "total": total,
         "page": page,
         "size": size,
+    }
+
+
+@router.get("/api/v1/admin/prompt-ratings/summary")
+async def get_rating_summary(
+    template_type: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_async_db),
+    admin_id: str = Depends(require_admin),
+):
+    filters = []
+    if template_type:
+        filters.append(PromptTemplate.template_type == template_type)
+
+    base_query = (
+        select(PromptRating, PromptTemplate, PromptExperiment, PromptExperimentVariant)
+        .select_from(PromptRating)
+        .outerjoin(PromptTemplate, PromptTemplate.id == PromptRating.prompt_template_id)
+        .outerjoin(PromptExperiment, PromptExperiment.id == PromptRating.experiment_id)
+        .outerjoin(PromptExperimentVariant, PromptExperimentVariant.id == PromptRating.variant_id)
+    )
+    if filters:
+        base_query = base_query.where(and_(*filters))
+
+    overview_query = select(
+        func.count(PromptRating.id).label("total_ratings"),
+        func.avg(PromptRating.rating).label("average_rating"),
+        func.sum(case((PromptRating.experiment_id.is_not(None), 1), else_=0)).label("experiment_ratings"),
+        func.sum(case((PromptRating.experiment_id.is_(None), 1), else_=0)).label("non_experiment_ratings"),
+        func.sum(case((PromptRating.comment.is_not(None), 1), else_=0)).label("commented_ratings"),
+    ).select_from(PromptRating).outerjoin(PromptTemplate, PromptTemplate.id == PromptRating.prompt_template_id)
+    if filters:
+        overview_query = overview_query.where(and_(*filters))
+    overview_row = (await db.execute(overview_query)).first()
+
+    distribution_query = (
+        select(PromptRating.rating, func.count(PromptRating.id))
+        .select_from(PromptRating)
+        .outerjoin(PromptTemplate, PromptTemplate.id == PromptRating.prompt_template_id)
+        .group_by(PromptRating.rating)
+        .order_by(PromptRating.rating)
+    )
+    if filters:
+        distribution_query = distribution_query.where(and_(*filters))
+    distribution_rows = (await db.execute(distribution_query)).all()
+    distribution = {str(score): 0 for score in range(1, 6)}
+    for score, count in distribution_rows:
+        distribution[str(score)] = count
+
+    template_stats_query = (
+        select(
+            PromptTemplate.id.label("prompt_template_id"),
+            PromptTemplate.name.label("prompt_template_name"),
+            PromptTemplate.version.label("prompt_template_version"),
+            PromptTemplate.template_type.label("prompt_template_type"),
+            func.count(PromptRating.id).label("rating_count"),
+            func.avg(PromptRating.rating).label("rating_avg"),
+            func.sum(case((PromptRating.experiment_id.is_not(None), 1), else_=0)).label("experiment_rating_count"),
+            func.sum(case((PromptRating.experiment_id.is_(None), 1), else_=0)).label("non_experiment_rating_count"),
+            func.max(PromptRating.created_at).label("last_rated_at"),
+        )
+        .select_from(PromptRating)
+        .join(PromptTemplate, PromptTemplate.id == PromptRating.prompt_template_id)
+        .group_by(PromptTemplate.id, PromptTemplate.name, PromptTemplate.version, PromptTemplate.template_type)
+        .order_by(func.count(PromptRating.id).desc(), PromptTemplate.id.desc())
+    )
+    if filters:
+        template_stats_query = template_stats_query.where(and_(*filters))
+    template_stats_rows = (await db.execute(template_stats_query)).all()
+
+    experiment_stats_query = (
+        select(
+            PromptExperiment.id.label("experiment_id"),
+            PromptExperiment.name.label("experiment_name"),
+            PromptExperiment.status.label("experiment_status"),
+            PromptExperiment.template_type.label("template_type"),
+            func.count(PromptRating.id).label("rating_count"),
+            func.avg(PromptRating.rating).label("rating_avg"),
+        )
+        .select_from(PromptRating)
+        .join(PromptExperiment, PromptExperiment.id == PromptRating.experiment_id)
+        .outerjoin(PromptTemplate, PromptTemplate.id == PromptRating.prompt_template_id)
+        .group_by(PromptExperiment.id, PromptExperiment.name, PromptExperiment.status, PromptExperiment.template_type)
+        .order_by(func.count(PromptRating.id).desc(), PromptExperiment.id.desc())
+    )
+    if filters:
+        experiment_stats_query = experiment_stats_query.where(and_(*filters))
+    experiment_stats_rows = (await db.execute(experiment_stats_query)).all()
+
+    recent_comments_query = (
+        select(
+            PromptRating,
+            PromptTemplate.name.label("prompt_template_name"),
+            PromptExperiment.name.label("experiment_name"),
+            PromptExperimentVariant.label.label("variant_label"),
+        )
+        .select_from(PromptRating)
+        .outerjoin(PromptTemplate, PromptTemplate.id == PromptRating.prompt_template_id)
+        .outerjoin(PromptExperiment, PromptExperiment.id == PromptRating.experiment_id)
+        .outerjoin(PromptExperimentVariant, PromptExperimentVariant.id == PromptRating.variant_id)
+        .where(and_(PromptRating.comment.is_not(None), PromptRating.comment != ""))
+        .order_by(PromptRating.created_at.desc())
+        .limit(20)
+    )
+    if filters:
+        recent_comments_query = recent_comments_query.where(and_(*filters))
+    recent_comment_rows = (await db.execute(recent_comments_query)).all()
+
+    return {
+        "overview": {
+            "total_ratings": int(overview_row.total_ratings or 0) if overview_row else 0,
+            "average_rating": round(float(overview_row.average_rating), 2) if overview_row and overview_row.average_rating is not None else None,
+            "experiment_ratings": int(overview_row.experiment_ratings or 0) if overview_row else 0,
+            "non_experiment_ratings": int(overview_row.non_experiment_ratings or 0) if overview_row else 0,
+            "commented_ratings": int(overview_row.commented_ratings or 0) if overview_row else 0,
+        },
+        "distribution": distribution,
+        "template_stats": [
+            {
+                "prompt_template_id": row.prompt_template_id,
+                "prompt_template_name": row.prompt_template_name,
+                "prompt_template_version": row.prompt_template_version,
+                "prompt_template_type": row.prompt_template_type,
+                "rating_count": int(row.rating_count or 0),
+                "rating_avg": round(float(row.rating_avg), 2) if row.rating_avg is not None else None,
+                "experiment_rating_count": int(row.experiment_rating_count or 0),
+                "non_experiment_rating_count": int(row.non_experiment_rating_count or 0),
+                "last_rated_at": row.last_rated_at.isoformat() if row.last_rated_at else None,
+            }
+            for row in template_stats_rows
+        ],
+        "experiment_stats": [
+            {
+                "experiment_id": row.experiment_id,
+                "experiment_name": row.experiment_name,
+                "experiment_status": row.experiment_status,
+                "template_type": row.template_type,
+                "rating_count": int(row.rating_count or 0),
+                "rating_avg": round(float(row.rating_avg), 2) if row.rating_avg is not None else None,
+            }
+            for row in experiment_stats_rows
+        ],
+        "recent_comments": [
+            {
+                **rating.to_dict(),
+                "prompt_template_name": prompt_template_name,
+                "experiment_name": experiment_name,
+                "variant_label": variant_label,
+            }
+            for rating, prompt_template_name, experiment_name, variant_label in recent_comment_rows
+        ],
     }
 
 

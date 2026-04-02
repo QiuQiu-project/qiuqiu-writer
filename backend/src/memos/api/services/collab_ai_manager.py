@@ -40,6 +40,9 @@ class CollabAITask:
     query: str
     status: str = "queued"  # queued | running | done | cancelled | error
     model: Optional[str] = None  # 用户选择的 AI 模型（None = 使用默认）
+    prompt_template_id: Optional[int] = None
+    experiment_id: Optional[int] = None
+    variant_id: Optional[int] = None
     asyncio_task: Optional[asyncio.Task] = field(default=None, repr=False)
     created_at: float = field(default_factory=time.time)
 
@@ -652,6 +655,10 @@ class CollabAIRoom:
                             continue
                         try:
                             event = json.loads(data_str)
+                            if event.get("type") == "prompt_meta":
+                                task.prompt_template_id = event.get("prompt_template_id")
+                                task.experiment_id = event.get("experiment_id")
+                                task.variant_id = event.get("variant_id")
                             if event.get("type") == "error":
                                 stream_error = str(
                                     event.get("content")

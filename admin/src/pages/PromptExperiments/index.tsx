@@ -148,8 +148,8 @@ const PromptExperimentsPage: React.FC = () => {
 
   const openDetail = async (id: number) => {
     try {
-      const res = await request.get(`/admin/prompt-experiments/${id}`);
-      setDetailData(res.data);
+      const res: any = await request.get(`/admin/prompt-experiments/${id}`);
+      setDetailData(res);
       setDetailOpen(true);
     } catch {
       message.error('加载详情失败');
@@ -385,7 +385,7 @@ const PromptExperimentsPage: React.FC = () => {
         rowKey="id"
         columns={columns}
         request={async (params) => {
-          const res = await request.get('/admin/prompt-experiments', {
+          const res: any = await request.get('/admin/prompt-experiments', {
             params: {
               template_type: params.template_type,
               status: params.status,
@@ -394,8 +394,8 @@ const PromptExperimentsPage: React.FC = () => {
             },
           });
           return {
-            data: res.data.items,
-            total: res.data.total,
+            data: Array.isArray(res?.items) ? res.items : [],
+            total: res?.total || 0,
             success: true,
           };
         }}

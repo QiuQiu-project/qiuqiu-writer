@@ -54,7 +54,7 @@ export default function RatingWidget({
     setSubmitting(true);
     try {
       const token = localStorage.getItem('access_token');
-      await fetch('/api/v1/prompt-ratings', {
+      const response = await fetch('/api/v1/prompt-ratings', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -70,10 +70,13 @@ export default function RatingWidget({
           context: context || {},
         }),
       });
+      if (!response.ok) {
+        throw new Error(`submit failed: ${response.status}`);
+      }
       setSubmitted(true);
     } catch {
-      // 静默失败，不影响用户体验
-      setSubmitted(true);
+      setSubmitting(false);
+      return;
     } finally {
       setSubmitting(false);
     }

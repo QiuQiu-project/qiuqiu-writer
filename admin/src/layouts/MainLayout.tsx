@@ -18,6 +18,7 @@ import {
   CrownOutlined,
   RobotOutlined,
   ExperimentOutlined,
+  BarChartOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 
@@ -122,6 +123,11 @@ const MainLayout: React.FC = () => {
       key: '/prompt-experiments',
       icon: <ExperimentOutlined />,
       label: 'Prompt 灰度实验',
+    },
+    {
+      key: '/prompt-ratings',
+      icon: <BarChartOutlined />,
+      label: 'Prompt 评分统计',
     },
     {
       key: '/settings',

@@ -19,6 +19,7 @@ from memos.api.services.work_service import WorkService
 from memos.api.ai_models import AnalysisSettings
 from memos.api.services.ai_service import get_ai_service
 from memos.api.services.token_service import TokenService
+from memos.api.services.prompt_experiment_service import get_prompt_for_user
 
 
 # 辅助函数：确保返回的是 AsyncSession 对象，而不是生成器
@@ -787,10 +788,18 @@ async def chat(chat_req: ChatRequest):
                     # Phase 1: 准备 Prompt（需要 DB）
                     async with AsyncSessionLocal() as db_session:
                         book_analysis_service = BookAnalysisService(db_session)
+                        real_user_id = _parse_real_user_id(chat_req.user_id) or chat_req.user_id
+                        prompt_template, experiment_id, variant_id = await get_prompt_for_user(
+                            db_session,
+                            "chapter_analysis",
+                            real_user_id,
+                        )
+                        if prompt_template and getattr(prompt_template, "id", None):
+                            yield f"data: {json.dumps({'type': 'prompt_meta', 'prompt_template_id': prompt_template.id, 'experiment_id': experiment_id, 'variant_id': variant_id}, ensure_ascii=False)}\n\n"
                         enhanced_prompt, chapter_content, _ = await book_analysis_service.prepare_chapter_outline_prompt(
                             work_id=work_id,
                             chapter_id=chapter_id,
-                            prompt=None
+                            prompt=prompt_template.prompt_content if prompt_template and getattr(prompt_template, "prompt_content", None) else None
                         )
                     
                     # Phase 2: 调用 AI（不需要 DB）

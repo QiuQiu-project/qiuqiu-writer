@@ -319,6 +319,9 @@ export function applyCollabAIMessage(
       const event = msg.event;
       let streamContent = existing.streamContent;
       let continueChapterResult = existing.continueChapterResult;
+      let promptTemplateId = existing.prompt_template_id;
+      let experimentId = existing.experiment_id;
+      let variantId = existing.variant_id;
 
       if (event.type === 'text' && typeof event.data === 'string') {
         streamContent += event.data;
@@ -328,8 +331,20 @@ export function applyCollabAIMessage(
         } catch {
           // ignore
         }
+      } else if (event.type === 'prompt_meta') {
+        const meta = event as { prompt_template_id?: number; experiment_id?: number; variant_id?: number };
+        promptTemplateId = meta.prompt_template_id;
+        experimentId = meta.experiment_id;
+        variantId = meta.variant_id;
       }
-      next.set(msg.request_id, { ...existing, streamContent, continueChapterResult });
+      next.set(msg.request_id, {
+        ...existing,
+        streamContent,
+        continueChapterResult,
+        prompt_template_id: promptTemplateId,
+        experiment_id: experimentId,
+        variant_id: variantId,
+      });
       break;
     }
 

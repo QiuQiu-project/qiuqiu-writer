@@ -17,6 +17,7 @@ import Feedback from './pages/Feedback';
 import Plans from './pages/Plans';
 import LLMConfigs from './pages/LLMConfigs';
 import PromptExperiments from './pages/PromptExperiments';
+import PromptRatings from './pages/PromptRatings';
 
 // Simple Auth Guard
 const RequireAuth: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -55,6 +56,7 @@ const App: React.FC = () => {
           <Route path="feedback" element={<Feedback />} />
           <Route path="llm-configs" element={<LLMConfigs />} />
           <Route path="prompt-experiments" element={<PromptExperiments />} />
+          <Route path="prompt-ratings" element={<PromptRatings />} />
           <Route path="settings" element={<div>Settings (Coming Soon)</div>} />
         </Route>
       </Routes>
