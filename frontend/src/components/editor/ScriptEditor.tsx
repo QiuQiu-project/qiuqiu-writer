@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { EditorContent, type Editor } from '@tiptap/react';
 import ChapterEditorToolbar from './ChapterEditorToolbar';
-import './ScriptEditor.css';
 
 interface ScriptEditorProps {
   editor?: Editor | null;

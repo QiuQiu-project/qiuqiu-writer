@@ -6,7 +6,6 @@ import { useState } from 'react';
 import { Sparkles, RefreshCw, Image as ImageIcon, Edit2, X, Check } from 'lucide-react';
 import { dramaGenerateImage } from '../../utils/dramaApi';
 import type { DramaCharacter, DramaEpisode, DramaMeta, DramaPanel, DramaScene, DramaStoryboard } from './dramaTypes';
-import './StoryboardView.css';
 
 const SHOT_TYPE_LABELS: Record<string, string> = {
   wide: '全景',

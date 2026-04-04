@@ -8,7 +8,11 @@ import { worksApi, type Work } from '../../utils/worksApi';
 import { chaptersApi, type Chapter } from '../../utils/chaptersApi';
 import { dramaChatComplete } from '../../utils/dramaApi';
 import type { DramaCharacter, DramaEpisode, DramaMeta } from './dramaTypes';
-import './ImportFromNovelModal.css';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 function buildSynopsisFallback(rawContent: string, title: string): string {
   const plain = rawContent
@@ -45,7 +49,6 @@ export default function ImportFromNovelModal({ isOpen, onClose, onImport, workId
   const [error, setError] = useState('');
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0, title: '' });
 
-  // 加载小说列表
   useEffect(() => {
     if (!isOpen) return;
     setStep('select');
@@ -61,14 +64,12 @@ export default function ImportFromNovelModal({ isOpen, onClose, onImport, workId
       .finally(() => setLoadingNovels(false));
   }, [isOpen]);
 
-  // 选择小说后加载章节
   const handleSelectNovel = async (novel: Work) => {
     setSelectedNovel(novel);
     setStep('preview');
     setLoadingChapters(true);
     setError('');
     try {
-      // 分页拉取全部章节（后端 size 上限 100）
       let allChapters: Chapter[] = [];
       let page = 1;
       let hasMore = true;
@@ -86,7 +87,6 @@ export default function ImportFromNovelModal({ isOpen, onClose, onImport, workId
         page++;
       }
       setChapters(allChapters);
-      // 默认全选
       setSelectedChapterIds(new Set(allChapters.map(c => c.id)));
     } catch {
       setError('加载章节失败，请重试');
@@ -112,16 +112,15 @@ export default function ImportFromNovelModal({ isOpen, onClose, onImport, workId
     }
   };
 
-  // 从小说 metadata 提取角色
   const extractCharacters = (novel: Work): DramaCharacter[] => {
     const rawChars = novel.metadata?.characters || [];
-    return rawChars.map((c, i) => ({
+    return (rawChars as Record<string, string>[]).map((c, i) => ({
       id: genId(),
-      name: (c.display_name as string) || (c.name as string) || `角色${i + 1}`,
-      role: (c.role as string) || (i === 0 ? '主角' : '配角'),
-      description: (c.description as string) || '',
-      appearance: (c.appearance as string) || '',
-      personality: (c.personality as string) || '',
+      name: c.display_name || c.name || `角色${i + 1}`,
+      role: c.role || (i === 0 ? '主角' : '配角'),
+      description: c.description || '',
+      appearance: c.appearance || '',
+      personality: c.personality || '',
     }));
   };
 
@@ -133,7 +132,6 @@ export default function ImportFromNovelModal({ isOpen, onClose, onImport, workId
     const selectedChapters = chapters.filter(c => selectedChapterIds.has(c.id));
     setImportProgress({ current: 0, total: selectedChapters.length, title: '' });
 
-    // 并发拉取每章正文内容
     const contentMap = new Map<number, string>();
     await Promise.allSettled(
       selectedChapters.map(async (ch) => {
@@ -144,7 +142,6 @@ export default function ImportFromNovelModal({ isOpen, onClose, onImport, workId
       })
     );
 
-    // 逐章调用 AI 转换为剧情简介
     const episodes: DramaEpisode[] = [];
     for (let i = 0; i < selectedChapters.length; i++) {
       const ch = selectedChapters[i];
@@ -162,13 +159,10 @@ export default function ImportFromNovelModal({ isOpen, onClose, onImport, workId
           `\n章节标题：${ch.title}`,
           `\n章节内容：\n${chapterContent.slice(0, 3000)}`,
         ].join('\n');
-
         try {
           const result = await dramaChatComplete(prompt, workId);
           if (result.trim()) synopsis = result.trim();
-        } catch {
-          void 0;
-        }
+        } catch { void 0; }
       }
 
       episodes.push({
@@ -187,20 +181,14 @@ export default function ImportFromNovelModal({ isOpen, onClose, onImport, workId
     let extractedOutline = selectedNovel.description || '';
     let extractedCharacters = characters;
 
-    // AI 提取角色和大纲
     if (workId && selectedChapters.length > 0) {
       setImportProgress({ current: selectedChapters.length, total: selectedChapters.length, title: '正在提取大纲与角色...' });
-      
-      // 聚合小说内容，取前 8000 字用于提取
       let combinedContent = '';
       for (const ch of selectedChapters) {
         if (combinedContent.length > 8000) break;
         const content = contentMap.get(ch.id) || '';
-        if (content) {
-          combinedContent += `\n【${ch.title}】\n${content}\n`;
-        }
+        if (content) combinedContent += `\n【${ch.title}】\n${content}\n`;
       }
-      
       if (combinedContent) {
         const prompt = [
           `请根据以下小说内容，提取出剧本的整体大纲（约300字），以及出场的主要角色列表。`,
@@ -212,43 +200,37 @@ export default function ImportFromNovelModal({ isOpen, onClose, onImport, workId
           `    { "name": "角色名", "role": "角色身份(如男主/反派)", "description": "简短描述", "appearance": "外貌特征", "personality": "性格特点" }`,
           `  ]`,
           `}`,
-          `\n小说内容：\n${combinedContent.slice(0, 8000)}`
+          `\n小说内容：\n${combinedContent.slice(0, 8000)}`,
         ].join('\n');
-
         try {
           const result = await dramaChatComplete(prompt, workId, {
-            systemPrompt: '你是一个专业的剧本大纲和角色提取助手。请只输出合法的JSON对象，不要任何Markdown标记。'
+            systemPrompt: '你是一个专业的剧本大纲和角色提取助手。请只输出合法的JSON对象，不要任何Markdown标记。',
           });
-          
           let jsonStr = result.trim();
           const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-          if (jsonMatch && jsonMatch[1]) {
+          if (jsonMatch?.[1]) {
             jsonStr = jsonMatch[1].trim();
           } else {
             const firstBrace = jsonStr.indexOf('{');
             const lastBrace = jsonStr.lastIndexOf('}');
-            if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+            if (firstBrace !== -1 && lastBrace > firstBrace) {
               jsonStr = jsonStr.substring(firstBrace, lastBrace + 1);
             }
           }
-          
           const parsed = JSON.parse(jsonStr);
-          if (parsed.outline) {
-            extractedOutline = parsed.outline;
-          }
+          if (parsed.outline) extractedOutline = parsed.outline;
           if (importCharacters && Array.isArray(parsed.characters) && parsed.characters.length > 0) {
-            extractedCharacters = parsed.characters.map((c: Record<string, string>) => ({
+            extractedCharacters = (parsed.characters as Record<string, string>[]).map(c => ({
               id: genId(),
               name: c.name || '未知角色',
               role: c.role || '配角',
               description: c.description || '',
               appearance: c.appearance || '',
-              personality: c.personality || ''
+              personality: c.personality || '',
             }));
           }
         } catch (e) {
           console.error('Failed to extract outline and characters:', e);
-          // 失败时回退到默认的描述和元数据中的角色
         }
       }
     }
@@ -268,101 +250,84 @@ export default function ImportFromNovelModal({ isOpen, onClose, onImport, workId
   const filteredNovels = novels.filter(n =>
     !searchQuery || (n.title || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
-
   const novelCharacters = selectedNovel ? extractCharacters(selectedNovel) : [];
-
-  if (!isOpen) return null;
+  const stepTitle =
+    step === 'select' ? '选择小说' :
+    step === 'preview' ? `导入「${selectedNovel?.title}」` :
+    '导入中...';
 
   return (
-    <div className="import-modal-overlay" onClick={onClose}>
-      <div className="import-modal" onClick={e => e.stopPropagation()}>
+    <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
+      <DialogContent showCloseButton={false} className="max-w-[560px] p-0 gap-0 overflow-hidden flex flex-col max-h-[80vh]">
         {/* Header */}
-        <div className="import-modal-header">
-          <div className="import-modal-title-group">
-            <BookOpen size={18} className="import-modal-icon" />
-            <h2 className="import-modal-title">
-              {step === 'select' ? '选择小说' : step === 'preview' ? `导入「${selectedNovel?.title}」` : '导入中...'}
-            </h2>
-          </div>
-          <button className="import-modal-close" onClick={onClose}>
-            <X size={18} />
-          </button>
-        </div>
+        <DialogHeader className="flex-row items-center justify-between px-5 py-4 border-b border-border shrink-0 space-y-0">
+          <DialogTitle className="flex items-center gap-2.5 text-sm font-semibold">
+            <BookOpen size={18} className="text-primary/70" />
+            {stepTitle}
+          </DialogTitle>
+          <Button variant="ghost" size="icon-sm" onClick={onClose} className="shrink-0">
+            <X size={16} />
+          </Button>
+        </DialogHeader>
 
-        {/* Steps indicator */}
-        <div className="import-steps">
-          <div className={`import-step ${step === 'select' ? 'active' : 'done'}`}>
-            <div className="import-step-dot">{step !== 'select' ? <Check size={10} /> : '1'}</div>
-            <span>选择小说</span>
-          </div>
-          <div className="import-step-line" />
-          <div className={`import-step ${step === 'preview' || step === 'importing' ? 'active' : ''}`}>
-            <div className="import-step-dot">2</div>
-            <span>预览内容</span>
-          </div>
-          <div className="import-step-line" />
-          <div className={`import-step ${step === 'importing' ? 'active' : ''}`}>
-            <div className="import-step-dot">3</div>
-            <span>完成导入</span>
-          </div>
+        {/* Steps */}
+        <div className="flex items-center px-5 py-3.5 border-b border-border shrink-0">
+          <StepItem label="选择小说" number={1} status={step === 'select' ? 'active' : 'done'} />
+          <div className="flex-1 h-px bg-border mx-2.5" />
+          <StepItem label="预览内容" number={2} status={step === 'preview' || step === 'importing' ? 'active' : 'idle'} done={step === 'importing'} />
+          <div className="flex-1 h-px bg-border mx-2.5" />
+          <StepItem label="完成导入" number={3} status={step === 'importing' ? 'active' : 'idle'} />
         </div>
 
         {/* Body */}
-        <div className="import-modal-body">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-5 py-4 min-h-0">
           {error && (
-            <div className="import-error">
-              <AlertCircle size={14} />
+            <div className="flex items-center gap-2 px-3 py-2.5 mb-3.5 rounded-lg bg-destructive/10 border border-destructive/20 text-sm text-destructive">
+              <AlertCircle size={14} className="shrink-0" />
               {error}
             </div>
           )}
 
           {/* Step 1: 选择小说 */}
           {step === 'select' && (
-            <div className="import-select-step">
-              <div className="import-search-bar">
-                <Search size={14} className="import-search-icon" />
-                <input
-                  className="import-search-input"
+            <div className="space-y-3.5">
+              <div className="relative">
+                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                <Input
+                  className="pl-8 h-8 text-sm"
                   placeholder="搜索小说..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                 />
               </div>
-
               {loadingNovels ? (
-                <div className="import-loading">
-                  <Loader size={20} className="spin" />
-                  <span>加载中...</span>
-                </div>
+                <LoadingState label="加载中..." />
               ) : filteredNovels.length === 0 ? (
-                <div className="import-empty">
-                  <BookOpen size={32} />
-                  <p>{searchQuery ? '没有找到匹配的小说' : '还没有小说作品'}</p>
-                </div>
+                <EmptyState icon={<BookOpen size={32} />} message={searchQuery ? '没有找到匹配的小说' : '还没有小说作品'} />
               ) : (
-                <div className="import-novel-list">
+                <div className="flex flex-col gap-1.5">
                   {filteredNovels.map(novel => (
                     <button
                       key={novel.id}
-                      className="import-novel-item"
+                      className="flex items-center gap-3 px-3.5 py-3 bg-muted/30 border border-border rounded-xl cursor-pointer transition-all text-left w-full hover:bg-muted/60 hover:border-primary/30 group"
                       onClick={() => handleSelectNovel(novel)}
                     >
-                      <div className="import-novel-cover">
+                      <div className="w-10 h-[52px] rounded-md bg-primary/10 border border-primary/20 flex items-center justify-center text-primary/60 shrink-0 overflow-hidden">
                         {novel.cover_image
-                          ? <img src={novel.cover_image} alt={novel.title} />
+                          ? <img src={novel.cover_image} alt={novel.title} className="w-full h-full object-cover" />
                           : <BookOpen size={20} />
                         }
                       </div>
-                      <div className="import-novel-info">
-                        <span className="import-novel-title">{novel.title}</span>
-                        <div className="import-novel-meta">
+                      <div className="flex-1 min-w-0">
+                        <span className="block text-sm font-semibold text-foreground truncate mb-1">{novel.title}</span>
+                        <div className="flex gap-1.5 text-xs text-muted-foreground">
                           <span>{novel.word_count?.toLocaleString() || 0} 字</span>
                           {novel.metadata?.characters && (
                             <span>· {(novel.metadata.characters as unknown[]).length} 个角色</span>
                           )}
                         </div>
                       </div>
-                      <ChevronRight size={16} className="import-novel-arrow" />
+                      <ChevronRight size={16} className="text-muted-foreground shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:text-primary/70" />
                     </button>
                   ))}
                 </div>
@@ -372,25 +337,23 @@ export default function ImportFromNovelModal({ isOpen, onClose, onImport, workId
 
           {/* Step 2: 预览 */}
           {step === 'preview' && selectedNovel && (
-            <div className="import-preview-step">
+            <div className="space-y-4">
               {loadingChapters ? (
-                <div className="import-loading">
-                  <Loader size={20} className="spin" />
-                  <span>加载章节中...</span>
-                </div>
+                <LoadingState label="加载章节中..." />
               ) : (
                 <>
                   {/* 角色导入选项 */}
                   {novelCharacters.length > 0 && (
-                    <div className="import-section">
-                      <div className="import-section-header">
-                        <div className="import-section-title">
+                    <div>
+                      <div className="flex items-center justify-between mb-2.5">
+                        <div className="flex items-center gap-1.5 text-sm font-semibold text-muted-foreground">
                           <Users size={15} />
                           <span>角色 ({novelCharacters.length})</span>
                         </div>
-                        <label className="import-toggle">
+                        <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
                           <input
                             type="checkbox"
+                            className="accent-primary cursor-pointer"
                             checked={importCharacters}
                             onChange={e => setImportCharacters(e.target.checked)}
                           />
@@ -398,16 +361,18 @@ export default function ImportFromNovelModal({ isOpen, onClose, onImport, workId
                         </label>
                       </div>
                       {importCharacters && (
-                        <div className="import-char-preview">
+                        <div className="flex flex-wrap gap-1.5 p-2.5 bg-muted/20 border border-border rounded-xl">
                           {novelCharacters.slice(0, 6).map(c => (
-                            <div key={c.id} className="import-char-chip">
-                              <div className="import-char-avatar">{c.name.slice(0, 1)}</div>
+                            <div key={c.id} className="flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 border border-primary/20 rounded-full text-xs text-muted-foreground">
+                              <div className="w-4.5 h-4.5 rounded-full bg-primary/25 flex items-center justify-center text-[10px] font-bold text-primary/90">
+                                {c.name.slice(0, 1)}
+                              </div>
                               <span>{c.name}</span>
-                              <span className="import-char-role">{c.role}</span>
+                              <span className="text-muted-foreground/60">{c.role}</span>
                             </div>
                           ))}
                           {novelCharacters.length > 6 && (
-                            <span className="import-more">+{novelCharacters.length - 6} 个</span>
+                            <span className="text-xs text-muted-foreground self-center px-2">+{novelCharacters.length - 6} 个</span>
                           )}
                         </div>
                       )}
@@ -415,41 +380,55 @@ export default function ImportFromNovelModal({ isOpen, onClose, onImport, workId
                   )}
 
                   {/* 章节选择 */}
-                  <div className="import-section">
-                    <div className="import-section-header">
-                      <div className="import-section-title">
+                  <div>
+                    <div className="flex items-center justify-between mb-2.5">
+                      <div className="flex items-center gap-1.5 text-sm font-semibold text-muted-foreground">
                         <Layers size={15} />
                         <span>章节转集数</span>
                       </div>
-                      <button className="import-select-all" onClick={toggleAllChapters}>
+                      <button
+                        className="flex items-center gap-1.5 text-xs text-primary/80 hover:text-primary cursor-pointer bg-transparent border-none"
+                        onClick={toggleAllChapters}
+                      >
                         {selectedChapterIds.size === chapters.length ? '取消全选' : '全选'}
-                        <span className="import-select-count">
+                        <span className="text-xs text-muted-foreground bg-muted/60 rounded-full px-1.5 py-0.5">
                           {selectedChapterIds.size}/{chapters.length}
                         </span>
                       </button>
                     </div>
 
-                    <div className="import-chapter-list">
-                      {chapters.map((ch, i) => (
-                        <label key={ch.id} className="import-chapter-item">
-                          <input
-                            type="checkbox"
-                            checked={selectedChapterIds.has(ch.id)}
-                            onChange={() => toggleChapter(ch.id)}
-                          />
-                          <span className="import-chapter-num">{i + 1}</span>
-                          <span className="import-chapter-title">{ch.title}</span>
-                          {ch.metadata?.outline && (
-                            <span className="import-chapter-has-outline" title="有大纲">✓</span>
-                          )}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
+                    <ScrollArea className="h-56 rounded-xl border border-border bg-muted/20 p-2">
+                      <div className="flex flex-col gap-0.5">
+                        {chapters.map((ch, i) => (
+                          <label
+                            key={ch.id}
+                            className={cn(
+                              'flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg cursor-pointer text-sm transition-colors',
+                              selectedChapterIds.has(ch.id)
+                                ? 'bg-primary/10 text-foreground'
+                                : 'text-muted-foreground hover:bg-muted/50'
+                            )}
+                          >
+                            <input
+                              type="checkbox"
+                              className="accent-primary cursor-pointer shrink-0"
+                              checked={selectedChapterIds.has(ch.id)}
+                              onChange={() => toggleChapter(ch.id)}
+                            />
+                            <span className="text-xs font-semibold text-muted-foreground/60 w-5 text-right shrink-0">{i + 1}</span>
+                            <span className="flex-1 truncate">{ch.title}</span>
+                            {ch.metadata?.outline && (
+                              <span className="text-[10px] text-emerald-500/70 shrink-0" title="有大纲">✓</span>
+                            )}
+                          </label>
+                        ))}
+                      </div>
+                    </ScrollArea>
 
-                  {selectedChapterIds.size === 0 && (
-                    <p className="import-warn">请至少选择一个章节</p>
-                  )}
+                    {selectedChapterIds.size === 0 && (
+                      <p className="text-xs text-amber-500/80 text-center mt-2">请至少选择一个章节</p>
+                    )}
+                  </div>
                 </>
               )}
             </div>
@@ -457,23 +436,23 @@ export default function ImportFromNovelModal({ isOpen, onClose, onImport, workId
 
           {/* Step 3: 导入中 */}
           {step === 'importing' && (
-            <div className="import-loading import-loading-center">
-              <Loader size={28} className="spin" />
+            <div className="flex flex-col items-center justify-center gap-3.5 py-12">
+              <Loader size={28} className="animate-spin text-primary" />
               {importProgress.total > 0 ? (
                 <>
-                  <p>AI 转换中 {importProgress.current}/{importProgress.total}</p>
+                  <p className="text-sm text-foreground">AI 转换中 {importProgress.current}/{importProgress.total}</p>
                   {importProgress.title && (
-                    <p className="import-progress-title">「{importProgress.title}」</p>
+                    <p className="text-xs text-muted-foreground max-w-[280px] truncate">「{importProgress.title}」</p>
                   )}
-                  <div className="import-progress-bar">
+                  <div className="w-60 h-1 bg-muted/60 rounded-full overflow-hidden">
                     <div
-                      className="import-progress-fill"
+                      className="h-full bg-gradient-to-r from-primary to-primary/70 rounded-full transition-all duration-300"
                       style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
                     />
                   </div>
                 </>
               ) : (
-                <p>正在准备...</p>
+                <p className="text-sm text-foreground">正在准备...</p>
               )}
             </div>
           )}
@@ -481,21 +460,74 @@ export default function ImportFromNovelModal({ isOpen, onClose, onImport, workId
 
         {/* Footer */}
         {step === 'preview' && !loadingChapters && (
-          <div className="import-modal-footer">
-            <button className="import-btn-secondary" onClick={() => setStep('select')}>
+          <div className="flex items-center justify-end gap-2.5 px-5 py-3.5 border-t border-border shrink-0">
+            <Button variant="outline" size="sm" onClick={() => setStep('select')}>
               返回
-            </button>
-            <button
-              className="import-btn-primary"
+            </Button>
+            <Button
+              size="sm"
               onClick={handleConfirmImport}
               disabled={selectedChapterIds.size === 0}
+              className="gap-1.5"
             >
               <Sparkles size={14} />
               AI 转换 {selectedChapterIds.size} 集
-            </button>
+            </Button>
           </div>
         )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ─── Sub-components ─── */
+
+function StepItem({
+  label,
+  number,
+  status = 'idle',
+  done = false,
+}: {
+  label: string;
+  number: number;
+  status?: 'active' | 'done' | 'idle';
+  done?: boolean;
+}) {
+  const isDone = status === 'done' || done;
+  return (
+    <div className={cn(
+      'flex items-center gap-1.5 text-xs font-medium transition-colors',
+      status === 'active' ? 'text-primary' : isDone ? 'text-emerald-500' : 'text-muted-foreground'
+    )}>
+      <div className={cn(
+        'w-5 h-5 rounded-full border flex items-center justify-center text-[10px] font-bold transition-all',
+        status === 'active'
+          ? 'bg-primary/20 border-primary/50 text-primary'
+          : isDone
+          ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-500'
+          : 'bg-muted/50 border-border'
+      )}>
+        {isDone ? <Check size={10} /> : number}
       </div>
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function LoadingState({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-2.5 py-8 text-muted-foreground text-sm">
+      <Loader size={20} className="animate-spin" />
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function EmptyState({ icon, message }: { icon?: React.ReactNode; message: string }) {
+  return (
+    <div className="flex flex-col items-center gap-2.5 py-10 text-muted-foreground text-sm text-center">
+      {icon}
+      <p>{message}</p>
     </div>
   );
 }

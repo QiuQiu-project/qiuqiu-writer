@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import './GuideTip.css';
 
 interface GuideTipProps {
   id: string;
@@ -43,7 +42,6 @@ export default function GuideTip({ id, content, children, placement = 'top', for
     const checkVisibility = () => {
       // Check global setting
       const globalEnabled = safeStorageGet(window.localStorage, GLOBAL_ENABLED_KEY);
-      // const isGlobalEnabled = globalEnabled === null || globalEnabled === 'true';
 
       // Check if this specific tip has been seen
       const seenKey = `${TIP_SEEN_PREFIX}${id}`;
@@ -51,13 +49,13 @@ export default function GuideTip({ id, content, children, placement = 'top', for
         seenInMemory.has(seenKey) ||
         safeStorageGet(window.sessionStorage, seenKey) === 'true' ||
         safeStorageGet(window.localStorage, seenKey) === 'true';
-      
+
       // If the tip has been seen, it should not be visible even if forced
       if (hasSeen) {
         setIsVisible(false);
         return;
       }
-      
+
       if (forceVisible || globalEnabled !== 'false') {
         setIsVisible(true);
       } else {
@@ -70,19 +68,13 @@ export default function GuideTip({ id, content, children, placement = 'top', for
     const handleStorageChange = () => checkVisibility();
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('wawawriter_guide_tips_updated', handleStorageChange);
-    
+
     // Add resize/scroll listener to update position
     const updatePosition = () => {
       if (containerRef.current && isVisible) {
         const rect = containerRef.current.getBoundingClientRect();
-        
-        // Calculate position based on placement
-        // We just store the anchor rect info, and let CSS or render logic handle the offset
-        // But for Portal, we need absolute coordinates
-        
-        // Adjust for placement logic handled in render
-        setPosition({ 
-          top: rect.top, // Use viewport coordinates for fixed positioning
+        setPosition({
+          top: rect.top,
           left: rect.left,
           width: rect.width,
           height: rect.height
@@ -92,12 +84,11 @@ export default function GuideTip({ id, content, children, placement = 'top', for
 
     if (isVisible) {
       window.addEventListener('resize', updatePosition);
-      window.addEventListener('scroll', updatePosition, true); // Capture phase for scrolling containers
-      // Initial update
+      window.addEventListener('scroll', updatePosition, true);
       setTimeout(updatePosition, 0);
-      setTimeout(updatePosition, 100); // Retry in case of layout shifts
+      setTimeout(updatePosition, 100);
     }
-    
+
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('wawawriter_guide_tips_updated', handleStorageChange);
@@ -112,10 +103,6 @@ export default function GuideTip({ id, content, children, placement = 'top', for
     seenInMemory.add(seenKey);
     safeStorageSet(window.sessionStorage, seenKey, 'true');
     safeStorageSet(window.localStorage, seenKey, 'true');
-    // Clicking "Got it" only closes the current tip, it should not turn off the global switch
-    // Otherwise, other unread tips will also disappear
-    
-    // Dispatch event to notify other components (like SpotlightOverlay) that a tip has been dismissed
     window.dispatchEvent(new Event('wawawriter_guide_tips_updated'));
   }, [id]);
 
@@ -144,15 +131,11 @@ export default function GuideTip({ id, content, children, placement = 'top', for
     return () => document.removeEventListener('mousedown', onMouseDown, true);
   }, [handleDismiss, isVisible]);
 
-  // Render children normally, but wrap with ref
-  // If visible, render popover via Portal
-  
   const popoverStyle: React.CSSProperties = {
     position: 'fixed',
-    zIndex: 9999, // Very high z-index
+    zIndex: 9999,
   };
-  
-  // Calculate position styles
+
   const pos = position;
   if (pos.top !== undefined) {
     if (placement === 'top') {
@@ -176,26 +159,49 @@ export default function GuideTip({ id, content, children, placement = 'top', for
 
   return (
     <>
-      <div className="guide-tip-anchor" ref={containerRef} style={{ display: 'inline-flex' }}>
+      <div ref={containerRef} style={{ display: 'inline-flex' }}>
         {children}
       </div>
       {isVisible && createPortal(
         <div
           ref={popoverRef}
-          className={`guide-tip-popover ${placement}`}
-          style={popoverStyle}
+          className="w-[240px] rounded-[8px] border p-[14px_14px_12px] [animation:guide-tip-in_0.18s_ease-out]"
+          style={{
+            ...popoverStyle,
+            background: 'var(--bg-primary)',
+            borderColor: 'var(--border-color)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          }}
           role="dialog"
           aria-label="引导提示"
         >
-          <button type="button" className="guide-tip-x" onClick={handleDismiss} aria-label="关闭提示">
+          <button
+            type="button"
+            className="absolute top-2 right-2 w-7 h-7 rounded-[8px] border text-[18px] leading-none cursor-pointer hover:[background:var(--bg-secondary)] hover:[color:var(--text-primary)]"
+            style={{
+              background: 'var(--bg-primary)',
+              borderColor: 'var(--border-light)',
+              color: 'var(--text-secondary)',
+            }}
+            onClick={handleDismiss}
+            aria-label="关闭提示"
+          >
             ×
           </button>
-          <div className="guide-tip-content">
+          <div className="text-sm mb-2 leading-[1.5]" style={{ color: 'var(--text-primary)' }}>
             {content}
           </div>
-          <div className="guide-tip-footer">
+          <div
+            className="flex justify-between items-center border-t pt-2 mt-2"
+            style={{ borderColor: 'var(--border-light)' }}
+          >
             <div style={{ flex: 1 }} />
-            <button type="button" className="guide-tip-close" onClick={handleDismiss}>
+            <button
+              type="button"
+              className="text-xs px-2 py-1 rounded-[4px] bg-transparent border-none cursor-pointer hover:[background:var(--bg-secondary)]"
+              style={{ color: 'var(--primary-color, #1890ff)' }}
+              onClick={handleDismiss}
+            >
               知道了
             </button>
           </div>

@@ -6,12 +6,12 @@
 import { useState, useEffect } from 'react';
 import DraggableResizableModal from './common/DraggableResizableModal';
 import { X, RefreshCw, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
-import { 
-  getRecoverableWorks, 
-  recoverWorkFromCache, 
-  type RecoveryProgress 
+import {
+  getRecoverableWorks,
+  recoverWorkFromCache,
+  type RecoveryProgress
 } from '../utils/workRecovery';
-import './WorkRecoveryModal.css';
+import { Button } from '@/components/ui/button';
 
 interface WorkRecoveryModalProps {
   isOpen: boolean;
@@ -26,10 +26,10 @@ interface RecoverableWork {
   existsOnline: boolean;
 }
 
-export default function WorkRecoveryModal({ 
-  isOpen, 
-  onClose, 
-  onSuccess 
+export default function WorkRecoveryModal({
+  isOpen,
+  onClose,
+  onSuccess
 }: WorkRecoveryModalProps) {
   const [recoverableWorks, setRecoverableWorks] = useState<RecoverableWork[]>([]);
   const [loading, setLoading] = useState(false);
@@ -54,7 +54,6 @@ export default function WorkRecoveryModal({
       setRecoverableWorks(offlineWorks);
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载可恢复作品失败');
-      
     } finally {
       setLoading(false);
     }
@@ -71,7 +70,6 @@ export default function WorkRecoveryModal({
       });
 
       if (result.success && result.workId) {
-        // 恢复成功
         setTimeout(() => {
           onSuccess?.(result.workId!);
           handleClose();
@@ -104,127 +102,140 @@ export default function WorkRecoveryModal({
       className="work-recovery-modal"
       handleClassName=".work-recovery-modal-header"
     >
-        <div className="work-recovery-modal-header">
-          <h2>从本地缓存恢复作品</h2>
-          <button className="work-recovery-modal-close" onClick={handleClose}>
-            <X size={20} />
-          </button>
-        </div>
+      {/* Header */}
+      <div className="work-recovery-modal-header flex shrink-0 items-center justify-between gap-3 border-b border-border px-5 py-4">
+        <h2 className="m-0 text-xl font-semibold text-foreground">从本地缓存恢复作品</h2>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={handleClose}
+          className="shrink-0 text-muted-foreground hover:text-foreground"
+        >
+          <X size={20} />
+        </Button>
+      </div>
 
-        <div className="work-recovery-modal-body">
-          {loading ? (
-            <div className="work-recovery-loading">
-              <Loader2 size={24} className="spinning" />
-              <p>正在扫描本地缓存...</p>
-            </div>
-          ) : error && !recovering ? (
-            <div className="work-recovery-error">
-              <AlertCircle size={24} />
-              <p>{error}</p>
-              <button className="work-recovery-retry-btn" onClick={loadRecoverableWorks}>
-                重试
-              </button>
-            </div>
-          ) : recoverableWorks.length === 0 ? (
-            <div className="work-recovery-empty">
-              <p>未找到可恢复的作品</p>
-              <p className="work-recovery-empty-hint">
-                只有存在于本地缓存但不在线上的作品才能恢复
-              </p>
-            </div>
-          ) : recovering ? (
-            <div className="work-recovery-progress">
-              {progress && (
-                <>
-                  <div className="work-recovery-progress-header">
-                    <h3>{progress.workTitle || `作品 ${progress.workId}`}</h3>
-                    <div className="work-recovery-progress-status">
-                      {progress.status === 'completed' && (
-                        <CheckCircle size={20} className="success" />
-                      )}
-                      {progress.status === 'error' && (
-                        <AlertCircle size={20} className="error" />
-                      )}
-                      {progress.status !== 'completed' && progress.status !== 'error' && (
-                        <Loader2 size={20} className="spinning" />
-                      )}
+      {/* Body */}
+      <div className="min-h-0 flex-1 overflow-y-auto p-5">
+        {loading ? (
+          <div className="flex flex-col items-center gap-3 py-8 text-muted-foreground">
+            <Loader2 size={24} className="animate-spin" />
+            <p className="m-0">正在扫描本地缓存...</p>
+          </div>
+        ) : error && !recovering ? (
+          <div className="flex flex-col items-center gap-3 py-8 text-destructive">
+            <AlertCircle size={24} />
+            <p className="m-0">{error}</p>
+            <Button variant="outline" size="sm" onClick={loadRecoverableWorks}>
+              重试
+            </Button>
+          </div>
+        ) : recoverableWorks.length === 0 ? (
+          <div className="py-8 text-center text-muted-foreground">
+            <p className="m-0">未找到可恢复的作品</p>
+            <p className="m-0 mt-2 text-sm">
+              只有存在于本地缓存但不在线上的作品才能恢复
+            </p>
+          </div>
+        ) : recovering ? (
+          <div className="py-4">
+            {progress && (
+              <>
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="m-0 text-base font-semibold text-foreground">
+                    {progress.workTitle || `作品 ${progress.workId}`}
+                  </h3>
+                  <div>
+                    {progress.status === 'completed' && (
+                      <CheckCircle size={20} className="text-green-500" />
+                    )}
+                    {progress.status === 'error' && (
+                      <AlertCircle size={20} className="text-destructive" />
+                    )}
+                    {progress.status !== 'completed' && progress.status !== 'error' && (
+                      <Loader2 size={20} className="animate-spin text-muted-foreground" />
+                    )}
+                  </div>
+                </div>
+
+                <div className="mb-3 text-sm text-muted-foreground">
+                  {progress.message}
+                </div>
+
+                {progress.totalChapters > 0 && (
+                  <div className="relative mb-3 h-5 w-full overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all"
+                      style={{
+                        width: `${(progress.recoveredChapters / progress.totalChapters) * 100}%`
+                      }}
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center text-xs font-medium text-foreground">
+                      {progress.recoveredChapters} / {progress.totalChapters}
                     </div>
                   </div>
-                  
-                  <div className="work-recovery-progress-message">
-                    {progress.message}
+                )}
+
+                {progress.currentChapter && (
+                  <div className="text-sm text-muted-foreground">
+                    正在恢复: 第{progress.currentChapter.chapterNumber}章 - {progress.currentChapter.title}
                   </div>
+                )}
 
-                  {progress.totalChapters > 0 && (
-                    <div className="work-recovery-progress-bar">
-                      <div 
-                        className="work-recovery-progress-fill"
-                        style={{ 
-                          width: `${(progress.recoveredChapters / progress.totalChapters) * 100}%` 
-                        }}
-                      />
-                      <div className="work-recovery-progress-text">
-                        {progress.recoveredChapters} / {progress.totalChapters}
-                      </div>
-                    </div>
-                  )}
-
-                  {progress.currentChapter && (
-                    <div className="work-recovery-current-chapter">
-                      正在恢复: 第{progress.currentChapter.chapterNumber}章 - {progress.currentChapter.title}
-                    </div>
-                  )}
-
-                  {progress.status === 'completed' && (
-                    <div className="work-recovery-success">
-                      <CheckCircle size={24} className="success" />
-                      <p>恢复完成！</p>
-                      <p className="work-recovery-success-detail">
-                        成功恢复 {progress.recoveredChapters} 个章节
-                      </p>
-                    </div>
-                  )}
-
-                  {progress.status === 'error' && progress.error && (
-                    <div className="work-recovery-error">
-                      <AlertCircle size={24} className="error" />
-                      <p>{progress.error}</p>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          ) : (
-            <div className="work-recovery-list">
-              <p className="work-recovery-list-hint">
-                以下作品存在于本地缓存但不在线上，可以恢复：
-              </p>
-              <div className="work-recovery-works">
-                {recoverableWorks.map((work) => (
-                  <div key={work.workId} className="work-recovery-item">
-                    <div className="work-recovery-item-info">
-                      <h4>{work.workTitle || `作品 ${work.workId}`}</h4>
-                      <p className="work-recovery-item-meta">
-                        作品ID: {work.workId} · {work.chapterCount} 个章节
-                      </p>
-                    </div>
-                    <button
-                      className="work-recovery-item-btn"
-                      onClick={() => handleRecover(work.workId)}
-                      disabled={recovering}
-                    >
-                      <RefreshCw size={16} />
-                      <span>恢复</span>
-                    </button>
+                {progress.status === 'completed' && (
+                  <div className="mt-4 flex flex-col items-center gap-2 text-center">
+                    <CheckCircle size={24} className="text-green-500" />
+                    <p className="m-0 font-medium text-foreground">恢复完成！</p>
+                    <p className="m-0 text-sm text-muted-foreground">
+                      成功恢复 {progress.recoveredChapters} 个章节
+                    </p>
                   </div>
-                ))}
-              </div>
+                )}
+
+                {progress.status === 'error' && progress.error && (
+                  <div className="mt-4 flex flex-col items-center gap-2 text-center text-destructive">
+                    <AlertCircle size={24} />
+                    <p className="m-0">{progress.error}</p>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        ) : (
+          <div>
+            <p className="mb-4 text-sm text-muted-foreground">
+              以下作品存在于本地缓存但不在线上，可以恢复：
+            </p>
+            <div className="flex flex-col gap-3">
+              {recoverableWorks.map((work) => (
+                <div
+                  key={work.workId}
+                  className="flex items-center justify-between rounded-lg border border-border bg-muted/20 p-4 transition-all hover:border-primary/50 hover:shadow-sm"
+                >
+                  <div className="min-w-0 flex-1">
+                    <h4 className="m-0 text-base font-semibold text-foreground">
+                      {work.workTitle || `作品 ${work.workId}`}
+                    </h4>
+                    <p className="m-0 mt-1 text-sm text-muted-foreground">
+                      作品ID: {work.workId} · {work.chapterCount} 个章节
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="ml-4 shrink-0 gap-1.5"
+                    onClick={() => handleRecover(work.workId)}
+                    disabled={recovering}
+                  >
+                    <RefreshCw size={16} />
+                    <span>恢复</span>
+                  </Button>
+                </div>
+              ))}
             </div>
-          )}
-        </div>
+          </div>
+        )}
+      </div>
     </DraggableResizableModal>
   );
 }
-
-
-

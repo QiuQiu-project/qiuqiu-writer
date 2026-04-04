@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Plus, Trash2, Sparkles, User } from 'lucide-react';
 import CharacterTimeline from './CharacterTimeline';
 import CharacterRelations from './CharacterRelations';
-import './Characters.css';
+import { cn } from '@/lib/utils';
 
 interface Character {
   id: string;
@@ -55,6 +55,9 @@ interface CharactersProps {
   readOnly?: boolean;
 }
 
+const tabBtnClass = 'px-4 py-2 border-none bg-transparent text-sm rounded-[6px] cursor-pointer transition-all font-medium shrink-0';
+const actionBtnClass = 'flex items-center gap-1.5 px-5 py-2.5 border border-[var(--accent-primary)] text-sm font-medium rounded-[8px] cursor-pointer transition-all hover:[background:var(--accent-light)] hover:[border-color:var(--accent-hover)]';
+
 export default function Characters({ availableCharacters = [], readOnly }: CharactersProps) {
   const [activeTab, setActiveTab] = useState<'list' | 'relationships' | 'timeline'>('list');
   const [selectedCharacter, setSelectedCharacter] = useState<{ id: string; name: string } | null>(null);
@@ -79,25 +82,29 @@ export default function Characters({ availableCharacters = [], readOnly }: Chara
   };
 
   return (
-    <div className="characters-page">
-      <div className="characters-header">
-        <h2 className="characters-title">角色</h2>
-        <div className="characters-tabs">
+    <div className="w-full h-full flex flex-col" style={{ background: 'var(--bg-primary)' }}>
+      {/* Header */}
+      <div className="px-6 py-5 border-b max-md:px-4" style={{ borderColor: 'var(--border-light)' }}>
+        <h2 className="text-lg font-semibold m-0 mb-4" style={{ color: 'var(--text-primary)' }}>角色</h2>
+        <div className="flex gap-2 max-md:overflow-x-auto max-md:pb-1 max-md:[scrollbar-width:none] max-md:[-webkit-overflow-scrolling:touch]">
           <button
-            className={`tab-btn ${activeTab === 'list' ? 'active' : ''}`}
+            className={cn(tabBtnClass, activeTab === 'list' ? 'font-semibold' : 'hover:[background:var(--bg-secondary)] hover:[color:var(--text-primary)]')}
+            style={activeTab === 'list' ? { background: 'var(--accent-primary)', color: 'var(--text-inverse)' } : { color: 'var(--text-secondary)' }}
             onClick={() => setActiveTab('list')}
           >
             角色列表
           </button>
           <button
-            className={`tab-btn ${activeTab === 'relationships' ? 'active' : ''}`}
+            className={cn(tabBtnClass, activeTab === 'relationships' ? 'font-semibold' : 'hover:[background:var(--bg-secondary)] hover:[color:var(--text-primary)]')}
+            style={activeTab === 'relationships' ? { background: 'var(--accent-primary)', color: 'var(--text-inverse)' } : { color: 'var(--text-secondary)' }}
             onClick={() => setActiveTab('relationships')}
           >
             人物关系
           </button>
           {selectedCharacter && (
             <button
-              className={`tab-btn ${activeTab === 'timeline' ? 'active' : ''}`}
+              className={cn(tabBtnClass, activeTab === 'timeline' ? 'font-semibold' : 'hover:[background:var(--bg-secondary)] hover:[color:var(--text-primary)]')}
+              style={activeTab === 'timeline' ? { background: 'var(--accent-primary)', color: 'var(--text-inverse)' } : { color: 'var(--text-secondary)' }}
               onClick={() => setActiveTab('timeline')}
             >
               {selectedCharacter.name} - 时间线
@@ -107,14 +114,14 @@ export default function Characters({ availableCharacters = [], readOnly }: Chara
       </div>
 
       {activeTab === 'list' && (
-        <div className="characters-content">
+        <div className="flex-1 p-6 overflow-y-auto max-md:p-4">
           {!readOnly && (
-            <div className="characters-actions">
-              <button className="action-btn">
+            <div className="flex gap-3 mb-6 max-md:flex-wrap max-md:gap-2">
+              <button className={actionBtnClass} style={{ background: 'var(--bg-primary)', color: 'var(--accent-primary)' }}>
                 <Plus size={16} />
                 <span>添加角色</span>
               </button>
-              <button className="action-btn">
+              <button className={actionBtnClass} style={{ background: 'var(--bg-primary)', color: 'var(--accent-primary)' }}>
                 <Sparkles size={16} />
                 <span>生成角色</span>
               </button>
@@ -122,25 +129,27 @@ export default function Characters({ availableCharacters = [], readOnly }: Chara
           )}
 
           {/* 主要角色 */}
-          <div className="characters-section">
-            <h3 className="section-title">主要角色</h3>
-            <div className="characters-grid">
+          <div className="mb-8">
+            <h3 className="text-base font-semibold m-0 mb-4" style={{ color: 'var(--text-primary)' }}>主要角色</h3>
+            <div className="grid gap-4 mb-4 [grid-template-columns:repeat(auto-fill,minmax(300px,1fr))] max-md:[grid-template-columns:1fr]">
               {mainCharacters.map((character) => (
                 <div
                   key={character.id}
-                  className="character-card"
+                  className="group border rounded-xl p-4 cursor-pointer transition-all hover:[border-color:var(--accent-primary)] hover:[box-shadow:var(--shadow)] hover:-translate-y-0.5"
+                  style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-light)' }}
                   onClick={() => handleCharacterClick(character)}
                 >
-                  <div className="character-header">
-                    <div className="character-info">
-                      <div className="character-name-row">
-                        <span className="character-name">{character.name}</span>
-                        <span className="character-gender">{character.gender}</span>
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-1">
+                        <span className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{character.name}</span>
+                        <span className="text-[13px] px-2 py-0.5 rounded-[4px]" style={{ color: 'var(--text-secondary)', background: 'var(--bg-secondary)' }}>{character.gender}</span>
                       </div>
                     </div>
                     {!readOnly && (
                       <button
-                        className="delete-btn"
+                        className="w-8 h-8 p-0 border-none bg-transparent rounded-[6px] cursor-pointer flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:[background:var(--error-light)]"
+                        style={{ color: 'var(--text-tertiary)' }}
                         onClick={(e) => {
                           e.stopPropagation();
                           // 处理删除逻辑
@@ -151,7 +160,7 @@ export default function Characters({ availableCharacters = [], readOnly }: Chara
                       </button>
                     )}
                   </div>
-                  <div className="character-description">
+                  <div className="text-sm line-clamp-3" style={{ color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                     {character.description}
                   </div>
                 </div>
@@ -160,31 +169,33 @@ export default function Characters({ availableCharacters = [], readOnly }: Chara
           </div>
 
           {/* 次要角色 */}
-          <div className="characters-section">
-            <h3 className="section-title">次要角色</h3>
+          <div>
+            <h3 className="text-base font-semibold m-0 mb-4" style={{ color: 'var(--text-primary)' }}>次要角色</h3>
             {secondaryCharacters.length === 0 ? (
-              <div className="empty-section">
-                <User size={48} />
-                <p>暂无次要角色</p>
+              <div className="flex flex-col items-center justify-center py-12 px-6 gap-4" style={{ color: 'var(--text-tertiary)' }}>
+                <User size={48} style={{ opacity: 0.5 }} />
+                <p className="text-sm m-0">暂无次要角色</p>
               </div>
             ) : (
-              <div className="characters-grid">
+              <div className="grid gap-4 mb-4 [grid-template-columns:repeat(auto-fill,minmax(300px,1fr))] max-md:[grid-template-columns:1fr]">
                 {secondaryCharacters.map((character) => (
                   <div
                     key={character.id}
-                    className="character-card"
+                    className="group border rounded-xl p-4 cursor-pointer transition-all hover:[border-color:var(--accent-primary)] hover:[box-shadow:var(--shadow)] hover:-translate-y-0.5"
+                    style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-light)' }}
                     onClick={() => handleCharacterClick(character)}
                   >
-                    <div className="character-header">
-                      <div className="character-info">
-                        <div className="character-name-row">
-                          <span className="character-name">{character.name}</span>
-                          <span className="character-gender">{character.gender}</span>
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-1">
+                          <span className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{character.name}</span>
+                          <span className="text-[13px] px-2 py-0.5 rounded-[4px]" style={{ color: 'var(--text-secondary)', background: 'var(--bg-secondary)' }}>{character.gender}</span>
                         </div>
                       </div>
                       {!readOnly && (
                         <button
-                          className="delete-btn"
+                          className="w-8 h-8 p-0 border-none bg-transparent rounded-[6px] cursor-pointer flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:[background:var(--error-light)]"
+                          style={{ color: 'var(--text-tertiary)' }}
                           onClick={(e) => {
                             e.stopPropagation();
                             // 处理删除逻辑
@@ -195,7 +206,7 @@ export default function Characters({ availableCharacters = [], readOnly }: Chara
                         </button>
                       )}
                     </div>
-                    <div className="character-description">
+                    <div className="text-sm line-clamp-3" style={{ color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                       {character.description}
                     </div>
                   </div>
@@ -203,12 +214,12 @@ export default function Characters({ availableCharacters = [], readOnly }: Chara
               </div>
             )}
             {!readOnly && (
-              <div className="section-actions">
-                <button className="action-btn">
+              <div className="flex gap-3 mt-4">
+                <button className={actionBtnClass} style={{ background: 'var(--bg-primary)', color: 'var(--accent-primary)' }}>
                   <Plus size={16} />
                   <span>添加角色</span>
                 </button>
-                <button className="action-btn">
+                <button className={actionBtnClass} style={{ background: 'var(--bg-primary)', color: 'var(--accent-primary)' }}>
                   <Sparkles size={16} />
                   <span>生成角色</span>
                 </button>
@@ -219,13 +230,13 @@ export default function Characters({ availableCharacters = [], readOnly }: Chara
       )}
 
       {activeTab === 'relationships' && (
-        <div className="relationships-content">
+        <div className="flex-1 flex flex-col overflow-hidden">
           <CharacterRelations />
         </div>
       )}
 
       {activeTab === 'timeline' && selectedCharacter && (
-        <div className="timeline-content-wrapper">
+        <div className="flex-1 flex flex-col overflow-hidden">
           <CharacterTimeline
             filterCharacterId={selectedCharacter.id}
             characterName={selectedCharacter.name}
@@ -236,4 +247,3 @@ export default function Characters({ availableCharacters = [], readOnly }: Chara
     </div>
   );
 }
-

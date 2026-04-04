@@ -1,6 +1,6 @@
 import { BookOpen, ChevronDown, ChevronRight, Plus, Settings, ArrowUpDown, Trash2, RotateCcw } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import './SideNav.css';
+import { cn } from '@/lib/utils';
 
 export type NavItem = 'work-info' | 'tags' | 'outline' | 'characters' | 'settings' | 'map' | 'factions';
 
@@ -9,7 +9,7 @@ export interface ChapterFullData {
   volumeId: string;
   volumeTitle: string;
   title: string;
-  chapter_number?: number;  // 章节号
+  chapter_number?: number;
   characters: string[];
   locations: string[];
   outline: string;
@@ -20,7 +20,7 @@ interface Chapter {
   id: string;
   volumeId: string;
   title: string;
-  chapter_number?: number;  // 章节号
+  chapter_number?: number;
   characters?: string[];
   locations?: string[];
   outline?: string;
@@ -42,28 +42,39 @@ interface SideNavProps {
   onChapterSelect?: (chapterId: string | null) => void;
   onOpenChapterModal?: (mode: 'create' | 'edit', volumeId: string, volumeTitle: string, chapterData?: ChapterFullData) => void;
   onOpenVolumeModal?: (mode: 'create' | 'edit', volumeId?: string, currentTitle?: string, currentOutline?: string, currentDetailOutline?: string) => void;
-  onChapterDelete?: (chapterId: string) => void;  // 删除章节回调
-  /** 已软删除的章节（回收站） */
+  onChapterDelete?: (chapterId: string) => void;
   deletedChapters?: Array<{ id: number; title: string; chapter_number?: number }>;
-  /** 加载回收站列表 */
   loadDeletedChapters?: () => Promise<void>;
-  /** 恢复已删除章节 */
   onRestoreChapter?: (chapterId: string) => void;
   volumes?: Volume[];
   onVolumesChange?: (volumes: Volume[]) => void;
-  workType?: 'long' | 'short' | 'script' | 'video';  // 作品类型：长篇支持分卷，短篇不分卷
+  workType?: 'long' | 'short' | 'script' | 'video';
   readOnly?: boolean;
 }
 
-// 导出 Chapter, Volume, SideNavProps 类型供外部使用
 export type { Chapter, Volume, SideNavProps };
 
-export default function SideNav({ activeNav, onNavChange, selectedChapter, onChapterSelect, onOpenChapterModal, onOpenVolumeModal, onChapterDelete, deletedChapters = [], loadDeletedChapters, onRestoreChapter, volumes: externalVolumes, readOnly }: SideNavProps) {
+// Shared small icon button base
+const iconBtnClass = 'w-6 h-6 p-0 border-none bg-transparent cursor-pointer flex items-center justify-center rounded-[4px] transition-all shrink-0';
+
+export default function SideNav({
+  activeNav,
+  onNavChange,
+  selectedChapter,
+  onChapterSelect,
+  onOpenChapterModal,
+  onOpenVolumeModal,
+  onChapterDelete,
+  deletedChapters = [],
+  loadDeletedChapters,
+  onRestoreChapter,
+  volumes: externalVolumes,
+  readOnly,
+}: SideNavProps) {
   const [chaptersExpanded, setChaptersExpanded] = useState(true);
-  const [isChaptersReversed, setIsChaptersReversed] = useState(false); // 章节排序状态
+  const [isChaptersReversed, setIsChaptersReversed] = useState(false);
   const [recycleExpanded, setRecycleExpanded] = useState(false);
-  
-  // 卷和章节数据 - 使用外部传入的或内部状态
+
   const [internalVolumes] = useState<Volume[]>([
     {
       id: 'vol1',
@@ -90,13 +101,9 @@ export default function SideNav({ activeNav, onNavChange, selectedChapter, onCha
   });
 
   const setVolumeExpanded = (volumeId: string, expanded: boolean) => {
-    setVolumesExpanded(prev => ({
-      ...prev,
-      [volumeId]: expanded,
-    }));
+    setVolumesExpanded(prev => ({ ...prev, [volumeId]: expanded }));
   };
 
-  // 添加新卷：打开创建弹窗，保证卷持久化到服务器
   const handleAddVolume = (e: React.MouseEvent) => {
     e.stopPropagation();
     const volumeNumber = volumes.length + 1;
@@ -104,14 +111,12 @@ export default function SideNav({ activeNav, onNavChange, selectedChapter, onCha
     onOpenVolumeModal?.('create', undefined, defaultTitle);
   };
 
-  // 打开新建章节弹框
   const handleAddChapter = (volumeId: string, volumeTitle: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setVolumesExpanded(prev => ({ ...prev, [volumeId]: true }));
     onOpenChapterModal?.('create', volumeId, volumeTitle);
   };
 
-  // 打开编辑章节弹框
   const handleEditChapter = (chapter: Chapter, volumeTitle: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const volume = volumes.find(v => v.chapters.some(c => c.id === chapter.id));
@@ -121,7 +126,7 @@ export default function SideNav({ activeNav, onNavChange, selectedChapter, onCha
         volumeId: volume.id,
         volumeTitle,
         title: chapter.title,
-        chapter_number: chapter.chapter_number,  // 传递章节号
+        chapter_number: chapter.chapter_number,
         characters: chapter.characters || [],
         locations: chapter.locations || [],
         outline: chapter.outline || '',
@@ -130,13 +135,11 @@ export default function SideNav({ activeNav, onNavChange, selectedChapter, onCha
     }
   };
 
-  // 删除章节（确认由父组件用自定义弹框处理）
   const handleDeleteChapter = (chapter: Chapter, e: React.MouseEvent) => {
     e.stopPropagation();
     onChapterDelete?.(chapter.id);
   };
 
-  // 获取卷的中文数字
   const getVolumeNumber = (num: number): string => {
     const numbers = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
     if (num <= 10) return numbers[num - 1];
@@ -144,41 +147,67 @@ export default function SideNav({ activeNav, onNavChange, selectedChapter, onCha
     return `${numbers[Math.floor(num / 10) - 1]}十${numbers[(num % 10) - 1] || ''}`;
   };
 
-  // 点击作品信息标题
   const handleWorkInfoClick = () => {
     onNavChange('work-info');
-    onChapterSelect?.(null); // 清除选中的章节，这样才能显示 WorkInfoManager
+    onChapterSelect?.(null);
   };
 
-  // 展开回收站时加载已删除章节
   useEffect(() => {
     if (recycleExpanded && loadDeletedChapters) loadDeletedChapters();
   }, [recycleExpanded, loadDeletedChapters]);
 
+  const isWorkInfoActive = activeNav === 'work-info' && selectedChapter === null;
+
   return (
-    <aside className="side-nav">
-      <div className="nav-volume-header">
-            <button
-              className={`nav-section-header ${activeNav === 'work-info' && selectedChapter === null ? 'active' : ''}`}
-              onClick={handleWorkInfoClick}
-            >
-              <BookOpen size={24} />
-              <span>作品信息</span>
-            </button>
+    <aside
+      className="w-full flex flex-col py-3 overflow-y-auto rounded-[12px] shadow-[var(--shadow-md)] max-md:rounded-none max-md:shadow-none max-md:h-full"
+      style={{ background: 'var(--bg-primary)' }}
+    >
+      {/* 作品信息 */}
+      <div className="flex items-center gap-2 px-3 py-2 pl-6 rounded-[8px] transition-all mb-1">
+        <button
+          className={cn(
+            'flex items-center gap-3 w-full px-4 py-2.5 border-none text-base font-bold text-left cursor-pointer transition-all rounded-[8px] border-l-[3px] tracking-[0.2px] max-md:py-3 max-md:text-sm',
+            isWorkInfoActive
+              ? 'border-l-[var(--accent-primary)]'
+              : 'border-l-transparent hover:[background:var(--bg-secondary)]'
+          )}
+          style={
+            isWorkInfoActive
+              ? {
+                  background: 'linear-gradient(90deg, var(--accent-light) 0%, transparent 100%)',
+                  color: 'var(--accent-primary)',
+                  paddingLeft: '17px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                }
+              : { color: 'var(--text-primary)', background: 'transparent' }
+          }
+          onClick={handleWorkInfoClick}
+        >
+          <BookOpen size={24} className="shrink-0" />
+          <span className="!text-[15px] !font-bold">作品信息</span>
+        </button>
       </div>
 
-      <div className="nav-section">
-        <div className="nav-volume-header">
+      {/* 章节区 */}
+      <div className="mb-6">
+        <div className="flex items-center gap-2 px-3 py-2 pl-6 rounded-[8px] transition-all mb-1 hover:[background:var(--bg-secondary)]">
           <button
-            className="nav-section-header"
+            className="flex items-center gap-3 flex-1 border-none bg-transparent text-base font-bold text-left cursor-pointer transition-all max-md:py-2 max-md:text-sm"
+            style={{ color: 'var(--text-primary)' }}
             onClick={() => setChaptersExpanded(!chaptersExpanded)}
           >
             {chaptersExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-            <span>章节</span>
+            <span className="!text-[15px] !font-bold">章节</span>
           </button>
-          <div className="nav-header-actions">
-            <button 
-              className={`nav-sort-btn ${isChaptersReversed ? 'reversed' : ''}`}
+          <div className="flex items-center gap-1">
+            <button
+              className={cn(
+                iconBtnClass,
+                isChaptersReversed
+                  ? '[color:var(--accent-primary)] [background:var(--accent-light)] hover:[background:var(--accent-primary)] hover:[color:var(--text-inverse)]'
+                  : '[color:var(--text-tertiary)] hover:[background:var(--bg-secondary)] hover:[color:var(--accent-primary)]'
+              )}
               title={isChaptersReversed ? '正序显示' : '倒序显示'}
               onClick={(e) => {
                 e.stopPropagation();
@@ -187,141 +216,168 @@ export default function SideNav({ activeNav, onNavChange, selectedChapter, onCha
             >
               <ArrowUpDown size={14} />
             </button>
-            {/* 显示添加卷按钮 */}
             {!readOnly && (
-              <button className="nav-add-btn" title="添加卷" onClick={handleAddVolume}>
+              <button
+                className={cn(iconBtnClass, '[color:var(--text-tertiary)] hover:[background:var(--bg-secondary)] hover:[color:var(--accent-primary)]')}
+                title="添加卷"
+                onClick={handleAddVolume}
+              >
                 <Plus size={14} />
               </button>
             )}
           </div>
         </div>
+
         {chaptersExpanded && (
-          <div className="nav-submenu">
-            {/* 显示分卷结构 */}
+          <div className="flex flex-col pl-5 gap-0.5 mt-1.5">
             {volumes.map((volume) => (
-                <div key={volume.id} className="nav-volume">
-                  <div className="nav-volume-header">
-                    <button
-                      className="nav-volume-toggle"
-                      onClick={() => setVolumeExpanded(volume.id, !volumesExpanded[volume.id])}
-                    >
-                      {volumesExpanded[volume.id] ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                    </button>
-                    <div className="nav-volume-item">
-                      <span>{volume.title}</span>
-                    </div>
-                    {!readOnly && (
-                      <button
-                        className="nav-volume-settings-btn"
-                        title="卷纲设置"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (onOpenVolumeModal) {
-                            onOpenVolumeModal('edit', volume.id, volume.title, volume.outline, volume.detailOutline);
-                          }
-                        }}
-                      >
-                        <Settings size={12} />
-                      </button>
-                    )}
-                    {!readOnly && (
-                      <button 
-                        className="nav-add-btn small" 
-                        title="添加章"
-                        onClick={(e) => handleAddChapter(volume.id, volume.title, e)}
-                      >
-                        <Plus size={12} />
-                      </button>
-                    )}
+              <div key={volume.id} className="mb-2">
+                {/* Volume row */}
+                <div className="group flex items-center gap-2 px-3 py-2 pl-6 rounded-[8px] transition-all mb-1 hover:[background:var(--bg-secondary)]">
+                  <button
+                    className={cn(iconBtnClass, '[color:var(--text-secondary)] hover:[color:var(--accent-primary)] hover:[background:var(--accent-light)]')}
+                    onClick={() => setVolumeExpanded(volume.id, !volumesExpanded[volume.id])}
+                  >
+                    {volumesExpanded[volume.id] ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  </button>
+                  <div
+                    className="flex-1 py-1.5 px-2 bg-transparent text-[13px] font-semibold text-left rounded-[8px] whitespace-nowrap overflow-hidden text-ellipsis min-w-0"
+                    style={{ color: 'var(--text-primary)' }}
+                  >
+                    {volume.title}
                   </div>
-                  {volumesExpanded[volume.id] && (
-                    <div className="nav-chapters">
-                      {(isChaptersReversed 
-                        ? [...volume.chapters].sort((a, b) => {
-                            const numA = a.chapter_number ?? 0;
-                            const numB = b.chapter_number ?? 0;
-                            return numB - numA; // 倒序
-                          })
-                        : [...volume.chapters].sort((a, b) => {
-                            const numA = a.chapter_number ?? 0;
-                            const numB = b.chapter_number ?? 0;
-                            return numA - numB; // 正序
-                          })
-                      ).map((chapter) => (
+                  {!readOnly && (
+                    <button
+                      className={cn(iconBtnClass, 'mr-1 hidden group-hover:flex [color:var(--text-tertiary)] hover:[background:var(--bg-tertiary)] hover:[color:var(--text-primary)]')}
+                      title="卷纲设置"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenVolumeModal?.('edit', volume.id, volume.title, volume.outline, volume.detailOutline);
+                      }}
+                    >
+                      <Settings size={12} />
+                    </button>
+                  )}
+                  {!readOnly && (
+                    <button
+                      className={cn('w-5 h-5 p-0 border-none bg-transparent cursor-pointer flex items-center justify-center rounded-[4px] transition-all shrink-0', '[color:var(--text-tertiary)] hover:[background:var(--bg-secondary)] hover:[color:var(--accent-primary)]')}
+                      title="添加章"
+                      onClick={(e) => handleAddChapter(volume.id, volume.title, e)}
+                    >
+                      <Plus size={12} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Chapters */}
+                {volumesExpanded[volume.id] && (
+                  <div className="flex flex-col pl-6 gap-0.5 mt-1.5">
+                    {(isChaptersReversed
+                      ? [...volume.chapters].sort((a, b) => (b.chapter_number ?? 0) - (a.chapter_number ?? 0))
+                      : [...volume.chapters].sort((a, b) => (a.chapter_number ?? 0) - (b.chapter_number ?? 0))
+                    ).map((chapter) => {
+                      const isActive = selectedChapter === chapter.id;
+                      return (
                         <div
                           key={chapter.id}
-                          className={`nav-chapter-item-wrapper ${selectedChapter === chapter.id ? 'active' : ''}`}
+                          className="relative ml-2"
                         >
                           <div
-                            className={`nav-chapter-item ${selectedChapter === chapter.id ? 'active' : ''}`}
+                            className={cn(
+                              'flex items-center justify-between gap-2 w-full px-3 py-2 border-none text-sm font-medium text-left cursor-pointer rounded-[8px] transition-all border-l-[3px]',
+                              isActive
+                                ? 'border-l-[var(--accent-primary)]'
+                                : 'border-l-transparent hover:[background:var(--bg-secondary)] hover:translate-x-0.5'
+                            )}
+                            style={
+                              isActive
+                                ? {
+                                    background: 'linear-gradient(90deg, var(--accent-light) 0%, transparent 100%)',
+                                    color: 'var(--accent-primary)',
+                                    paddingLeft: '11px',
+                                    fontWeight: 600,
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                                  }
+                                : { color: 'var(--text-primary)', background: 'transparent' }
+                            }
                             onClick={() => onChapterSelect?.(chapter.id)}
                             role="button"
                             tabIndex={0}
                             onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                onChapterSelect?.(chapter.id);
-                              }
+                              if (e.key === 'Enter' || e.key === ' ') onChapterSelect?.(chapter.id);
                             }}
                           >
-                            <span>
-                              {chapter.chapter_number !== undefined 
+                            <span className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap leading-[1.4]">
+                              {chapter.chapter_number !== undefined
                                 ? `第${chapter.chapter_number}章 ${chapter.title}`
-                                : chapter.title
-                              }
+                                : chapter.title}
                             </span>
-                                {selectedChapter === chapter.id && !readOnly && (
-                                  <div className="nav-chapter-actions">
-                                    <button
-                                      className="nav-chapter-edit-btn"
-                                      onClick={(e) => handleEditChapter(chapter, volume.title, e)}
-                                      title="编辑章节设置"
-                                    >
-                                      <Settings size={12} />
-                                    </button>
-                                    <button
-                                      className="nav-chapter-delete-btn"
-                                      onClick={(e) => handleDeleteChapter(chapter, e)}
-                                      title="删除章节"
-                                    >
-                                      <Trash2 size={12} />
-                                    </button>
-                                  </div>
-                                )}
+                            {isActive && !readOnly && (
+                              <div className="flex items-center gap-1">
+                                <button
+                                  className={cn(iconBtnClass, '[color:var(--accent-primary)] hover:[background:var(--accent-light)] hover:scale-110')}
+                                  onClick={(e) => handleEditChapter(chapter, volume.title, e)}
+                                  title="编辑章节设置"
+                                >
+                                  <Settings size={12} />
+                                </button>
+                                <button
+                                  className={cn(iconBtnClass, '[color:var(--accent-primary)] hover:[background:var(--error-light)] hover:[color:var(--error)] hover:scale-110')}
+                                  onClick={(e) => handleDeleteChapter(chapter, e)}
+                                  title="删除章节"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </div>
 
-      {/* 回收站：已软删除的章节，可恢复 */}
+      {/* 回收站 */}
       {!readOnly && (loadDeletedChapters || deletedChapters.length > 0) && (
-        <div className="nav-section">
-          <div className="nav-volume-header">
+        <div className="mb-6">
+          <div className="flex items-center gap-2 px-3 py-2 pl-6 rounded-[8px] transition-all mb-1 hover:[background:var(--bg-secondary)]">
             <button
-              className="nav-section-header"
+              className="flex items-center gap-3 flex-1 border-none bg-transparent text-[15px] font-bold text-left cursor-pointer transition-all max-md:py-2 max-md:text-sm"
+              style={{ color: 'var(--text-primary)' }}
               onClick={() => setRecycleExpanded(!recycleExpanded)}
             >
               {recycleExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
               <span>回收站</span>
               {deletedChapters.length > 0 && (
-                <span className="nav-recycle-badge">{deletedChapters.length}</span>
+                <span
+                  className="ml-1.5 px-1.5 py-0.5 text-[11px] font-semibold rounded-[10px]"
+                  style={{ color: 'var(--text-inverse)', background: 'var(--text-tertiary)' }}
+                >
+                  {deletedChapters.length}
+                </span>
               )}
             </button>
           </div>
+
           {recycleExpanded && (
-            <div className="nav-submenu">
+            <div className="flex flex-col pl-5 gap-0.5 mt-1.5">
               {deletedChapters.length === 0 ? (
-                <div className="nav-recycle-empty">暂无已删除章节</div>
+                <div className="px-4 py-3 text-[13px]" style={{ color: 'var(--text-tertiary)' }}>
+                  暂无已删除章节
+                </div>
               ) : (
                 deletedChapters.map((ch) => (
-                  <div key={ch.id} className="nav-chapter-item-wrapper nav-recycle-item">
-                    <div className="nav-chapter-item">
-                      <span>
+                  <div key={ch.id} className="relative ml-2">
+                    <div
+                      className="flex items-center justify-between gap-2 w-full px-3 py-2 border-none text-sm font-medium text-left cursor-pointer rounded-[8px] transition-all border-l-[3px] border-l-transparent"
+                      style={{ color: 'var(--text-primary)', background: 'transparent' }}
+                    >
+                      <span className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap leading-[1.4]">
                         {ch.chapter_number != null
                           ? `第${ch.chapter_number}章 ${ch.title}`
                           : ch.title}
@@ -329,7 +385,7 @@ export default function SideNav({ activeNav, onNavChange, selectedChapter, onCha
                       {onRestoreChapter && (
                         <button
                           type="button"
-                          className="nav-chapter-restore-btn"
+                          className={cn(iconBtnClass, '[color:var(--text-tertiary)] hover:[background:var(--accent-light)] hover:[color:var(--accent-primary)]')}
                           onClick={(e) => {
                             e.stopPropagation();
                             onRestoreChapter(String(ch.id));
@@ -350,4 +406,3 @@ export default function SideNav({ activeNav, onNavChange, selectedChapter, onCha
     </aside>
   );
 }
-

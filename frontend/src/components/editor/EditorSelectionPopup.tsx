@@ -4,7 +4,6 @@
 
 import { useEffect } from 'react';
 import { MessageSquare, Sparkles } from 'lucide-react';
-import './EditorSelectionPopup.css';
 
 export interface EditorSelectionPopupProps {
   visible: boolean;

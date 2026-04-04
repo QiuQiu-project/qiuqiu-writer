@@ -1,7 +1,5 @@
 import { type Editor, EditorContent } from '@tiptap/react';
 import DramaScriptToolbar from './DramaScriptToolbar';
-import './ScriptEditor.css';
-import './DramaScriptEditor.css';
 
 interface DramaScriptEditorProps {
   editor?: Editor | null;

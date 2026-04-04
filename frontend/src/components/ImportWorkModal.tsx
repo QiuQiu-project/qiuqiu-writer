@@ -8,7 +8,8 @@ import StarterKit from '@tiptap/starter-kit';
 import { prosemirrorJSONToYXmlFragment } from 'y-prosemirror';
 import { createWorkFromFile } from '../utils/bookAnalysisApi';
 import { convertTextToHtml } from '../utils/editorHelpers';
-import './ImportWorkModal.css';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 interface ImportWorkModalProps {
   isOpen: boolean;
@@ -394,89 +395,110 @@ export default function ImportWorkModal({ isOpen, onClose, onSuccess }: ImportWo
   };
 
   return (
-      <DraggableResizableModal
-        isOpen={isOpen}
-        onClose={handleClose}
-        initialWidth={600}
-        initialHeight={500}
-        className="import-work-modal"
-        handleClassName=".import-work-modal-header"
-      >
-        <div className="import-work-modal-header">
-          <h2>导入作品</h2>
-          <button className="close-btn" onClick={handleClose} aria-label="关闭">
-            <X size={20} />
-          </button>
-        </div>
+    <DraggableResizableModal
+      isOpen={isOpen}
+      onClose={handleClose}
+      initialWidth={600}
+      initialHeight={500}
+      className="import-work-modal"
+      handleClassName=".import-work-modal-header"
+    >
+      {/* Header */}
+      <div className="import-work-modal-header flex shrink-0 items-center justify-between gap-3 border-b border-border px-5 py-4">
+        <h2 className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xl font-semibold text-foreground">
+          导入作品
+        </h2>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={handleClose}
+          aria-label="关闭"
+          className="shrink-0 text-muted-foreground hover:text-foreground"
+        >
+          <X size={20} />
+        </Button>
+      </div>
 
-        <div className="import-work-modal-body">
-          {status === 'success' ? (
-            <div className="import-success">
-              <CheckCircle size={48} className="success-icon" />
-              <h3>导入成功！</h3>
-              <p>{progress}</p>
-            </div>
-          ) : (
-            <>
-              <div className="file-upload-area">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".txt,.md"
-                  onChange={handleFileSelect}
-                  className="file-input"
-                  id="file-input"
-                  disabled={status !== 'idle'}
-                />
-                <label htmlFor="file-input" className={`file-label ${status !== 'idle' ? 'disabled' : ''}`}>
-                  {file ? (
-                    <div className="file-selected">
-                      <FileText size={32} />
-                      <span>{file.name}</span>
-                      <span className="file-size">({(file.size / 1024).toFixed(2)} KB)</span>
-                    </div>
-                  ) : (
-                    <div className="file-placeholder">
-                      <Upload size={32} />
-                      <span>点击选择文件或拖拽文件到此处</span>
-                      <span className="file-hint">支持 .txt 和 .md 格式</span>
-                    </div>
-                  )}
-                </label>
-              </div>
-
-              {(status === 'uploading' || status === 'splitting' || status === 'creating') && (
-                <div className="import-progress">
-                  <Loader2 size={20} className="spinner" />
-                  <span>{progress}</span>
-                </div>
-              )}
-
-              {status === 'error' && errorMessage && (
-                <div className="import-error">
-                  <AlertCircle size={20} />
-                  <span>{errorMessage}</span>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-
-        <div className="import-work-modal-footer">
-            {status === 'success' ? (
-              <button className="btn-primary" onClick={handleClose}>
-                关闭
-              </button>
-            ) : (
-              <button
-                className="btn-primary"
-                onClick={handleImport}
-                disabled={!file || status !== 'idle'}
-              >
-                {status === 'idle' ? '开始导入' : '导入中...'}
-              </button>
-            )}
+      {/* Body */}
+      <div className="min-h-0 flex-1 overflow-y-auto p-5">
+        {status === 'success' ? (
+          <div className="flex flex-col items-center gap-4 px-5 py-10 text-center">
+            <CheckCircle size={48} className="text-green-500" />
+            <h3 className="m-0 text-xl font-semibold text-foreground">导入成功！</h3>
+            <p className="m-0 text-muted-foreground">{progress}</p>
           </div>
-      </DraggableResizableModal>
-    );
+        ) : (
+          <>
+            {/* File upload area */}
+            <div className="min-w-0">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".txt,.md"
+                onChange={handleFileSelect}
+                className="hidden"
+                id="file-input"
+                disabled={status !== 'idle'}
+              />
+              <label
+                htmlFor="file-input"
+                className={cn(
+                  'block min-w-0 overflow-hidden rounded-lg border-2 border-dashed border-border bg-muted/30 px-5 py-10 text-center transition-all',
+                  status === 'idle'
+                    ? 'cursor-pointer hover:border-primary hover:bg-muted/50'
+                    : 'cursor-not-allowed opacity-60'
+                )}
+              >
+                {file ? (
+                  <div className="flex flex-col items-center gap-2 text-foreground">
+                    <FileText size={32} className="text-primary" />
+                    <span className="break-words">{file.name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      ({(file.size / 1024).toFixed(2)} KB)
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                    <Upload size={32} className="text-primary" />
+                    <span className="break-words">点击选择文件或拖拽文件到此处</span>
+                    <span className="text-xs text-muted-foreground">支持 .txt 和 .md 格式</span>
+                  </div>
+                )}
+              </label>
+            </div>
+
+            {/* Progress */}
+            {(status === 'uploading' || status === 'splitting' || status === 'creating') && (
+              <div className="mb-5 mt-4 flex items-center gap-3 rounded-lg bg-muted/50 px-4 py-4 text-foreground">
+                <Loader2 size={20} className="animate-spin shrink-0" />
+                <span>{progress}</span>
+              </div>
+            )}
+
+            {/* Error */}
+            {status === 'error' && errorMessage && (
+              <div className="mb-5 mt-4 flex items-center gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-4 text-destructive">
+                <AlertCircle size={20} className="shrink-0" />
+                <span>{errorMessage}</span>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="flex shrink-0 flex-wrap items-center justify-end gap-3 border-t border-border px-5 py-4">
+        {status === 'success' ? (
+          <Button onClick={handleClose}>关闭</Button>
+        ) : (
+          <Button
+            onClick={handleImport}
+            disabled={!file || status !== 'idle'}
+          >
+            {status === 'idle' ? '开始导入' : '导入中...'}
+          </Button>
+        )}
+      </div>
+    </DraggableResizableModal>
+  );
 }

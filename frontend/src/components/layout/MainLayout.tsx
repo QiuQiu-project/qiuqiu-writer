@@ -7,7 +7,7 @@ import type { MessageType } from '../common/MessageModal';
 import { authApi, type UserInfo } from '../../utils/authApi';
 import { getUserAvatarUrl } from '../../utils/avatarUtils';
 import ImportWorkModal from '../ImportWorkModal';
-import './MainLayout.css';
+import { cn } from '@/lib/utils';
 
 export default function MainLayout() {
   const location = useLocation();
@@ -24,7 +24,6 @@ export default function MainLayout() {
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const createMenuRef = useRef<HTMLDivElement>(null);
 
-  // 消息提示状态
   const [messageState, setMessageState] = useState<{
     isOpen: boolean;
     type: MessageType;
@@ -41,7 +40,6 @@ export default function MainLayout() {
     setMessageState(prev => ({ ...prev, isOpen: false }));
   };
 
-  // 检查登录状态
   useEffect(() => {
     const checkAuth = async () => {
       if (authApi.isAuthenticated()) {
@@ -66,18 +64,15 @@ export default function MainLayout() {
         setUserInfo(null);
       }
     };
-
     checkAuth();
   }, []);
 
-  // 是否需要展示“请先登录”提示条（由路由 state 触发，但登录后要立刻消失）
   useEffect(() => {
     const nextNeedLogin =
       !isAuthenticated && Boolean((location.state as { needLogin?: boolean } | null)?.needLogin);
     setNeedLoginPrompt(nextNeedLogin);
   }, [isAuthenticated, location.state]);
 
-  // 点击外部关闭菜单
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
@@ -122,7 +117,6 @@ export default function MainLayout() {
     }
   };
 
-  // 处理导入成功
   const handleImportSuccess = (workId: string) => {
     setShowImportModal(false);
     navigate(`/novel/editor?workId=${workId}`);
@@ -131,212 +125,327 @@ export default function MainLayout() {
   const isHomePage = location.pathname === '/';
   const isMyProfilePage = userInfo && location.pathname === `/users/${userInfo.id}`;
   const isUserPage = location.pathname.startsWith('/users/');
+  const isSpecialPage = isHomePage || isUserPage;
 
   return (
-    <div className={`qiuqiu-layout sidebar-layout${isHomePage ? ' is-homepage' : ''}${isUserPage ? ' is-profile-page' : ''}`}>
+    <div
+      className="w-full min-h-screen flex flex-row"
+      style={{ background: 'var(--bg-primary)' }}
+    >
+      {/* Login prompt banner */}
       {needLoginPrompt && (
-        <div className="login-prompt-banner">
+        <div
+          className="fixed top-0 left-0 right-0 z-[300] flex items-center justify-center gap-3 px-4 py-2.5 text-sm border-b max-md:top-[60px]"
+          style={{
+            background: 'var(--warning-light, rgba(253,230,138,0.1))',
+            color: 'var(--warning, #f59e0b)',
+            borderColor: 'var(--warning, #fcd34d)',
+          }}
+        >
           <span>请先登录以继续访问</span>
-          <button type="button" className="login-prompt-btn" onClick={() => setLoginModalOpen(true)}>
+          <button
+            type="button"
+            className="px-3 py-1 border-none rounded text-xs text-white cursor-pointer"
+            style={{ background: 'var(--warning, #f59e0b)' }}
+            onClick={() => setLoginModalOpen(true)}
+          >
             登录
           </button>
         </div>
       )}
-      
-      {/* 侧边栏导航 */}
+
+      {/* Desktop Sidebar */}
       {!isHomePage && (
-        <aside className={`qiuqiu-sidebar${isMyProfilePage ? ' profile-sidebar' : ''}`}>
-          <div className="sidebar-header">
-            <Link to="/" className="logo-link">
-              <img src="/favicon.png" alt="Logo" className="logo-icon" />
-              <span className="logo-text">球球写作</span>
+        <aside
+          className={cn(
+            'w-[240px] h-screen sticky top-0 flex flex-col border-r z-[100] shrink-0 transition-transform duration-300 max-md:hidden',
+          )}
+          style={{
+            background: isSpecialPage ? 'var(--bg-sidebar, var(--bg-secondary))' : 'var(--bg-secondary)',
+            borderColor: 'var(--border-color)',
+          }}
+        >
+          {/* Logo */}
+          <div className="h-16 px-5 flex items-center justify-between border-b border-transparent">
+            <Link
+              to="/"
+              className="flex items-center gap-2.5 no-underline font-semibold text-lg transition-opacity hover:opacity-80"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              <img src="/favicon.png" alt="Logo" className="w-7 h-7" data-no-lightbox />
+              <span className="text-[18px] font-bold tracking-[-0.5px]">球球写作</span>
             </Link>
           </div>
 
-          <nav className="sidebar-nav">
-            <Link 
-              to="/" 
-              className={`nav-link ${location.pathname === '/' ? 'active' : ''}`}
-            >
-              <Compass size={20} />
-              <span className="nav-text">探索</span>
-            </Link>
-            {isAuthenticated && (
-              <>
-                <Link 
-                  to={userInfo ? `/users/${userInfo.id}` : '/'}
-                  className={`nav-link ${isMyProfilePage ? 'active' : ''}`}
-                >
-                  <BookOpen size={20} />
-                  <span className="nav-text">小说创作</span>
-                </Link>
-                <Link
-                  to="/drama"
-                  className={`nav-link ${location.pathname.startsWith('/drama') ? 'active' : ''}`}
-                >
-                  <Clapperboard size={20} />
-                  <span className="nav-text">剧本创作</span>
-                </Link>
-              </>
-            )}
+          {/* Navigation */}
+          <nav className="flex-1 px-3 py-5 flex flex-col gap-1 overflow-y-auto">
+            {[
+              { to: '/', icon: <Compass size={20} />, label: '探索', active: location.pathname === '/' },
+              ...(isAuthenticated ? [
+                {
+                  to: userInfo ? `/users/${userInfo.id}` : '/',
+                  icon: <BookOpen size={20} />,
+                  label: '小说创作',
+                  active: !!isMyProfilePage,
+                },
+                {
+                  to: '/drama',
+                  icon: <Clapperboard size={20} />,
+                  label: '剧本创作',
+                  active: location.pathname.startsWith('/drama'),
+                },
+              ] : []),
+            ].map((item) => (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={cn(
+                  'flex items-center gap-3 px-4 py-2.5 rounded-lg text-[15px] font-medium no-underline transition-all duration-200',
+                  item.active
+                    ? 'font-semibold [background:var(--bg-tertiary)] [color:var(--text-primary)]'
+                    : '[color:var(--text-secondary)] hover:[background:var(--bg-tertiary)] hover:[color:var(--text-primary)]',
+                )}
+              >
+                <span className={item.active ? 'opacity-100' : 'opacity-80'}>{item.icon}</span>
+                <span>{item.label}</span>
+              </Link>
+            ))}
           </nav>
 
-          <div className="sidebar-footer">
+          {/* Footer */}
+          <div className="px-5 py-4 border-t flex flex-col gap-3" style={{ borderColor: 'var(--border-light)' }}>
             {isAuthenticated ? (
-              <>
-                <div className="user-menu-wrapper" ref={userMenuRef}>
-                  <button
-                    className="user-avatar-btn"
-                    onClick={() => setUserMenuOpen(!userMenuOpen)}
-                    title="用户菜单"
-                  >
-                    {userInfo ? (
-                      <img 
-                        src={getUserAvatarUrl(userInfo.avatar_url, userInfo.username, userInfo.display_name)} 
-                        alt={userInfo.display_name || userInfo.username || '用户'}
-                        className="user-avatar-btn-img"
-                      />
-                    ) : (
+              <div className="relative" ref={userMenuRef}>
+                <button
+                  className="flex items-center gap-2.5 px-3 py-2 w-full border-none bg-transparent rounded-lg cursor-pointer text-left transition-colors duration-200 hover:[background:var(--bg-tertiary)]"
+                  style={{ color: 'var(--text-primary)' }}
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  title="用户菜单"
+                >
+                  {userInfo ? (
+                    <img
+                      src={getUserAvatarUrl(userInfo.avatar_url, userInfo.username, userInfo.display_name)}
+                      alt={userInfo.display_name || userInfo.username || '用户'}
+                      className="w-8 h-8 rounded-full object-cover border"
+                      style={{ borderColor: 'var(--border-color)' }}
+                    />
+                  ) : (
+                    <span className="w-8 h-8 flex items-center justify-center">
                       <User size={20} />
-                    )}
-                    <span className="user-name-small">{userInfo?.display_name || userInfo?.username}</span>
-                  </button>
-                  {userMenuOpen && (
-                    <div className="user-menu-dropdown sidebar-user-dropdown">
-                      <div className="user-menu-header">
-                        <div className="user-avatar-btn">
-                          {userInfo ? (
-                            <img 
-                              src={getUserAvatarUrl(userInfo.avatar_url, userInfo.username, userInfo.display_name)} 
-                              alt={userInfo.display_name || userInfo.username || '用户'}
-                              className="user-avatar-btn-img"
-                            />
-                          ) : (
-                            <User size={24} />
-                          )}
-                        </div>
-                        <div className="user-details">
-                          <div className="user-name">{userInfo?.display_name || userInfo?.username || '用户'}</div>
-                        </div>
-                      </div>
-                      <div className="menu-divider"></div>
-                      <Link
-                        to={userInfo ? `/users/${userInfo.id}` : '/'}
-                        className="menu-item"
-                        onClick={() => setUserMenuOpen(false)}
-                      >
-                        <BookOpen size={16} />
-                        个人主页
-                      </Link>
-                      <Link
-                        to="/plans"
-                        className="menu-item"
-                        onClick={() => setUserMenuOpen(false)}
-                      >
-                        <CreditCard size={16} />
-                        <span>我的套餐</span>
-                      </Link>
-                      <Link
-                        to="/transactions"
-                        className="menu-item"
-                        onClick={() => setUserMenuOpen(false)}
-                      >
-                        <Receipt size={16} />
-                        交易记录
-                      </Link>
-                      <div className="menu-divider"></div>
-                      <a
-                        href="#"
-                        className="menu-item"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handleLogout();
-                        }}
-                      >
-                        <LogOut size={16} />
-                        退出登录
-                      </a>
-                    </div>
+                    </span>
                   )}
-                </div>
-              </>
+                  <span
+                    className="flex-1 text-sm font-medium overflow-hidden text-ellipsis whitespace-nowrap"
+                  >
+                    {userInfo?.display_name || userInfo?.username}
+                  </span>
+                </button>
+
+                {/* User dropdown */}
+                {userMenuOpen && (
+                  <div
+                    className="absolute bottom-0 left-full ml-3 w-[260px] rounded-xl border py-2 z-[1000]"
+                    style={{
+                      background: 'var(--bg-primary)',
+                      borderColor: 'var(--border-color)',
+                      boxShadow: 'var(--shadow-lg)',
+                      animation: 'fade-in 0.2s ease',
+                    }}
+                  >
+                    {/* Dropdown header */}
+                    <div className="flex items-center gap-3 px-4 py-3">
+                      {userInfo ? (
+                        <img
+                          src={getUserAvatarUrl(userInfo.avatar_url, userInfo.username, userInfo.display_name)}
+                          alt={userInfo.display_name || userInfo.username || '用户'}
+                          className="w-8 h-8 rounded-full object-cover border shrink-0"
+                          style={{ borderColor: 'var(--border-color)' }}
+                        />
+                      ) : (
+                        <User size={24} />
+                      )}
+                      <div className="flex-1 min-w-0 flex items-center">
+                        <span
+                          className="text-sm font-semibold whitespace-nowrap overflow-hidden text-ellipsis"
+                          style={{ color: 'var(--text-primary)' }}
+                        >
+                          {userInfo?.display_name || userInfo?.username || '用户'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Divider */}
+                    <div className="h-px mx-0 my-1.5" style={{ background: 'var(--border-light)' }} />
+
+                    {/* Menu items */}
+                    {[
+                      { to: userInfo ? `/users/${userInfo.id}` : '/', icon: <BookOpen size={16} />, label: '个人主页' },
+                      { to: '/plans', icon: <CreditCard size={16} />, label: '我的套餐' },
+                      { to: '/transactions', icon: <Receipt size={16} />, label: '交易记录' },
+                    ].map((item) => (
+                      <Link
+                        key={item.to}
+                        to={item.to}
+                        className="flex items-center gap-2.5 px-4 py-2.5 text-sm no-underline transition-colors duration-200 hover:[background:var(--bg-secondary)]"
+                        style={{ color: 'var(--text-primary)' }}
+                        onClick={() => setUserMenuOpen(false)}
+                      >
+                        {item.icon}
+                        {item.label}
+                      </Link>
+                    ))}
+
+                    <div className="h-px mx-0 my-1.5" style={{ background: 'var(--border-light)' }} />
+
+                    <a
+                      href="#"
+                      className="flex items-center gap-2.5 px-4 py-2.5 text-sm no-underline transition-colors duration-200 hover:[background:var(--bg-secondary)]"
+                      style={{ color: 'var(--text-primary)' }}
+                      onClick={(e) => { e.preventDefault(); handleLogout(); }}
+                    >
+                      <LogOut size={16} />
+                      退出登录
+                    </a>
+                  </div>
+                )}
+              </div>
             ) : (
               <button
-                className="sidebar-btn primary login-btn"
+                className="flex items-center justify-center gap-2.5 px-4 py-2.5 w-full border rounded-lg cursor-pointer text-sm font-medium transition-all duration-200 hover:opacity-90"
+                style={{
+                  background: 'var(--accent-primary)',
+                  color: 'var(--text-inverse)',
+                  borderColor: 'var(--accent-primary)',
+                }}
                 onClick={() => setLoginModalOpen(true)}
               >
-                <span className="btn-text">登录</span>
+                <span>登录</span>
               </button>
             )}
           </div>
         </aside>
       )}
 
-      {/* 移动端菜单按钮 (仅在小屏幕显示) */}
+      {/* Mobile hamburger button */}
       <button
-        className="mobile-menu-toggle"
+        className="hidden fixed top-4 left-4 z-[200] p-2 border rounded-lg cursor-pointer max-md:flex items-center justify-center"
+        style={{
+          background: 'var(--bg-secondary)',
+          borderColor: 'var(--border-color)',
+          color: 'var(--text-primary)',
+          boxShadow: 'var(--shadow-sm)',
+        }}
         onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
       >
         <Menu size={24} />
       </button>
 
-      {/* 移动端侧边栏 */}
+      {/* Mobile sidebar overlay */}
       {mobileMenuOpen && (
-        <div className="mobile-sidebar-overlay" onClick={() => setMobileMenuOpen(false)}>
-          <aside className="mobile-sidebar" onClick={e => e.stopPropagation()}>
-             {/* 复用侧边栏内容或简化版 */}
-             <div className="sidebar-header">
-              <span className="logo-text">球球写作</span>
-              <button className="close-btn" onClick={() => setMobileMenuOpen(false)}>
+        <div
+          className="fixed inset-0 z-[1000] bg-black/50 backdrop-blur-[4px]"
+          style={{ animation: 'fade-in 0.2s ease' }}
+          onClick={() => setMobileMenuOpen(false)}
+        >
+          <aside
+            className="w-[280px] h-full flex flex-col"
+            style={{
+              background: 'var(--bg-secondary)',
+              boxShadow: 'var(--shadow-xl)',
+              animation: 'slide-right 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="h-[60px] px-4 flex items-center justify-between">
+              <span className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>球球写作</span>
+              <button
+                className="bg-transparent border-none p-2 cursor-pointer"
+                style={{ color: 'var(--text-secondary)' }}
+                onClick={() => setMobileMenuOpen(false)}
+              >
                 <X size={20} />
               </button>
             </div>
-            <nav className="sidebar-nav">
-              <Link to="/" className="nav-link" onClick={() => setMobileMenuOpen(false)}>
+
+            <nav className="flex-1 px-3 py-5 flex flex-col gap-1">
+              <Link
+                to="/"
+                className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-[15px] font-medium no-underline transition-all hover:[background:var(--bg-tertiary)] hover:[color:var(--text-primary)]"
+                style={{ color: 'var(--text-secondary)' }}
+                onClick={() => setMobileMenuOpen(false)}
+              >
                 <Compass size={20} />
-                <span className="nav-text">探索</span>
+                <span>探索</span>
               </Link>
               {isAuthenticated && (
                 <>
-                  <Link to={userInfo ? `/users/${userInfo.id}` : '/'} className="nav-link" onClick={() => setMobileMenuOpen(false)}>
+                  <Link
+                    to={userInfo ? `/users/${userInfo.id}` : '/'}
+                    className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-[15px] font-medium no-underline transition-all hover:[background:var(--bg-tertiary)] hover:[color:var(--text-primary)]"
+                    style={{ color: 'var(--text-secondary)' }}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
                     <BookOpen size={20} />
-                    <span className="nav-text">小说创作</span>
+                    <span>小说创作</span>
                   </Link>
-                  <Link to="/drama" className="nav-link" onClick={() => setMobileMenuOpen(false)}>
+                  <Link
+                    to="/drama"
+                    className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-[15px] font-medium no-underline transition-all hover:[background:var(--bg-tertiary)] hover:[color:var(--text-primary)]"
+                    style={{ color: 'var(--text-secondary)' }}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
                     <Clapperboard size={20} />
-                    <span className="nav-text">剧本创作</span>
+                    <span>剧本创作</span>
                   </Link>
                 </>
               )}
             </nav>
-            <div className="sidebar-footer">
-               {isAuthenticated ? (
-                 <button className="sidebar-btn" onClick={handleLogout}>
-                   <LogOut size={20} />
-                   <span className="btn-text">退出登录</span>
-                 </button>
-               ) : (
-                 <button className="sidebar-btn primary" onClick={() => { setLoginModalOpen(true); setMobileMenuOpen(false); }}>
-                   登录
-                 </button>
-               )}
+
+            <div className="px-5 py-4 border-t" style={{ borderColor: 'var(--border-light)' }}>
+              {isAuthenticated ? (
+                <button
+                  className="flex items-center justify-center gap-2.5 px-4 py-2.5 w-full border rounded-lg cursor-pointer text-sm font-medium transition-all hover:[background:var(--bg-tertiary)] hover:[border-color:var(--border-hover)]"
+                  style={{
+                    background: 'var(--bg-primary)',
+                    borderColor: 'var(--border-color)',
+                    color: 'var(--text-primary)',
+                  }}
+                  onClick={handleLogout}
+                >
+                  <LogOut size={20} />
+                  <span>退出登录</span>
+                </button>
+              ) : (
+                <button
+                  className="flex items-center justify-center gap-2.5 px-4 py-2.5 w-full border-none rounded-lg cursor-pointer text-sm font-medium transition-all hover:opacity-90"
+                  style={{
+                    background: 'var(--accent-primary)',
+                    color: 'var(--text-inverse)',
+                  }}
+                  onClick={() => { setLoginModalOpen(true); setMobileMenuOpen(false); }}
+                >
+                  登录
+                </button>
+              )}
             </div>
           </aside>
         </div>
       )}
 
-      {/* 主内容区域 */}
-      <main className="qiuqiu-content">
+      {/* Main content */}
+      <main
+        className="flex-1 min-w-0 h-screen overflow-y-auto relative max-md:h-auto max-md:min-h-screen max-md:pt-[60px]"
+        style={{ background: isSpecialPage ? 'transparent' : 'var(--bg-primary)' }}
+      >
         <Outlet context={{ setLoginModalOpen }} />
       </main>
 
-      {/* 登录弹窗 */}
       <LoginModal
         isOpen={loginModalOpen}
         onClose={() => setLoginModalOpen(false)}
         onLoginSuccess={handleLoginSuccess}
       />
-      
+
       <MessageModal
         isOpen={messageState.isOpen}
         onClose={closeMessage}
@@ -348,7 +457,7 @@ export default function MainLayout() {
           if (messageState.onConfirm) messageState.onConfirm();
         }}
       />
-      {/* 导入作品弹窗 */}
+
       <ImportWorkModal
         isOpen={showImportModal}
         onClose={() => setShowImportModal(false)}

@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Plus, Edit2, Trash2, User, MapPin, Calendar, FileText } from 'lucide-react';
-import './CharacterTimeline.css';
 
 interface CharacterInfo {
   id: string;

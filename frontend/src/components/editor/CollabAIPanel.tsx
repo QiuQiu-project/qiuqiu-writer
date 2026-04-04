@@ -989,7 +989,6 @@ export default function CollabAIPanel({
                   onSelectModel={setSelectedModel}
                 />
                 <span className="toolbar-sep" />
-                <span className="chat-input-hint">Ctrl+Enter</span>
                 <button
                   className="chat-input-send"
                   onClick={handleSend}

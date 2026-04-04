@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { BookOpen } from 'lucide-react';
-import './OnboardingGuide.css';
 import DraggableResizableModal from './DraggableResizableModal';
 
 interface OnboardingGuideProps {

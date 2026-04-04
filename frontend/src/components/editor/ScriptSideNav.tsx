@@ -1,6 +1,6 @@
 import { BookOpen, Tag, FileText, Users, ChevronDown, ChevronRight, Plus } from 'lucide-react';
 import { useState } from 'react';
-import './ScriptSideNav.css';
+import { cn } from '@/lib/utils';
 
 export type ScriptNavItem = 'work-info' | 'tags' | 'outline' | 'characters';
 
@@ -26,6 +26,9 @@ const defaultEpisodes: ScriptEpisode[] = [
   { id: 1, title: '第1集', word_count: 0 },
 ];
 
+const sectionHeaderClass = 'flex items-center gap-2 w-full py-2.5 px-4 border-none bg-transparent text-sm font-semibold text-left cursor-pointer transition-all hover:[background:var(--bg-secondary)] hover:[color:var(--text-primary)]';
+const iconBtnClass = 'w-6 h-6 p-0 border-none bg-transparent cursor-pointer flex items-center justify-center rounded-[4px] transition-all hover:[background:var(--bg-secondary)] hover:[color:var(--accent-primary)]';
+
 export default function ScriptSideNav({ activeNav, onNavChange, selectedEpisode, onEpisodeSelect, episodes, onAddEpisode }: ScriptSideNavProps) {
   const [episodesExpanded, setEpisodesExpanded] = useState(true);
   const [draftsExpanded, setDraftsExpanded] = useState(false);
@@ -39,18 +42,31 @@ export default function ScriptSideNav({ activeNav, onNavChange, selectedEpisode,
   ];
 
   return (
-    <aside className="script-side-nav">
-      <div className="nav-section">
-        <nav className="nav-menu">
+    <aside className="w-[200px] flex flex-col py-4 overflow-y-auto border-r shrink-0" style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-light)' }}>
+      {/* Main nav items */}
+      <div className="mb-6">
+        <nav className="flex flex-col gap-1">
           {navItems.map((item) => {
             const Icon = item.icon;
+            const isActive = activeNav === item.id;
             return (
               <button
                 key={item.id}
-                className={`nav-item ${activeNav === item.id ? 'active' : ''}`}
+                className={cn(
+                  'relative flex items-center gap-3 py-2.5 px-4 border-none text-sm text-left cursor-pointer transition-all',
+                  isActive
+                    ? 'font-semibold'
+                    : 'bg-transparent hover:[background:var(--bg-secondary)] hover:[color:var(--text-primary)]'
+                )}
+                style={isActive ? { background: 'var(--accent-light)', color: 'var(--accent-primary)' } : { color: 'var(--text-secondary)' }}
                 onClick={() => onNavChange(item.id)}
               >
-                <Icon size={18} />
+                {/* Left accent bar (replaces ::before pseudo-element) */}
+                <span
+                  className={cn('absolute left-0 top-1/2 -translate-y-1/2 w-[3px] rounded-[0_3px_3px_0] transition-all', isActive ? 'h-[60%]' : 'h-0')}
+                  style={{ background: 'var(--accent-gradient)' }}
+                />
+                <Icon size={18} className="shrink-0" />
                 <span>{item.label}</span>
               </button>
             );
@@ -58,48 +74,67 @@ export default function ScriptSideNav({ activeNav, onNavChange, selectedEpisode,
         </nav>
       </div>
 
-      <div className="nav-section">
-        <div className="nav-section-header-with-action">
+      {/* Episodes section */}
+      <div className="mb-6">
+        <div className="flex items-center gap-2 w-full py-2.5 px-4">
           <button
-            className="nav-section-header"
+            className="flex-1 flex items-center gap-2 border-none bg-transparent text-sm font-semibold text-left cursor-pointer transition-all p-0 hover:[color:var(--text-primary)]"
+            style={{ color: 'var(--text-secondary)' }}
             onClick={() => setEpisodesExpanded(!episodesExpanded)}
           >
             {episodesExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
             <span>剧集</span>
           </button>
-          <button className="nav-add-btn" title="添加剧集" onClick={onAddEpisode}>
+          <button
+            className={iconBtnClass}
+            style={{ color: 'var(--text-tertiary)' }}
+            title="添加剧集"
+            onClick={onAddEpisode}
+          >
             <Plus size={14} />
           </button>
         </div>
         {episodesExpanded && (
-          <div className="nav-submenu">
-            {episodeList.map((episode) => (
-              <button
-                key={episode.id}
-                className={`nav-episode-item ${selectedEpisode === episode.id ? 'active' : ''}`}
-                onClick={() => {
-                  onEpisodeSelect(episode.id);
-                }}
-              >
-                <span>{episode.title}</span>
-                <span className="episode-word-count">{episode.word_count}字</span>
-              </button>
-            ))}
+          <div className="flex flex-col gap-0.5 pl-4">
+            {episodeList.map((episode) => {
+              const isActive = selectedEpisode === episode.id;
+              return (
+                <button
+                  key={episode.id}
+                  className={cn(
+                    'flex items-center justify-between py-2 px-4 border-none text-[13px] text-left cursor-pointer rounded-[var(--radius-sm)] transition-all',
+                    isActive
+                      ? 'font-semibold'
+                      : 'bg-transparent hover:[background:var(--bg-secondary)] hover:[color:var(--text-primary)]'
+                  )}
+                  style={isActive ? { background: 'var(--accent-light)', color: 'var(--accent-primary)' } : { color: 'var(--text-secondary)' }}
+                  onClick={() => onEpisodeSelect(episode.id)}
+                >
+                  <span>{episode.title}</span>
+                  <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{episode.word_count}字</span>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
 
-      <div className="nav-section">
+      {/* Drafts section */}
+      <div className="mb-6">
         <button
-          className="nav-section-header"
+          className={sectionHeaderClass}
+          style={{ color: 'var(--text-secondary)' }}
           onClick={() => setDraftsExpanded(!draftsExpanded)}
         >
           {draftsExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           <span>草稿箱</span>
         </button>
         {draftsExpanded && (
-          <div className="nav-submenu">
-            <button className="nav-subitem">
+          <div className="flex flex-col gap-0.5 pl-4">
+            <button
+              className="py-2 px-4 pl-8 border-none bg-transparent text-[13px] text-left cursor-pointer rounded-[var(--radius-sm)] transition-all hover:[background:var(--bg-secondary)] hover:[color:var(--text-primary)]"
+              style={{ color: 'var(--text-secondary)' }}
+            >
               <span>草稿 1</span>
             </button>
           </div>
@@ -108,4 +143,3 @@ export default function ScriptSideNav({ activeNav, onNavChange, selectedEpisode,
     </aside>
   );
 }
-

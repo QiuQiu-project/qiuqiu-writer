@@ -11,7 +11,7 @@ import ShareWorkModal from '../components/ShareWorkModal';
 import MessageModal from '../components/common/MessageModal';
 import type { MessageType } from '../components/common/MessageModal';
 import { parseError } from '../utils/errorUtils';
-import './WorksPage.css';
+import { cn } from '@/lib/utils';
 
 type ViewMode = 'grid' | 'list';
 
@@ -24,7 +24,7 @@ export default function WorksPage() {
   const [openExportMenuId, setOpenExportMenuId] = useState<string | null>(null);
   const createMenuRef = useRef<HTMLDivElement | null>(null);
   const exportMenuRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  
+
   const [works, setWorks] = useState<Work[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,7 +74,6 @@ export default function WorksPage() {
       setTotal(response.total);
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载作品失败');
-      
     } finally {
       setLoading(false);
     }
@@ -88,12 +87,9 @@ export default function WorksPage() {
   // 点击外部关闭菜单
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      // 关闭创建作品菜单
       if (createMenuRef.current && !createMenuRef.current.contains(event.target as Node)) {
         setShowCreateMenu(false);
       }
-      
-      // 关闭导出菜单
       Object.values(exportMenuRefs.current).forEach((ref) => {
         if (ref && !ref.contains(event.target as Node)) {
           setOpenExportMenuId(null);
@@ -112,11 +108,9 @@ export default function WorksPage() {
 
   // 处理删除作品
   const handleDeleteWork = async (workId: string) => {
-    // 查找作品信息以显示标题
     const workToDelete = works.find(w => String(w.id) === workId);
     const workTitle = workToDelete?.title || '这个作品';
-    
-    // 确认删除
+
     showMessage(
       `确定要删除作品《${workTitle}》吗？\n\n⚠️ 警告：此操作不可恢复！\n将永久删除作品及其所有章节、内容。`,
       'warning',
@@ -125,23 +119,15 @@ export default function WorksPage() {
         try {
           setLoading(true);
           setError(null);
-          
-          // 调用删除API
           await worksApi.deleteWork(workId);
-          
-          // 显示成功提示
           showToast(`作品《${workTitle}》已成功删除`);
-          
-          // 如果当前页只有这一个作品，且不是第一页，则返回上一页
           if (works.length === 1 && currentPage > 1) {
             setCurrentPage(prev => prev - 1);
           } else {
-            // 重新加载作品列表
             await loadWorks();
           }
         } catch (err) {
-          
-                    const errorMessage = err instanceof Error ? err.message : '删除作品失败，请稍后重试';
+          const errorMessage = err instanceof Error ? err.message : '删除作品失败，请稍后重试';
           setError(errorMessage);
           showMessage(parseError(err, `删除作品失败：${errorMessage}`), 'error', '删除失败');
         } finally {
@@ -153,57 +139,38 @@ export default function WorksPage() {
 
   // 处理菜单项点击
   const handleMenuAction = async (action: string, workId: string, format?: string) => {
-    
-    // 先执行操作，再关闭菜单，避免菜单关闭导致事件丢失
     try {
       switch (action) {
         case 'delete':
           await handleDeleteWork(workId);
           break;
         case 'export':
-          // 实现导出功能
           setLoading(true);
-          
-          
           try {
-            // 获取作品信息
-            
             const work = await worksApi.getWork(workId);
-            
-            
-            // 根据格式调用相应的导出函数
             if (format === 'text') {
-              
               await exportAsText(work);
-              
               showMessage(`✅ 导出成功！\n\n文件：${work.title}.txt\n\n文件已开始下载，请查看浏览器下载文件夹。`, 'success');
             } else if (format === 'word') {
-              
               await exportAsWord(work);
-              
               showMessage(`✅ 导出成功！\n\n文件：${work.title}.doc\n\n文件已开始下载，请查看浏览器下载文件夹。`, 'success');
             } else if (format === 'pdf') {
-              
               await exportAsPdf(work);
-              
               showMessage(`✅ 导出成功！\n\n正在打开打印对话框，请选择"另存为 PDF"保存文件。`, 'success');
             } else {
               showMessage('❌ 不支持的导出格式', 'error');
             }
           } catch (err) {
-            
             const errorMessage = err instanceof Error ? err.message : '导出失败，请稍后重试';
             showMessage(parseError(err, `导出失败：${errorMessage}`), 'error', '导出失败');
-            throw err; // 重新抛出错误，让调用者知道失败了
+            throw err;
           } finally {
             setLoading(false);
           }
           break;
         case 'copy-link':
           {
-            // 生成作品链接
             const workLink = `${window.location.origin}/novel/editor?workId=${workId}`;
-
             const success = await copyToClipboard(workLink);
             if (success) {
               showToast('链接已复制到剪贴板');
@@ -221,10 +188,9 @@ export default function WorksPage() {
           await handleConvertToDrama(workId);
           break;
         default:
-          
+          break;
       }
     } catch (err) {
-      
       showMessage(err instanceof Error ? err.message : '操作失败', 'error');
     }
   };
@@ -234,7 +200,6 @@ export default function WorksPage() {
     setConvertingId(workId);
     try {
       const novel = await worksApi.getWork(workId);
-      // 分页拉取全部章节（后端 size 上限 100）
       let allChapters: Awaited<ReturnType<typeof chaptersApi.listChapters>>['chapters'] = [];
       let chapPage = 1;
       let hasMore = true;
@@ -252,7 +217,6 @@ export default function WorksPage() {
         chapPage++;
       }
 
-      // 并发拉取每章正文内容
       const contentMap = new Map<number, string>();
       await Promise.allSettled(
         allChapters.map(async (ch) => {
@@ -263,7 +227,6 @@ export default function WorksPage() {
         })
       );
 
-      // 构建剧本 metadata
       const genId = () => Math.random().toString(36).slice(2, 10);
       const rawChars = (novel.metadata?.characters as Record<string, unknown>[] | undefined) || [];
       const characters = rawChars.map((c, i) => ({
@@ -296,7 +259,6 @@ export default function WorksPage() {
         sourceNovelTitle: novel.title,
       };
 
-      // 创建剧本作品
       const drama = await worksApi.createWork({
         title: `${novel.title}（剧本）`,
         work_type: 'video',
@@ -316,32 +278,19 @@ export default function WorksPage() {
   // 处理创建作品
   const handleCreateWork = async () => {
     try {
-      
       setLoading(true);
-      
       const workData = {
         title: '未命名作品',
-        work_type: 'long' as const, // 统一使用long作为默认类型
+        work_type: 'long' as const,
         is_public: false,
       };
-      
-      
-      
       const newWork = await worksApi.createWork(workData);
-      
-      
-      
       if (!newWork || !newWork.id) {
         throw new Error('创建作品成功，但未返回作品ID');
       }
-      
-      // 重新加载作品列表
       await loadWorks();
-      
-      // 跳转到编辑器
       navigate(`/novel/editor?workId=${newWork.id}`);
     } catch (err) {
-      
       const errorMessage = err instanceof Error ? err.message : '创建作品失败';
       showMessage(parseError(err), 'error', '创建失败');
       setError(errorMessage);
@@ -352,42 +301,55 @@ export default function WorksPage() {
 
   // 处理导入成功
   const handleImportSuccess = (_workId: string, _workTitle: string) => {
-    // 重新加载作品列表
     loadWorks();
     showToast(`导入成功：${_workTitle}`);
-    // 可选：跳转到作品页面
     navigate(`/novel/editor?workId=${_workId}`);
   };
 
+  const actionBtnClass = "flex items-center gap-1.5 px-4 py-2 border rounded text-sm font-medium cursor-pointer transition-all hover:[background:var(--bg-secondary)] hover:[border-color:var(--border-hover)]";
+  const actionBtnStyle = { background: 'var(--bg-primary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' };
+
   return (
-    <div className="works-page">
-      <div className="works-header">
-        <h1 className="works-title">我的作品</h1>
-          <div className="works-actions">
-          <button 
-            className="action-btn"
-            onClick={handleCreateWork}
-          >
+    <div
+      className="w-full min-h-[calc(100vh-62px)] p-6 [animation:fade-in_0.4s_ease-out] max-md:p-4"
+      style={{ background: 'var(--bg-primary)' }}
+    >
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6 max-md:flex-col max-md:items-start max-md:gap-4">
+        <h1 className="text-[28px] font-semibold m-0 tracking-[-0.5px]" style={{ color: 'var(--text-primary)' }}>我的作品</h1>
+        <div className="flex items-center gap-3 max-md:w-full max-md:flex-wrap">
+          <button className={actionBtnClass} style={actionBtnStyle} onClick={handleCreateWork}>
             <Plus size={16} />
             <span>创建作品</span>
           </button>
-          <button className="action-btn" onClick={() => setShowImportModal(true)}>
+          <button className={actionBtnClass} style={actionBtnStyle} onClick={() => setShowImportModal(true)}>
             <Upload size={16} />
             <span>导入作品</span>
           </button>
-          <button className="action-btn" onClick={() => setShowRecoveryModal(true)}>
+          <button className={actionBtnClass} style={actionBtnStyle} onClick={() => setShowRecoveryModal(true)}>
             <RefreshCw size={16} />
             <span>恢复作品</span>
           </button>
-          <div className="view-toggle">
+          {/* View toggle */}
+          <div className="flex gap-0.5 p-0.5 rounded ml-2" style={{ background: 'var(--bg-secondary)' }}>
             <button
-              className={`view-btn ${viewMode === 'grid' ? 'active' : ''}`}
+              className={cn(
+                'flex items-center justify-center w-8 h-8 border-none cursor-pointer rounded transition-all',
+                viewMode === 'grid'
+                  ? 'shadow-sm [background:var(--bg-primary)] [color:var(--text-primary)]'
+                  : 'bg-transparent [color:var(--text-tertiary)] hover:[color:var(--text-secondary)]'
+              )}
               onClick={() => setViewMode('grid')}
             >
               <Grid size={18} />
             </button>
             <button
-              className={`view-btn ${viewMode === 'list' ? 'active' : ''}`}
+              className={cn(
+                'flex items-center justify-center w-8 h-8 border-none cursor-pointer rounded transition-all',
+                viewMode === 'list'
+                  ? 'shadow-sm [background:var(--bg-primary)] [color:var(--text-primary)]'
+                  : 'bg-transparent [color:var(--text-tertiary)] hover:[color:var(--text-secondary)]'
+              )}
               onClick={() => setViewMode('list')}
             >
               <List size={18} />
@@ -396,61 +358,80 @@ export default function WorksPage() {
         </div>
       </div>
 
-
-      {loading && <div className="works-loading">加载中...</div>}
-      {error && <div className="works-error">错误: {error}</div>}
+      {loading && (
+        <div className="text-center py-8 text-sm" style={{ color: 'var(--text-tertiary)' }}>加载中...</div>
+      )}
+      {error && (
+        <div className="text-center py-8 text-sm" style={{ color: 'var(--error)' }}>错误: {error}</div>
+      )}
       {!loading && !error && (
-        <div className={`works-content ${viewMode}`}>
+        <div
+          className={cn(
+            'grid gap-6 mb-8',
+            viewMode === 'grid'
+              ? 'grid-cols-[repeat(auto-fill,minmax(280px,1fr))] max-md:grid-cols-1 max-md:gap-4'
+              : 'grid-cols-1'
+          )}
+        >
           {works.length === 0 ? (
-            <div className="works-empty">
-              <p>暂无作品</p>
-              <button className="action-btn" onClick={handleCreateWork}>
+            <div className="col-span-full text-center py-12">
+              <p className="mb-4" style={{ color: 'var(--text-secondary)' }}>暂无作品</p>
+              <button className={actionBtnClass} style={actionBtnStyle} onClick={handleCreateWork}>
                 <Plus size={16} />
                 <span>创建第一个作品</span>
               </button>
             </div>
           ) : (
             works.map((work) => (
-              <div 
-                key={work.id} 
-                className="work-card"
+              <div
+                key={work.id}
+                className="border rounded-xl p-4 cursor-pointer transition-colors hover:[border-color:var(--border-hover)] max-md:p-3"
+                style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-color)' }}
                 onClick={() => navigate(`/novel/editor?workId=${work.id}`)}
-                style={{ cursor: 'pointer' }}
               >
                 {work.cover_image ? (
-                  <div className="work-cover">
-                    <img src={work.cover_image} alt={work.title} />
+                  <div
+                    className="w-full h-[180px] mb-4 rounded overflow-hidden border max-md:h-[160px]"
+                    style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-light)' }}
+                  >
+                    <img src={work.cover_image} alt={work.title} className="w-full h-full object-cover" />
                   </div>
                 ) : (
-                  <div className="work-preview">
-                    <h3 className="work-card-title">{work.title}</h3>
+                  <div>
+                    <h3 className="text-base font-semibold m-0 mb-2" style={{ color: 'var(--text-primary)' }}>
+                      {work.title}
+                    </h3>
                     {work.description && (
-                      <p className="work-description">{work.description}</p>
+                      <p
+                        className="text-[13px] leading-[1.5] m-0 mb-4 line-clamp-2 h-10"
+                        style={{ color: 'var(--text-secondary)' }}
+                      >
+                        {work.description}
+                      </p>
                     )}
-                    <p className="work-date">{new Date(work.created_at).toLocaleString('zh-CN')}</p>
+                    <p className="text-xs m-0" style={{ color: 'var(--text-tertiary)' }}>
+                      {new Date(work.created_at).toLocaleString('zh-CN')}
+                    </p>
                   </div>
                 )}
-                <div 
-                  className="work-actions" 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    
-                  }}
-                  onMouseDown={(e) => {
-                    e.stopPropagation();
-                    
-                  }}
+                {/* Work actions */}
+                <div
+                  className="flex gap-2 pt-4 border-t mt-auto"
+                  style={{ borderColor: 'var(--border-light)' }}
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
                 >
-                  <div className="export-menu-wrapper" ref={(el) => { exportMenuRefs.current[String(work.id)] = el; }}>
+                  {/* Export menu */}
+                  <div className="relative" ref={(el) => { exportMenuRefs.current[String(work.id)] = el; }}>
                     <button
-                      className={`work-action-btn ${openExportMenuId === String(work.id) ? 'active' : ''}`}
+                      className={cn(
+                        'flex items-center justify-center gap-1 px-3 py-1.5 border border-transparent bg-transparent rounded text-xs cursor-pointer transition-all hover:[background:var(--bg-secondary)] hover:[color:var(--text-primary)]',
+                        openExportMenuId === String(work.id) ? '[background:var(--bg-secondary)] [color:var(--text-primary)]' : '[color:var(--text-secondary)]'
+                      )}
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        
-                        const newState = openExportMenuId === String(work.id) ? null : String(work.id);
-                        
-                        setOpenExportMenuId(newState);
+                        setOpenExportMenuId(openExportMenuId === String(work.id) ? null : String(work.id));
                       }}
                       title="导出作品"
                     >
@@ -458,79 +439,38 @@ export default function WorksPage() {
                       <ChevronDown size={14} />
                     </button>
                     {openExportMenuId === String(work.id) && (
-                      <div 
-                        className="export-menu"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          
-                        }}
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          
-                        }}
-                        onMouseEnter={() => {
-                          
-                        }}
-                        style={{ 
+                      <div
+                        className="absolute top-[calc(100%+4px)] left-0 border rounded py-1 min-w-[160px]"
+                        style={{
+                          background: 'var(--bg-primary)',
+                          borderColor: 'var(--border-color)',
+                          boxShadow: 'var(--shadow-md)',
                           pointerEvents: 'auto',
-                          zIndex: 1000
+                          zIndex: 1000,
                         }}
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                        onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
                       >
                         <button
-                          className="export-menu-item"
+                          className="flex items-center w-full gap-2 px-3 py-2 border-none bg-transparent text-sm text-left cursor-pointer rounded transition-colors hover:[background:var(--bg-secondary)] hover:[color:var(--text-primary)]"
+                          style={{ color: 'var(--text-secondary)' }}
                           type="button"
-                          onMouseDown={(e) => {
-                            
-                            e.preventDefault();
-                            e.stopPropagation();
-                          }}
-                          onMouseUp={(e) => {
-                            
-                            e.preventDefault();
-                            e.stopPropagation();
-                          }}
-                          onMouseEnter={() => {
-                            
-                          }}
-                          onMouseLeave={() => {
-                            
-                          }}
+                          onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
                           onClick={(e) => {
-                            
                             e.preventDefault();
                             e.stopPropagation();
-                            
-                            
-                            // 立即关闭菜单
                             setOpenExportMenuId(null);
-                            
-                            
-                            // 使用立即执行函数处理异步操作
                             (async () => {
                               try {
                                 setLoading(true);
-                                
-                                
-                                
-                                // 直接获取作品信息
                                 const workData = await worksApi.getWork(work.id);
-                                
-                                
-                                
                                 await exportAsText(workData);
-                                
-                                
                                 showMessage(`✅ 导出成功！\n\n文件：${workData.title}.txt\n\n文件已开始下载，请查看浏览器下载文件夹。`, 'success');
-                                
                               } catch (err) {
-                                
                                 const errorMsg = err instanceof Error ? err.message : '未知错误';
-                                                                showMessage(`❌ 导出失败\n\n错误：${errorMsg}\n\n请查看浏览器控制台（F12）获取更多信息。`, 'error');
+                                showMessage(`❌ 导出失败\n\n错误：${errorMsg}\n\n请查看浏览器控制台（F12）获取更多信息。`, 'error');
                               } finally {
                                 setLoading(false);
-                                
                               }
                             })();
                           }}
@@ -538,18 +478,15 @@ export default function WorksPage() {
                           导出为 Text
                         </button>
                         <button
-                          className="export-menu-item"
+                          className="flex items-center w-full gap-2 px-3 py-2 border-none bg-transparent text-sm text-left cursor-pointer rounded transition-colors hover:[background:var(--bg-secondary)] hover:[color:var(--text-primary)]"
+                          style={{ color: 'var(--text-secondary)' }}
                           onClick={async (e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            
                             setOpenExportMenuId(null);
                             try {
-                              
                               await handleMenuAction('export', String(work.id), 'word');
-                              
                             } catch (err) {
-                              
                               showMessage(`导出失败：${err instanceof Error ? err.message : '未知错误'}`, 'error');
                             }
                           }}
@@ -559,45 +496,34 @@ export default function WorksPage() {
                       </div>
                     )}
                   </div>
+
                   <button
-                    className="work-action-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleMenuAction('copy-link', String(work.id));
-                    }}
+                    className="flex items-center justify-center gap-1 px-3 py-1.5 border border-transparent bg-transparent rounded text-xs cursor-pointer transition-all hover:[background:var(--bg-secondary)] hover:[color:var(--text-primary)] [color:var(--text-secondary)]"
+                    onClick={(e) => { e.stopPropagation(); handleMenuAction('copy-link', String(work.id)); }}
                     title="复制链接"
                   >
                     <Link2 size={16} />
                   </button>
                   <button
-                    className="work-action-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShareWork(work);
-                    }}
+                    className="flex items-center justify-center gap-1 px-3 py-1.5 border border-transparent bg-transparent rounded text-xs cursor-pointer transition-all hover:[background:var(--bg-secondary)] hover:[color:var(--text-primary)] [color:var(--text-secondary)]"
+                    onClick={(e) => { e.stopPropagation(); setShareWork(work); }}
                     title="共享作品"
                   >
                     <Users size={16} />
                   </button>
                   <button
-                    className="work-action-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleMenuAction('convert-to-drama', String(work.id));
-                    }}
+                    className="flex items-center justify-center gap-1 px-3 py-1.5 border border-transparent bg-transparent rounded text-xs cursor-pointer transition-all hover:[background:var(--bg-secondary)] hover:[color:var(--text-primary)] [color:var(--text-secondary)] disabled:opacity-50"
+                    onClick={(e) => { e.stopPropagation(); handleMenuAction('convert-to-drama', String(work.id)); }}
                     title="转换为剧本"
                     disabled={convertingId === String(work.id)}
                   >
                     <Film size={16} />
                   </button>
                   <button
-                    className="work-action-btn danger"
+                    className="flex items-center justify-center gap-1 px-3 py-1.5 border border-transparent bg-transparent rounded text-xs cursor-pointer transition-all hover:bg-red-500/10 hover:text-red-400"
+                    style={{ color: 'var(--error)' }}
                     type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      handleDeleteWork(String(work.id));
-                    }}
+                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleDeleteWork(String(work.id)); }}
                     title="删除作品"
                   >
                     <Trash2 size={16} />
@@ -609,25 +535,34 @@ export default function WorksPage() {
         </div>
       )}
 
+      {/* Pagination */}
       {total > 0 && (
-        <div className="works-pagination">
-          <button 
-            className="pagination-btn" 
+        <div className="flex items-center gap-2 mt-6">
+          <button
+            className="px-3 py-1.5 border rounded text-sm cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed hover:[background:var(--bg-secondary)]"
+            style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)', background: 'var(--bg-primary)' }}
             disabled={currentPage === 1}
             onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
           >
             &lt;
           </button>
-          <button className="pagination-btn active">{currentPage}</button>
-          <button 
-            className="pagination-btn" 
+          <button
+            className="px-3 py-1.5 border rounded text-sm"
+            style={{ borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)', background: 'var(--bg-primary)' }}
+          >
+            {currentPage}
+          </button>
+          <button
+            className="px-3 py-1.5 border rounded text-sm cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed hover:[background:var(--bg-secondary)]"
+            style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)', background: 'var(--bg-primary)' }}
             disabled={currentPage * itemsPerPage >= total}
             onClick={() => setCurrentPage(prev => prev + 1)}
           >
             &gt;
           </button>
           <select
-            className="pagination-select"
+            className="px-2 py-1.5 border rounded text-sm cursor-pointer"
+            style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)', background: 'var(--bg-primary)' }}
             value={itemsPerPage}
             onChange={(e) => {
               setItemsPerPage(Number(e.target.value));
@@ -638,7 +573,7 @@ export default function WorksPage() {
             <option value={20}>20条/页</option>
             <option value={50}>50条/页</option>
           </select>
-          <span className="pagination-info">共 {total} 条</span>
+          <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>共 {total} 条</span>
         </div>
       )}
 
@@ -659,13 +594,11 @@ export default function WorksPage() {
         isOpen={showRecoveryModal}
         onClose={() => setShowRecoveryModal(false)}
         onSuccess={(workId) => {
-          // 恢复成功后，重新加载作品列表
           loadWorks();
-          // 可选：跳转到恢复的作品
           navigate(`/novel/editor?workId=${workId}`);
         }}
       />
-      
+
       <MessageModal
         isOpen={messageState.isOpen}
         onClose={closeMessage}

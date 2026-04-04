@@ -5,7 +5,6 @@ import type { ComponentType, ComponentConfig, TemplateConfig } from './types';
 import { DataDependenciesSelector } from './DataDependenciesSelector';
 import { promptTemplateApi } from '../../../utils/promptTemplateApi';
 
-import './ComponentEditorModal.css';
 
 /** 多选标签随机颜色池（区分度高、适合做标签背景） */
 const TAG_COLORS = [

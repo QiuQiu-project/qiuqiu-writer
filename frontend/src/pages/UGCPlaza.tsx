@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import './UGCPlaza.css';
 import SearchBar from '../components/ugc-plaza/SearchBar';
 import FilterBar from '../components/ugc-plaza/FilterBar';
 import ContentCard from '../components/ugc-plaza/ContentCard';
@@ -96,20 +95,61 @@ export default function UGCPlaza() {
   const allTags = Array.from(new Set(mockData.flatMap((item) => item.tags)));
 
   return (
-    <div className="ugc-plaza">
-      <div className="ugc-plaza-header">
-        <h1 className="plaza-title">内容广场</h1>
-        <p className="plaza-subtitle">发现优质内容，分享创作灵感</p>
+    <div
+      className="w-full min-h-[calc(100vh-64px)] flex flex-col relative [animation:fade-in_0.4s_ease-out]"
+      style={{ background: 'var(--bg-gradient-soft)' }}
+    >
+      {/* Header */}
+      <div
+        className="relative z-[1] px-8 pt-12 pb-8 border-b backdrop-blur-[10px] shadow-sm max-md:px-4 max-md:pt-6 max-md:pb-4"
+        style={{
+          background: 'linear-gradient(180deg,rgba(255,255,255,0.95) 0%,rgba(255,255,255,0.8) 100%)',
+          borderColor: 'var(--border-light)',
+        }}
+      >
+        <h1
+          className="text-[2.5rem] font-extrabold tracking-[-0.02em] mb-3 relative max-md:text-[1.75rem]"
+          style={{
+            background: 'var(--accent-gradient)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+          }}
+        >
+          内容广场
+          {/* Underline decoration */}
+          <span
+            className="absolute bottom-[-8px] left-0 w-[60px] h-1 rounded-full"
+            style={{ background: 'var(--accent-gradient)' }}
+          />
+        </h1>
+        <p className="text-lg font-medium mt-2" style={{ color: 'var(--text-secondary)' }}>
+          发现优质内容，分享创作灵感
+        </p>
       </div>
 
-      <div className="ugc-plaza-toolbar">
+      {/* Toolbar */}
+      <div
+        className="relative z-[1] flex justify-between items-center gap-4 px-8 py-6 border-b backdrop-blur-[10px] shadow-[0_1px_3px_rgba(0,0,0,0.05)] max-md:px-4 max-md:py-4 max-md:flex-col max-md:items-stretch"
+        style={{
+          background: 'rgba(255,255,255,0.8)',
+          borderColor: 'var(--border-light)',
+        }}
+      >
         <SearchBar value={searchQuery} onChange={setSearchQuery} />
-        <div className="toolbar-right">
+        <div className="flex gap-4 items-center max-md:justify-between max-md:w-full">
           <SortSelector value={sortBy} onChange={setSortBy} />
         </div>
       </div>
 
-      <div className="ugc-plaza-filters">
+      {/* Filters */}
+      <div
+        className="relative z-[1] px-8 py-6 border-b backdrop-blur-[10px] flex flex-col gap-5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] max-md:px-4 max-md:py-4"
+        style={{
+          background: 'rgba(255,255,255,0.6)',
+          borderColor: 'var(--border-light)',
+        }}
+      >
         <CategoryTags
           categories={categories}
           selected={selectedCategory}
@@ -122,18 +162,26 @@ export default function UGCPlaza() {
         />
       </div>
 
-      <div className="ugc-plaza-content">
+      {/* Content */}
+      <div className="relative z-[1] flex-1 p-10 overflow-y-auto max-md:p-4 max-sm:p-2">
         {filteredContent.length === 0 ? (
-          <div className="empty-state">
-            <p>暂无内容</p>
-            <p className="empty-hint">尝试调整筛选条件</p>
+          <div
+            className="flex flex-col items-center justify-center py-24 px-8 text-center rounded-xl border-2 border-dashed backdrop-blur-[10px]"
+            style={{
+              color: 'var(--text-secondary)',
+              background: 'rgba(255,255,255,0.5)',
+              borderColor: 'var(--border-color)',
+            }}
+          >
+            <p className="text-xl mb-3 font-semibold" style={{ color: 'var(--text-primary)' }}>暂无内容</p>
+            <p className="text-[0.9375rem] opacity-80" style={{ color: 'var(--text-secondary)' }}>尝试调整筛选条件</p>
           </div>
         ) : (
-          <div className="content-grid">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-8 max-w-[1400px] mx-auto [animation:fade-in-up_0.6s_ease-out] max-sm:grid-cols-1 max-sm:gap-6">
             {filteredContent.map((item, index) => (
-              <ContentCard 
-                key={item.id} 
-                content={item} 
+              <ContentCard
+                key={item.id}
+                content={item}
                 index={index}
               />
             ))}
@@ -143,4 +191,3 @@ export default function UGCPlaza() {
     </div>
   );
 }
-

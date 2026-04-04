@@ -5,7 +5,7 @@
 
 import { useState } from 'react';
 import { Star, MessageSquare, Check } from 'lucide-react';
-import './RatingWidget.css';
+import { cn } from '@/lib/utils';
 
 // 获取或生成匿名 session_id（存入 localStorage）
 function getSessionId(): string {
@@ -88,7 +88,7 @@ export default function RatingWidget({
 
   if (submitted) {
     return (
-      <div className="rating-widget rating-widget--done">
+      <div className="flex items-center gap-1 mt-2 px-2.5 py-1 rounded-[8px] text-xs border" style={{ color: 'var(--text-tertiary)', background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
         <Check size={13} />
         <span>感谢反馈</span>
       </div>
@@ -96,35 +96,48 @@ export default function RatingWidget({
   }
 
   return (
-    <div className="rating-widget">
-      <span className="rating-widget__label">对这次生成评分：</span>
-      <div className="rating-widget__stars">
-        {[1, 2, 3, 4, 5].map(star => (
-          <button
-            key={star}
-            className={`rating-star${star <= (hover || selected) ? ' active' : ''}`}
-            onMouseEnter={() => setHover(star)}
-            onMouseLeave={() => setHover(0)}
-            onClick={() => {
-              if (compact) {
-                submit(star);
-              } else {
-                setSelected(star);
-                setShowComment(true);
-              }
-            }}
-            disabled={submitting}
-            title={`${star} 星`}
-          >
-            <Star size={14} />
-          </button>
-        ))}
+    <div
+      className="flex items-center gap-1.5 mt-2 px-2.5 py-[5px] rounded-[8px] border flex-wrap"
+      style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}
+    >
+      <span className="text-[11px] whitespace-nowrap" style={{ color: 'var(--text-tertiary)' }}>
+        对这次生成评分：
+      </span>
+      <div className="flex gap-0.5">
+        {[1, 2, 3, 4, 5].map(star => {
+          const isActive = star <= (hover || selected);
+          return (
+            <button
+              key={star}
+              className={cn(
+                'bg-transparent border-none p-0.5 cursor-pointer transition-[color_0.12s,transform_0.1s] leading-none flex items-center disabled:opacity-50 disabled:cursor-not-allowed',
+                isActive ? 'text-amber-400 scale-[1.15] [&>svg]:fill-current' : ''
+              )}
+              style={{ color: isActive ? '#f59e0b' : 'var(--text-tertiary)' }}
+              onMouseEnter={() => setHover(star)}
+              onMouseLeave={() => setHover(0)}
+              onClick={() => {
+                if (compact) {
+                  submit(star);
+                } else {
+                  setSelected(star);
+                  setShowComment(true);
+                }
+              }}
+              disabled={submitting}
+              title={`${star} 星`}
+            >
+              <Star size={14} />
+            </button>
+          );
+        })}
       </div>
 
       {!compact && showComment && (
-        <div className="rating-widget__comment">
+        <div className="flex gap-1 items-center flex-1 min-w-[160px]">
           <input
-            className="rating-widget__input"
+            className="flex-1 h-[26px] px-2 rounded-[5px] border text-xs outline-none focus:[border-color:var(--accent-primary)]"
+            style={{ borderColor: 'var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
             placeholder="说说原因（可选）"
             value={comment}
             onChange={e => setComment(e.target.value)}
@@ -132,7 +145,12 @@ export default function RatingWidget({
             maxLength={200}
             autoFocus
           />
-          <button className="rating-widget__submit" onClick={submitWithComment} disabled={submitting}>
+          <button
+            className="w-[26px] h-[26px] rounded-[5px] border-none text-white cursor-pointer flex items-center justify-center shrink-0 hover:opacity-85"
+            style={{ background: 'var(--accent-primary)' }}
+            onClick={submitWithComment}
+            disabled={submitting}
+          >
             <Check size={13} />
           </button>
         </div>
@@ -140,7 +158,8 @@ export default function RatingWidget({
 
       {!compact && !showComment && (
         <button
-          className="rating-widget__comment-btn"
+          className="bg-transparent border-none cursor-pointer p-0.5 flex items-center hover:[color:var(--text-secondary)]"
+          style={{ color: 'var(--text-tertiary)' }}
           onClick={() => setShowComment(true)}
           title="添加评论"
         >

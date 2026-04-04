@@ -6,7 +6,6 @@
 import { useState } from 'react';
 import DraggableResizableModal from '../common/DraggableResizableModal';
 import { X, Download, Upload, GitMerge, AlertTriangle, Eye, EyeOff } from 'lucide-react';
-import './VersionConflictModal.css';
 
 export interface VersionConflictInfo {
   documentId: string;

@@ -15,13 +15,13 @@ import {
 import { authApi } from '../utils/authApi';
 import MessageModal from '../components/common/MessageModal';
 import type { MessageType } from '../components/common/MessageModal';
-import './HomePage.css';
+import { cn } from '@/lib/utils';
 
 export default function HomePage() {
   const navigate = useNavigate();
   const context = useOutletContext<{ setLoginModalOpen: (open: boolean) => void }>();
   const setLoginModalOpen = context?.setLoginModalOpen;
-  
+
   const isAuthenticated = authApi.isAuthenticated();
 
   const [messageState, setMessageState] = useState<{
@@ -90,42 +90,119 @@ export default function HomePage() {
   };
 
   return (
-    <div className="landing-page">
-      {/* 装饰性背景光晕 */}
-      <div className="bg-orbs" aria-hidden="true">
-        <div className="orb orb-1" />
-        <div className="orb orb-2" />
-        <div className="orb orb-3" />
+    <div className="landing-bg w-full min-h-[calc(100vh-60px)] relative overflow-x-hidden antialiased" style={{ color: 'var(--text-primary)' }}>
+
+      {/* Animated Background Orbs */}
+      <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden" aria-hidden="true">
+        <div
+          className="absolute rounded-full blur-[90px] opacity-[0.18] w-[700px] h-[700px] -top-[180px] -left-[140px]"
+          style={{
+            background: 'radial-gradient(circle, var(--orb-1-color, rgba(59,130,246,0.5)), transparent 70%)',
+            animation: 'orb-float 26s ease-in-out infinite',
+          }}
+        />
+        <div
+          className="absolute rounded-full blur-[90px] opacity-[0.14] w-[550px] h-[550px] bottom-[80px] -right-[120px]"
+          style={{
+            background: 'radial-gradient(circle, var(--orb-2-color, rgba(99,102,241,0.55)), transparent 70%)',
+            animation: 'orb-float 20s ease-in-out infinite',
+            animationDelay: '-9s',
+          }}
+        />
+        <div
+          className="absolute rounded-full blur-[90px] opacity-[0.10] w-[420px] h-[420px] top-[38%] left-[45%]"
+          style={{
+            background: 'radial-gradient(circle, var(--orb-3-color, rgba(14,165,233,0.45)), transparent 70%)',
+            animation: 'orb-float 16s ease-in-out infinite',
+            animationDelay: '-5s',
+          }}
+        />
       </div>
 
       {/* Hero Section */}
-      <section className="hero-section">
-        <div className="hero-content">
-          <div className="hero-badge">
+      <section className="relative z-[1] max-w-[1200px] mx-auto px-10 py-[120px] pb-[110px] flex items-center justify-center min-h-[calc(100vh-60px)] text-center max-md:px-6 max-md:py-20 max-md:min-h-auto max-sm:px-4 max-sm:py-[60px]">
+        <div className="max-w-[820px] flex flex-col items-center">
+
+          {/* Badge */}
+          <div
+            className="inline-flex items-center gap-[7px] px-[18px] py-1.5 rounded-full text-[13px] font-medium tracking-[0.04em] backdrop-blur-sm mb-9"
+            style={{
+              background: 'var(--hero-badge-bg)',
+              border: '1px solid var(--hero-badge-border)',
+              color: 'var(--hero-badge-color)',
+              animation: 'fade-in-down 0.65s cubic-bezier(0.16, 1, 0.3, 1) both',
+            }}
+          >
             <Sparkles size={13} />
             <span>AI 驱动的智能写作平台</span>
           </div>
 
-          <h1 className="hero-title">
-            <span className="hero-title-main">球球写作</span>
-            <span className="hero-subtitle">让创作更简单，让故事更精彩</span>
+          {/* Title */}
+          <h1
+            className="flex flex-col gap-2.5 mb-7 text-[clamp(52px,9vw,88px)] font-extrabold leading-[1.04] tracking-[-0.045em]"
+            style={{ animation: 'fade-in-up 0.7s 0.1s cubic-bezier(0.16, 1, 0.3, 1) both' }}
+          >
+            <span
+              className="bg-clip-text text-transparent"
+              style={{ backgroundImage: 'var(--hero-title-gradient)' }}
+            >
+              球球写作
+            </span>
+            <span
+              className="text-[clamp(20px,3.2vw,30px)] font-normal tracking-[-0.015em]"
+              style={{ color: 'var(--hero-subtitle-color)' }}
+            >
+              让创作更简单，让故事更精彩
+            </span>
           </h1>
 
-          <p className="hero-description">
+          {/* Description */}
+          <p
+            className="text-[clamp(15px,1.8vw,18px)] leading-[1.8] mb-[52px] max-w-[580px] max-md:mb-10"
+            style={{
+              color: 'var(--text-tertiary)',
+              animation: 'fade-in-up 0.7s 0.2s cubic-bezier(0.16, 1, 0.3, 1) both',
+            }}
+          >
             专业的 AI 写作助手，帮助你从灵感到成稿，轻松完成每一部作品。
             无论你想写什么，球球写作都是你最好的创作伙伴。
           </p>
 
-          <div className="hero-actions">
+          {/* Action Buttons */}
+          <div
+            className="flex gap-3.5 flex-wrap justify-center max-md:flex-col max-md:w-full max-md:max-w-[300px]"
+            style={{ animation: 'fade-in-up 0.7s 0.3s cubic-bezier(0.16, 1, 0.3, 1) both' }}
+          >
             <button
-              className="btn-primary"
               onClick={handleGetStarted}
+              className={cn(
+                'inline-flex items-center gap-2 px-[34px] py-[15px] rounded-full text-[15px] font-semibold tracking-[0.01em] cursor-pointer border-0 text-white',
+                'transition-all duration-[280ms] ease-[cubic-bezier(0.4,0,0.2,1)]',
+                'bg-gradient-to-br from-blue-500 to-blue-600',
+                'shadow-[0_4px_28px_rgba(59,130,246,0.38),0_1px_3px_rgba(0,0,0,0.3)]',
+                'hover:from-blue-400 hover:to-blue-500 hover:-translate-y-0.5',
+                'hover:shadow-[0_8px_36px_rgba(59,130,246,0.5),0_2px_6px_rgba(0,0,0,0.25)]',
+                'active:translate-y-0 active:shadow-[0_4px_18px_rgba(59,130,246,0.3)]',
+                'disabled:opacity-60 disabled:cursor-not-allowed',
+                'max-md:w-full max-md:justify-center',
+              )}
             >
               开始创作
               <ArrowRight size={17} />
             </button>
             {!isAuthenticated && (
-              <button className="btn-secondary" onClick={() => navigate('/')}>
+              <button
+                onClick={() => navigate('/')}
+                className={cn(
+                  'inline-flex items-center gap-2 px-[34px] py-[15px] rounded-full text-[15px] font-medium tracking-[0.01em] cursor-pointer',
+                  'transition-all duration-[280ms] ease-[cubic-bezier(0.4,0,0.2,1)]',
+                  'backdrop-blur-md border border-white/[0.12]',
+                  'bg-white/[0.06] text-[color:var(--text-secondary)]',
+                  'hover:bg-white/[0.10] hover:border-white/[0.22] hover:text-[color:var(--text-primary)] hover:-translate-y-0.5',
+                  'hover:shadow-[0_6px_24px_rgba(0,0,0,0.15)]',
+                  'max-md:w-full max-md:justify-center',
+                )}
+              >
                 了解更多
               </button>
             )}
@@ -134,21 +211,64 @@ export default function HomePage() {
       </section>
 
       {/* Features Section */}
-      <section className="features-section">
-        <div className="section-container">
-          <div className="section-header">
-            <span className="section-label">核心功能</span>
-            <h2 className="section-title">为什么选择球球写作？</h2>
-            <p className="section-description">
+      <section className="relative z-[1] py-[100px] px-10 max-md:py-[70px] max-md:px-6 max-sm:py-14 max-sm:px-4">
+        <div className="max-w-[1200px] mx-auto">
+          <div className="text-center mb-16 max-sm:mb-10">
+            <span
+              className="inline-block text-[11px] font-bold tracking-[0.12em] uppercase mb-[18px] opacity-90"
+              style={{ color: 'var(--section-label-color)' }}
+            >
+              核心功能
+            </span>
+            <h2
+              className="text-[clamp(28px,4vw,44px)] font-bold tracking-[-0.025em] leading-[1.15] mb-[18px]"
+              style={{ color: 'var(--section-title-color)' }}
+            >
+              为什么选择球球写作？
+            </h2>
+            <p className="text-base mx-auto leading-[1.75] max-w-[480px]" style={{ color: 'var(--text-tertiary)' }}>
               我们提供全方位的创作支持，让你的创作之旅更加顺畅
             </p>
           </div>
-          <div className="features-grid">
+
+          <div className="grid grid-cols-3 gap-5 max-lg:grid-cols-2 max-sm:grid-cols-1 max-sm:gap-4">
             {features.map((feature, index) => (
-              <div key={index} className="feature-card">
-                <div className="feature-icon">{feature.icon}</div>
-                <h3 className="feature-title">{feature.title}</h3>
-                <p className="feature-description">{feature.description}</p>
+              <div
+                key={index}
+                className={cn(
+                  'p-8 backdrop-blur-xl border rounded-[20px] relative overflow-hidden group',
+                  'transition-all duration-[320ms] ease-[cubic-bezier(0.4,0,0.2,1)]',
+                  'hover:-translate-y-[7px]',
+                  'hover:shadow-[0_24px_60px_rgba(0,0,0,0.2),0_0_0_1px_rgba(59,130,246,0.12)]',
+                  'max-md:p-7 max-sm:p-6',
+                )}
+                style={{
+                  background: 'var(--glass-bg)',
+                  borderColor: 'var(--glass-border)',
+                  animation: `fade-in-up 0.6s ${0.05 + Math.floor(index / 3) * 0.07 + (index % 3) * 0.07}s cubic-bezier(0.16, 1, 0.3, 1) both`,
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = 'var(--glass-bg-hover)'; (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--accent-primary)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = 'var(--glass-bg)'; (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--glass-border)'; }}
+              >
+                {/* Hover glow overlay */}
+                <div className="absolute inset-0 rounded-[20px] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-[320ms] bg-gradient-to-br from-blue-500/[0.06] to-transparent" />
+
+                <div
+                  className="w-[50px] h-[50px] flex items-center justify-center rounded-[13px] border mb-[22px] flex-shrink-0 relative z-[1] transition-all duration-300 group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(59,130,246,0.2)]"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(59,130,246,0.18) 0%, rgba(99,102,241,0.13) 100%)',
+                    borderColor: 'rgba(59,130,246,0.24)',
+                    color: 'var(--accent-primary)',
+                  }}
+                >
+                  {feature.icon}
+                </div>
+                <h3 className="text-[17px] font-semibold tracking-[-0.01em] mb-2.5 relative z-[1]" style={{ color: 'var(--feature-title-color)' }}>
+                  {feature.title}
+                </h3>
+                <p className="text-sm leading-[1.72] relative z-[1]" style={{ color: 'var(--text-tertiary)' }}>
+                  {feature.description}
+                </p>
               </div>
             ))}
           </div>
@@ -156,59 +276,117 @@ export default function HomePage() {
       </section>
 
       {/* Use Cases Section */}
-      <section className="use-cases-section">
-        <div className="section-container">
-          <div className="section-header">
-            <span className="section-label">应用场景</span>
-            <h2 className="section-title">适用于各类创作需求</h2>
-            <p className="section-description">
+      <section className="relative z-[1] pt-5 px-10 pb-[100px] max-md:py-[70px] max-md:px-6 max-sm:py-14 max-sm:px-4">
+        <div className="max-w-[1200px] mx-auto">
+          <div className="text-center mb-16 max-sm:mb-10">
+            <span
+              className="inline-block text-[11px] font-bold tracking-[0.12em] uppercase mb-[18px] opacity-90"
+              style={{ color: 'var(--section-label-color)' }}
+            >
+              应用场景
+            </span>
+            <h2
+              className="text-[clamp(28px,4vw,44px)] font-bold tracking-[-0.025em] leading-[1.15] mb-[18px]"
+              style={{ color: 'var(--section-title-color)' }}
+            >
+              适用于各类创作需求
+            </h2>
+            <p className="text-base mx-auto leading-[1.75] max-w-[480px]" style={{ color: 'var(--text-tertiary)' }}>
               无论你是专业作家还是写作爱好者，球球写作都能满足你的需求
             </p>
           </div>
-          <div className="use-cases-grid">
-            <div className="use-case-card">
-              <BookOpen size={32} className="use-case-icon" />
-              <h3 className="use-case-title">创作管理</h3>
-              <ul className="use-case-list">
-                <li><Check size={15} /> 章节结构管理</li>
-                <li><Check size={15} /> 角色关系梳理</li>
-                <li><Check size={15} /> 情节大纲规划</li>
-                <li><Check size={15} /> 自动保存功能</li>
-              </ul>
-            </div>
-            <div className="use-case-card">
-              <FileText size={32} className="use-case-icon" />
-              <h3 className="use-case-title">内容编辑</h3>
-              <ul className="use-case-list">
-                <li><Check size={15} /> 富文本编辑</li>
-                <li><Check size={15} /> Markdown 支持</li>
-                <li><Check size={15} /> 实时预览</li>
-                <li><Check size={15} /> 格式自动调整</li>
-              </ul>
-            </div>
-            <div className="use-case-card">
-              <Users size={32} className="use-case-icon" />
-              <h3 className="use-case-title">团队协作</h3>
-              <ul className="use-case-list">
-                <li><Check size={15} /> 多人实时编辑</li>
-                <li><Check size={15} /> 版本历史管理</li>
-                <li><Check size={15} /> 评论批注功能</li>
-                <li><Check size={15} /> 权限精细控制</li>
-              </ul>
-            </div>
+
+          <div className="grid grid-cols-3 gap-6 max-lg:grid-cols-2 max-sm:grid-cols-1 max-sm:gap-[18px]">
+            {[
+              {
+                icon: <BookOpen size={32} />,
+                title: '创作管理',
+                items: ['章节结构管理', '角色关系梳理', '情节大纲规划', '自动保存功能'],
+              },
+              {
+                icon: <FileText size={32} />,
+                title: '内容编辑',
+                items: ['富文本编辑', 'Markdown 支持', '实时预览', '格式自动调整'],
+              },
+              {
+                icon: <Users size={32} />,
+                title: '团队协作',
+                items: ['多人实时编辑', '版本历史管理', '评论批注功能', '权限精细控制'],
+              },
+            ].map((uc, i) => (
+              <div
+                key={i}
+                className={cn(
+                  'px-9 py-10 backdrop-blur-xl border rounded-[24px] relative overflow-hidden group',
+                  'transition-all duration-[320ms] ease-[cubic-bezier(0.4,0,0.2,1)]',
+                  'hover:-translate-y-2 hover:shadow-[0_28px_64px_rgba(0,0,0,0.2)]',
+                  'max-md:px-7 max-md:py-8 max-sm:px-6 max-sm:py-7',
+                )}
+                style={{
+                  background: 'var(--glass-bg)',
+                  borderColor: 'var(--glass-border)',
+                  animation: `fade-in-up 0.6s ${0.1 + i * 0.08}s cubic-bezier(0.16, 1, 0.3, 1) both`,
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = 'var(--glass-bg-hover)'; (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--glass-border-hover)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = 'var(--glass-bg)'; (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--glass-border)'; }}
+              >
+                {/* Bottom accent line on hover */}
+                <div className="absolute bottom-0 left-[20%] right-[20%] h-px opacity-0 group-hover:opacity-100 transition-opacity duration-[320ms]"
+                  style={{ background: 'linear-gradient(90deg, transparent, var(--accent-primary), transparent)' }} />
+
+                <div className="mb-6 transition-all duration-300 group-hover:scale-[1.08] group-hover:[filter:drop-shadow(0_0_12px_rgba(59,130,246,0.4))]"
+                  style={{ color: 'var(--accent-primary)', opacity: 0.85 }}>
+                  {uc.icon}
+                </div>
+                <h3 className="text-[22px] font-bold tracking-[-0.025em] mb-[22px]" style={{ color: 'var(--feature-title-color)' }}>
+                  {uc.title}
+                </h3>
+                <ul className="flex flex-col gap-[11px] list-none p-0 m-0">
+                  {uc.items.map(item => (
+                    <li key={item} className="flex items-center gap-2.5 text-sm leading-[1.5]" style={{ color: 'var(--text-tertiary)' }}>
+                      <Check size={15} className="text-emerald-400 shrink-0" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
       {/* Bottom CTA */}
-      <section className="cta-section">
-        <div className="cta-inner">
-          <div className="cta-glow" aria-hidden="true" />
-          <h2 className="cta-title">立即开启你的创作之旅</h2>
-          <p className="cta-desc">加入创作者社区，用 AI 助力你的每一个故事</p>
+      <section className="relative z-[1] pt-[60px] px-10 pb-[100px] max-md:pt-10 max-md:px-6 max-md:pb-[70px] max-sm:pt-[30px] max-sm:px-4 max-sm:pb-[60px]">
+        <div
+          className="max-w-[680px] mx-auto text-center px-12 py-[72px] backdrop-blur-xl border rounded-[32px] relative overflow-hidden shadow-[0_32px_80px_rgba(0,0,0,0.15)] max-md:px-7 max-md:py-12 max-md:rounded-[24px]"
+          style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-border)' }}
+        >
+          {/* Top glow */}
+          <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-[400px] h-[200px] pointer-events-none"
+            style={{ background: 'radial-gradient(ellipse, rgba(59,130,246,0.2), transparent 70%)' }}
+            aria-hidden="true"
+          />
+
+          <h2
+            className="text-[clamp(26px,3.5vw,38px)] font-bold tracking-[-0.03em] leading-[1.2] mb-4"
+            style={{ color: 'var(--cta-title-color)' }}
+          >
+            立即开启你的创作之旅
+          </h2>
+          <p className="text-base leading-[1.6] mb-10" style={{ color: 'var(--text-tertiary)' }}>
+            加入创作者社区，用 AI 助力你的每一个故事
+          </p>
           <button
-            className="btn-primary cta-btn"
             onClick={handleGetStarted}
+            className={cn(
+              'inline-flex items-center gap-2 px-10 py-4 rounded-full text-[16px] font-semibold tracking-[0.01em] cursor-pointer border-0 text-white',
+              'transition-all duration-[280ms] ease-[cubic-bezier(0.4,0,0.2,1)]',
+              'bg-gradient-to-br from-blue-500 to-blue-600',
+              'shadow-[0_4px_28px_rgba(59,130,246,0.38),0_1px_3px_rgba(0,0,0,0.3)]',
+              'hover:from-blue-400 hover:to-blue-500 hover:-translate-y-0.5',
+              'hover:shadow-[0_8px_36px_rgba(59,130,246,0.5)]',
+              'active:translate-y-0 disabled:opacity-60 disabled:cursor-not-allowed',
+            )}
           >
             免费开始创作
             <ArrowRight size={17} />

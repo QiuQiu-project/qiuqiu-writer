@@ -1,6 +1,6 @@
 import { Home, BookOpen } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
-import './HomeSideNav.css';
+import { cn } from '@/lib/utils';
 
 const navItems = [
   { id: 'home', label: '首页', icon: Home, path: '/home' },
@@ -11,12 +11,23 @@ export default function HomeSideNav() {
   const location = useLocation();
 
   return (
-    <aside className="home-side-nav">
-      <div className="nav-logo">
-        <img src="/favicon.png" alt="Logo" className="planet-icon" />
-        <span className="logo-text">球球写作</span>
+    <aside
+      className="w-[220px] border-r flex flex-col py-6 h-[calc(100vh-64px)] overflow-y-auto sticky top-16"
+      style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-light)' }}
+    >
+      <div
+        className="flex items-center gap-2 px-5 pb-6 border-b mb-4"
+        style={{ borderColor: 'var(--border-light)' }}
+      >
+        <img src="/favicon.png" alt="Logo" className="w-8 h-8 object-contain" data-no-lightbox />
+        <span
+          className="text-lg font-bold bg-clip-text text-transparent"
+          style={{ backgroundImage: 'var(--accent-gradient)' }}
+        >
+          球球写作
+        </span>
       </div>
-      <nav className="nav-menu">
+      <nav className="flex flex-col gap-1 px-3">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
@@ -24,11 +35,18 @@ export default function HomeSideNav() {
             <Link
               key={item.id}
               to={item.path}
-              className={`nav-item ${isActive ? 'active' : ''}`}
+              className={cn(
+                'flex items-center gap-3 px-4 py-3 rounded-lg text-sm no-underline transition-all duration-200',
+                isActive ? 'font-semibold' : 'hover:[background:var(--bg-secondary)] hover:[color:var(--text-primary)]',
+              )}
+              style={
+                isActive
+                  ? { background: 'var(--accent-light)', color: 'var(--accent-primary)' }
+                  : { color: 'var(--text-secondary)' }
+              }
             >
-              <Icon size={18} />
+              <Icon size={18} className="shrink-0" />
               <span>{item.label}</span>
-              {/* 如果以后需要 badge，可以给 navItems 增加 badge 字段并扩展类型 */}
             </Link>
           );
         })}
@@ -36,4 +54,3 @@ export default function HomeSideNav() {
     </aside>
   );
 }
-

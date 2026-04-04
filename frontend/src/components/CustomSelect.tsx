@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
-import './CustomSelect.css';
+import { cn } from '@/lib/utils';
 
 export interface SelectOption {
   value: string;
@@ -78,7 +78,6 @@ export default function CustomSelect({
   };
 
   const selectedOption = options.find(opt => opt.value === value);
-  // 有选中项用 label；没有匹配项但 value 有值（如历史数据或 options 未加载）时显示 value，否则显示 placeholder
   const displayText = selectedOption ? selectedOption.label : (value ? String(value) : placeholder);
   const isEmpty = !value;
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -88,19 +87,16 @@ export default function CustomSelect({
     if (isOpen && selectRef.current && dropdownRef.current) {
       const triggerRect = selectRef.current.getBoundingClientRect();
       const dropdown = dropdownRef.current;
-      
-      // 计算位置
+
       dropdown.style.top = `${triggerRect.bottom + window.scrollY + 4}px`;
       dropdown.style.left = `${triggerRect.left + window.scrollX}px`;
       dropdown.style.width = `${triggerRect.width}px`;
-      
-      // 检查是否需要向上展开
+
       const spaceBelow = window.innerHeight - triggerRect.bottom;
       const spaceAbove = triggerRect.top;
       const dropdownHeight = Math.min(300, options.length * 40 + 8);
-      
+
       if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
-        // 向上展开
         dropdown.style.top = `${triggerRect.top + window.scrollY - dropdownHeight - 4}px`;
         dropdown.style.bottom = 'auto';
       }
@@ -111,54 +107,78 @@ export default function CustomSelect({
     <div
       ref={selectRef}
       id={id}
-      className={`custom-select ${isOpen ? 'open' : ''} ${disabled ? 'disabled' : ''} ${fullWidth ? 'full-width' : ''} ${className}`}
+      className={cn(
+        'relative inline-block min-w-[120px]',
+        fullWidth && 'w-full',
+        disabled && 'opacity-60 cursor-not-allowed pointer-events-none',
+        className
+      )}
       onKeyDown={handleKeyDown}
       tabIndex={disabled ? -1 : 0}
     >
       <button
         type="button"
-        className="custom-select-trigger"
+        className="w-full flex items-center justify-between gap-2 px-3 py-2 border rounded-[8px] text-sm font-[inherit] cursor-pointer transition-all min-h-9 box-border text-left hover:[border-color:var(--accent-primary)] hover:[background:var(--bg-secondary)] focus:outline-none focus:[border-color:var(--accent-primary)] focus:shadow-[0_0_0_3px_var(--accent-light)] disabled:cursor-not-allowed disabled:opacity-60 max-md:px-3.5 max-md:py-2.5 max-md:text-base max-md:min-h-11"
+        style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
       >
-        <span className={`custom-select-value ${isEmpty ? 'placeholder' : ''}`}>
+        <span
+          className="flex-1 whitespace-nowrap overflow-hidden text-ellipsis"
+          style={{ color: isEmpty ? 'var(--text-tertiary)' : 'var(--text-primary)' }}
+        >
           {displayText}
         </span>
         <ChevronDown
           size={16}
-          className={`custom-select-arrow ${isOpen ? 'open' : ''}`}
+          className={cn('shrink-0 transition-transform duration-200', isOpen && 'rotate-180')}
+          style={{ color: 'var(--text-secondary)' }}
         />
       </button>
-      
+
       {isOpen && (
-        <div 
+        <div
           ref={dropdownRef}
-          className="custom-select-dropdown"
+          className="custom-select-dropdown fixed border rounded-[8px] z-[10010] overflow-hidden [animation:slide-down_0.2s_ease-out] max-h-[300px] overflow-y-auto min-w-[120px] max-md:max-h-[50vh]"
+          style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-light)', boxShadow: 'var(--shadow-md)' }}
         >
-          <div className="custom-select-options">
-            {options.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                className={`custom-select-option ${value === option.value ? 'selected' : ''} ${option.disabled ? 'disabled' : ''}`}
-                onClick={() => {
-                  if (!option.disabled) {
-                    onChange(option.value);
-                    setIsOpen(false);
+          <div className="p-1">
+            {options.map((option) => {
+              const isSelected = value === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={cn(
+                    'w-full flex items-center justify-between gap-2 px-3 py-2.5 bg-transparent border-none rounded-[6px] text-sm font-[inherit] text-left cursor-pointer transition-all min-h-10 box-border max-md:px-3.5 max-md:py-3 max-md:text-base max-md:min-h-12',
+                    isSelected
+                      ? 'font-medium'
+                      : 'hover:[background:var(--bg-secondary)]',
+                    option.disabled && 'opacity-50 cursor-not-allowed pointer-events-none'
+                  )}
+                  style={
+                    isSelected
+                      ? { background: 'var(--accent-light)', color: 'var(--accent-primary)' }
+                      : { color: 'var(--text-primary)' }
                   }
-                }}
-                disabled={option.disabled}
-              >
-                <span className="option-label">{option.label}</span>
-                {value === option.value && (
-                  <Check size={16} className="option-check" />
-                )}
-              </button>
-            ))}
+                  onClick={() => {
+                    if (!option.disabled) {
+                      onChange(option.value);
+                      setIsOpen(false);
+                    }
+                  }}
+                  disabled={option.disabled}
+                >
+                  <span className="flex-1 whitespace-nowrap overflow-hidden text-ellipsis">{option.label}</span>
+                  {isSelected && (
+                    <Check size={16} className="shrink-0" style={{ color: 'var(--accent-primary)' }} />
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
     </div>
   );
 }
-

@@ -5,7 +5,6 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { X, ZoomIn, ZoomOut } from 'lucide-react';
-import './ImageLightbox.css';
 
 interface LightboxState {
   src: string;
@@ -69,33 +68,61 @@ export default function ImageLightbox() {
   if (!lightbox) return null;
 
   return (
-    <div className="lb-overlay" onClick={close}>
+    <div
+      className="fixed inset-0 z-[99999] flex items-center justify-center cursor-zoom-out backdrop-blur-[6px] [animation:lb-fade-in_0.15s_ease]"
+      style={{ background: 'rgba(0,0,0,0.92)' }}
+      onClick={close}
+    >
       {/* 工具栏 */}
-      <div className="lb-toolbar" onClick={e => e.stopPropagation()}>
-        <button className="lb-btn" onClick={() => setScale(s => Math.min(4, s + 0.25))} title="放大">
-          <ZoomIn size={16} />
-        </button>
-        <button className="lb-btn" onClick={() => setScale(s => Math.max(0.25, s - 0.25))} title="缩小">
-          <ZoomOut size={16} />
-        </button>
-        <button className="lb-btn" onClick={close} title="关闭 (Esc)">
-          <X size={16} />
-        </button>
+      <div
+        className="fixed top-4 right-4 flex items-center gap-1.5 z-[100000]"
+        onClick={e => e.stopPropagation()}
+      >
+        {[
+          { icon: ZoomIn, label: '放大', action: () => setScale(s => Math.min(4, s + 0.25)) },
+          { icon: ZoomOut, label: '缩小', action: () => setScale(s => Math.max(0.25, s - 0.25)) },
+          { icon: X, label: '关闭 (Esc)', action: close },
+        ].map(({ icon: Icon, label, action }) => (
+          <button
+            key={label}
+            className="w-[34px] h-[34px] rounded-[8px] border cursor-pointer flex items-center justify-center transition-[background_0.15s,border-color_0.15s] backdrop-blur-[8px] hover:border-white/30 hover:text-white"
+            style={{
+              borderColor: 'rgba(255,255,255,0.18)',
+              background: 'rgba(0,0,0,0.55)',
+              color: 'rgba(255,255,255,0.85)',
+            }}
+            onClick={action}
+            title={label}
+          >
+            <Icon size={16} />
+          </button>
+        ))}
       </div>
 
       {/* 图片 */}
-      <div className="lb-content" onClick={e => e.stopPropagation()}>
+      <div
+        className="max-w-[96vw] max-h-[92vh] flex items-center justify-center cursor-default overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
         <img
           src={lightbox.src}
           alt={lightbox.alt}
-          className="lb-img"
-          style={{ transform: `scale(${scale})` }}
+          className="max-w-[96vw] max-h-[92vh] object-contain rounded-[6px] select-none transition-transform duration-200 [transform-origin:center_center] [animation:lb-img-in_0.2s_ease]"
+          style={{
+            transform: `scale(${scale})`,
+            boxShadow: '0 8px 60px rgba(0,0,0,0.6)',
+          }}
           draggable={false}
         />
       </div>
 
       {/* 提示 */}
-      <div className="lb-hint">滚轮缩放 · 点击空白处关闭</div>
+      <div
+        className="fixed bottom-5 left-1/2 -translate-x-1/2 text-[11px] whitespace-nowrap pointer-events-none tracking-[0.04em]"
+        style={{ color: 'rgba(255,255,255,0.3)' }}
+      >
+        滚轮缩放 · 点击空白处关闭
+      </div>
     </div>
   );
 }

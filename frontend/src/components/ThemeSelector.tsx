@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, Palette } from 'lucide-react';
 import { themes, getCurrentTheme, applyTheme } from '../utils/theme';
-import './ThemeSelector.css';
+import { cn } from '@/lib/utils';
 
 interface ThemeSelectorProps {
   onClose?: () => void;
@@ -75,35 +75,40 @@ export default function ThemeSelector({ onClose }: ThemeSelectorProps) {
   };
 
   const renderThemeList = () => (
-    <div className="theme-list">
+    <div className="flex max-h-[400px] flex-col gap-1 overflow-y-auto p-2">
       {themes.map((theme) => (
         <button
           key={theme.id}
           type="button"
-          className={`theme-item ${currentThemeId === theme.id ? 'active' : ''}`}
+          className={cn(
+            'flex w-full cursor-pointer items-center justify-between rounded-md border px-3 py-2.5 text-left transition-all hover:border-primary/60 hover:bg-muted/50 hover:translate-x-0.5',
+            currentThemeId === theme.id
+              ? 'border-primary/60 bg-primary/10'
+              : 'border-border bg-background'
+          )}
           onClick={() => handleThemeChange(theme.id)}
         >
-          <div className="theme-preview">
+          <div className="flex flex-1 items-center gap-3">
             <div
-              className="theme-color-preview"
+              className="h-10 w-10 shrink-0 rounded-md border border-border"
               style={{ background: theme.previewGradient }}
             />
-            <div className="theme-info">
-              <span className="theme-name">{theme.name}</span>
-              <div className="theme-colors">
+            <div className="flex flex-1 flex-col gap-1.5">
+              <span className="text-sm font-medium text-foreground">{theme.name}</span>
+              <div className="flex items-center gap-1.5">
                 <span
-                  className="theme-color-dot"
+                  className="h-3 w-3 shrink-0 rounded-full border border-border"
                   style={{ backgroundColor: theme.previewAccent }}
                 />
                 <span
-                  className="theme-color-dot"
+                  className="h-3 w-3 shrink-0 rounded-full border border-border"
                   style={{ backgroundColor: theme.previewText }}
                 />
               </div>
             </div>
           </div>
           {currentThemeId === theme.id && (
-            <Check size={16} className="theme-check" />
+            <Check size={16} className="shrink-0 text-primary" />
           )}
         </button>
       ))}
@@ -113,7 +118,7 @@ export default function ThemeSelector({ onClose }: ThemeSelectorProps) {
   const renderDropdown = () => (
     <div
       ref={dropdownRef}
-      className="theme-selector-dropdown theme-selector-dropdown-portal"
+      className="overflow-hidden rounded-md border border-border bg-background shadow-lg"
       style={
         dropdownPosition
           ? {
@@ -127,7 +132,7 @@ export default function ThemeSelector({ onClose }: ThemeSelectorProps) {
           : undefined
       }
     >
-      <div className="theme-selector-header">
+      <div className="border-b border-border bg-muted/40 px-4 py-3 text-sm font-semibold text-foreground">
         <span>选择主题</span>
       </div>
       {renderThemeList()}
@@ -135,10 +140,10 @@ export default function ThemeSelector({ onClose }: ThemeSelectorProps) {
   );
 
   return (
-    <div className="theme-selector-wrapper" ref={wrapperRef}>
+    <div className="relative inline-block" ref={wrapperRef}>
       <button
         type="button"
-        className="theme-selector-trigger"
+        className="flex cursor-pointer items-center gap-1 rounded-md border-none bg-transparent px-3 py-1.5 text-sm text-muted-foreground transition-all hover:bg-muted/40 hover:text-foreground"
         onClick={() => setIsOpen(!isOpen)}
         aria-label="选择主题"
         aria-expanded={isOpen}
@@ -149,8 +154,11 @@ export default function ThemeSelector({ onClose }: ThemeSelectorProps) {
 
       {/* 未在抽屉内时用原有相对定位 */}
       {isOpen && dropdownPosition == null && (
-        <div ref={dropdownRef} className="theme-selector-dropdown">
-          <div className="theme-selector-header">
+        <div
+          ref={dropdownRef}
+          className="absolute right-0 top-[calc(100%+8px)] z-[1000] w-[280px] overflow-hidden rounded-md border border-border bg-background shadow-lg"
+        >
+          <div className="border-b border-border bg-muted/40 px-4 py-3 text-sm font-semibold text-foreground">
             <span>选择主题</span>
           </div>
           {renderThemeList()}

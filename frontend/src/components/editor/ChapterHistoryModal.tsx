@@ -10,7 +10,6 @@ import { chaptersApi } from '../../utils/chaptersApi';
 import { getContentJSONFromYjsSnapshotBase64, getTextFromProsemirrorJSON } from '../../utils/yjsSnapshot';
 import { diffLines, type DiffLine } from '../../utils/simpleDiff';
 import LoadingSpinner from '../common/LoadingSpinner';
-import './ChapterHistoryModal.css';
 
 interface ChapterHistoryModalProps {
   isOpen: boolean;

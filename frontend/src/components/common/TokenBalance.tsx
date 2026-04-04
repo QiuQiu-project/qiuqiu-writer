@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { tokenApi, type TokenInfo } from '../../utils/tokenApi';
-import './TokenBalance.css';
+import { cn } from '@/lib/utils';
 
 export default function TokenBalance() {
   const [info, setInfo] = useState<TokenInfo | null>(null);
@@ -22,13 +22,13 @@ export default function TokenBalance() {
   if (!info) {
     return (
       <button
-        className="token-balance"
+        className="inline-flex items-center gap-1 cursor-pointer px-2 py-1 rounded-md text-[13px] font-medium text-muted-foreground bg-muted border border-border transition-[background,color] hover:bg-accent hover:text-foreground whitespace-nowrap select-none"
         onClick={handleClick}
         title="点击升级套餐"
         type="button"
       >
-        <span className="token-balance__icon">⚡</span>
-        <span className="token-balance__text">...</span>
+        <span className="text-sm leading-none">⚡</span>
+        <span className="leading-none">...</span>
       </button>
     );
   }
@@ -39,13 +39,18 @@ export default function TokenBalance() {
 
   return (
     <button
-      className={`token-balance${isWarning ? ' token-balance--warning' : ''}`}
+      className={cn(
+        'inline-flex items-center gap-1 cursor-pointer px-2 py-1 rounded-md text-[13px] font-medium bg-muted border border-border transition-[background,color] whitespace-nowrap select-none',
+        isWarning
+          ? 'text-amber-500 border-amber-500 hover:bg-amber-500/10'
+          : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+      )}
       onClick={handleClick}
       title={`剩余 ${info.token_remaining.toLocaleString()} tokens，点击升级套餐`}
       type="button"
     >
-      <span className="token-balance__icon">⚡</span>
-      <span className="token-balance__text">升级套餐</span>
+      <span className="text-sm leading-none">⚡</span>
+      <span className="leading-none">升级套餐</span>
     </button>
   );
 }

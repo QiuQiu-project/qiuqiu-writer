@@ -3,7 +3,6 @@
  */
 
 import React, { useRef, useLayoutEffect, useCallback } from 'react';
-import './ChatInputContentEditable.css';
 
 const REF_REGEX = /@chapter:\d+\s*第\d+-\d+字|@chapter:\d+|@character:[^\s@]+|\/[a-zA-Z0-9_-]+/g;
 

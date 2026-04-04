@@ -2,7 +2,6 @@ import React, { useRef, useState, useEffect } from 'react';
 import Draggable from 'react-draggable';
 import { ResizableBox } from 'react-resizable';
 import { useIsMobile } from '../../hooks/useMediaQuery';
-import './DraggableResizableModal.css';
 
 interface DraggableResizableModalProps {
   isOpen: boolean;
@@ -38,12 +37,10 @@ export default function DraggableResizableModal({
 }: DraggableResizableModalProps) {
   const nodeRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
-  
-  // 使用 state 管理 ResizableBox 的宽高，以便在重新打开时重置或保持
+
   const [width, setWidth] = useState(initialWidth);
   const [height, setHeight] = useState(initialHeight);
 
-  // 当 isOpen 变为 true 时，如果需要重置，可以在这里处理
   useEffect(() => {
     if (isOpen) {
       // 可以在这里添加逻辑
@@ -52,13 +49,16 @@ export default function DraggableResizableModal({
 
   if (!isOpen) return null;
 
+  const overlayClass = `fixed inset-0 flex justify-center items-center z-[1000] backdrop-blur-[3px] ${overlayClassName}`;
+  const overlayStyle = { background: 'rgba(0,0,0,0.45)' };
+
   if (isMobile) {
     return (
       <div
-        className={`draggable-resizable-modal-overlay ${overlayClassName}`}
+        className={overlayClass}
+        style={{ ...overlayStyle, padding: 0 }}
         onClick={onClose}
         onWheel={(e) => e.stopPropagation()}
-        style={{ padding: 0 }}
       >
         <div
           className={className}
@@ -71,7 +71,7 @@ export default function DraggableResizableModal({
             overflowY: scrollable ? 'auto' : 'hidden',
             display: 'flex',
             flexDirection: 'column',
-            backgroundColor: 'var(--bg-primary, #ffffff)', // 默认背景色，避免透明
+            backgroundColor: 'var(--bg-primary, #ffffff)',
           }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -83,7 +83,8 @@ export default function DraggableResizableModal({
 
   return (
     <div
-      className={`draggable-resizable-modal-overlay ${overlayClassName}`}
+      className={overlayClass}
+      style={overlayStyle}
       onClick={onClose}
       onWheel={(e) => e.stopPropagation()}
     >
@@ -102,7 +103,7 @@ export default function DraggableResizableModal({
               setWidth(size.width);
               setHeight(size.height);
             }}
-            className={`react-resizable ${className}`}
+            className={`relative box-border ${className}`}
             resizeHandles={['se']}
             handle={
               <span className="custom-resize-handle" onClick={(e) => e.stopPropagation()} />

@@ -5,7 +5,6 @@ import Placeholder from '@tiptap/extension-placeholder';
 import { useEffect, useRef } from 'react';
 import { apiClient } from '../utils/api';
 import Toolbar from './Toolbar';
-import './Editor.css';
 
 interface EditorProps {
   docId: string | null;
@@ -71,12 +70,9 @@ export default function Editor({ docId }: EditorProps) {
     if (!editor || !docId) return;
 
     const handleUpdate = () => {
-      // Clear existing timeout
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
-
-      // Set new timeout for auto-save
       saveTimeoutRef.current = setTimeout(() => {
         saveDocument(docId, editor.getHTML());
       }, SAVE_DEBOUNCE_MS);
@@ -93,9 +89,9 @@ export default function Editor({ docId }: EditorProps) {
   }, [editor, docId]);
 
   return (
-    <div className="editor-container">
+    <div className="flex-1 flex flex-col overflow-hidden">
       <Toolbar editor={editor} />
-      <div className="editor-wrapper">
+      <div className="flex-1 overflow-y-auto px-12 py-12 max-w-[800px] mx-auto w-full">
         <EditorContent editor={editor} />
       </div>
     </div>

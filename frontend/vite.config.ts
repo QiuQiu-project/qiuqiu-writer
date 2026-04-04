@@ -1,14 +1,16 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const apiTarget = env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
   return {
-    plugins: [react()],
+    plugins: [tailwindcss(), react()],
     resolve: {
       alias: {
+        '@': path.resolve(__dirname, './src'),
         'y-prosemirror': path.resolve(__dirname, 'node_modules/y-prosemirror'),
         'prosemirror-state': path.resolve(__dirname, 'node_modules/prosemirror-state'),
         'prosemirror-view': path.resolve(__dirname, 'node_modules/prosemirror-view'),

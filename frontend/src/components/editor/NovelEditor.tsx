@@ -3,7 +3,6 @@ import StarterKit from '@tiptap/starter-kit';
 import UnderlineExtension from '@tiptap/extension-underline';
 import Placeholder from '@tiptap/extension-placeholder';
 import { Undo2, Redo2, Type, Bold, Underline, ToggleLeft, ToggleRight } from 'lucide-react';
-import './NovelEditor.css';
 
 interface NovelEditorProps {
   smartCompletion?: boolean;

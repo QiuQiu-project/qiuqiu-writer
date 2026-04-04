@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Settings, Sparkles } from 'lucide-react';
 import type { ComponentConfig } from './types';
 import GuideTip from '../../common/GuideTip';
-import './TabsComponent.css';
+import { cn } from '@/lib/utils';
 
 export interface TabsComponentProps {
   tabs: { id: string; label: string; components: ComponentConfig[] }[];
@@ -63,12 +63,22 @@ export function TabsComponent({
   const activeTabData = tabs.find(t => t.id === activeTab) || tabs[0];
 
   return (
-    <div className="comp-tabs">
-      <div className="tabs-header">
+    <div className="flex flex-col gap-4 w-full">
+      <div className="flex items-center gap-2 border-b pb-3 flex-wrap" style={{ borderColor: 'var(--border-light)' }}>
         {tabs.map(tab => (
           <button
             key={tab.id}
-            className={`tab-btn ${activeTabData?.id === tab.id ? 'active' : ''}`}
+            className={cn(
+              'px-4 py-2 border-none text-sm font-medium cursor-pointer rounded-[var(--radius-sm)] transition-all flex items-center justify-center whitespace-nowrap',
+              activeTabData?.id === tab.id
+                ? 'font-semibold'
+                : 'bg-transparent hover:[background:var(--bg-secondary)] hover:[color:var(--text-primary)]'
+            )}
+            style={
+              activeTabData?.id === tab.id
+                ? { background: 'var(--accent-primary)', color: 'var(--text-inverse)' }
+                : { color: 'var(--text-secondary)' }
+            }
             onClick={() => handleTabChange(tab.id)}
           >
             {tab.label}

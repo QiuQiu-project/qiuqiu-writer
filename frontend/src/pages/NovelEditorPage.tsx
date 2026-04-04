@@ -53,7 +53,6 @@ import { createYjsSnapshotFromEditor, restoreYjsSnapshotToEditor, getTextFromPro
 import { sendChatMessage } from '../utils/chatApi';
 
 // 样式
-import '../components/editor/NovelEditor.css';
 import './NovelEditorPage.css';
 
 export default function NovelEditorPage() {

@@ -32,7 +32,6 @@ import DramaScriptEditor from '../components/editor/DramaScriptEditor';
 import StoryboardView from '../components/drama/StoryboardView';
 import type { WorkData } from '../components/editor/work-info/types';
 import type { DramaCharacter, DramaEpisode, DramaMeta, DramaScene, DramaStoryboard, LocalDramaTask, EpisodeProductionStatus, SubjectType } from '../components/drama/dramaTypes';
-import '../components/editor/NovelEditor.css';
 import './DramaEditorPage.css';
 
 type LeftTab = 'work-info' | 'episodes' | 'subjects' | 'production';

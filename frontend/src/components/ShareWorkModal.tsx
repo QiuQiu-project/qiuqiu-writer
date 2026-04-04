@@ -2,7 +2,9 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react
 import { createPortal } from 'react-dom';
 import DraggableResizableModal from './common/DraggableResizableModal';
 import { worksApi, type WorkCollaborator } from '../utils/worksApi';
-import './ShareWorkModal.css';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 
 interface ShareWorkModalProps {
   isOpen: boolean;
@@ -28,10 +30,20 @@ function Avatar({ name, avatarUrl, size = 32 }: { name: string; avatarUrl?: stri
   const colors = ['#4e6ef2', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
   const color = colors[initial.charCodeAt(0) % colors.length];
   if (avatarUrl) {
-    return <img src={avatarUrl} alt={name} className="swm-avatar" style={{ width: size, height: size }} />;
+    return (
+      <img
+        src={avatarUrl}
+        alt={name}
+        className="shrink-0 rounded-full object-cover"
+        style={{ width: size, height: size }}
+      />
+    );
   }
   return (
-    <div className="swm-avatar-initial" style={{ width: size, height: size, background: color, fontSize: size * 0.4 }}>
+    <div
+      className="shrink-0 rounded-full flex items-center justify-center font-semibold text-white"
+      style={{ width: size, height: size, background: color, fontSize: size * 0.4 }}
+    >
       {initial}
     </div>
   );
@@ -45,39 +57,28 @@ function PermSelect({ value, onChange }: { value: string; onChange: (v: string) 
 
   useLayoutEffect(() => {
     if (!open) return;
-    
+
     const updatePosition = () => {
       if (btnRef.current) {
         const rect = btnRef.current.getBoundingClientRect();
         const viewportWidth = window.innerWidth;
         const viewportHeight = window.innerHeight;
-        
-        // Measure dropdown height if available
+
         let dropdownHeight = 0;
         if (dropdownRef.current) {
           dropdownHeight = dropdownRef.current.offsetHeight;
         }
 
-        // Horizontal positioning: align right edge, but clamp to viewport
-        // Default: align right edge of dropdown with right edge of button
-        let left = rect.right - 240; 
-        
-        // If aligning right pushes it off the left edge, align left edge instead
+        let left = rect.right - 240;
         if (left < 10) {
           left = Math.max(10, rect.left);
         }
-        
-        // Ensure it doesn't overflow right edge
         if (left + 240 > viewportWidth - 10) {
-          left = viewportWidth - 250; 
+          left = viewportWidth - 250;
         }
 
-        // Vertical positioning: default below
         let top = rect.bottom + 4;
-        
-        // Check if there's enough space below
         const spaceBelow = viewportHeight - rect.bottom;
-        // If not enough space below, and there is space above, flip it
         if (spaceBelow < (dropdownHeight || 200) + 10 && rect.top > (dropdownHeight || 200) + 10) {
           top = rect.top - (dropdownHeight || 200) - 4;
         }
@@ -87,14 +88,13 @@ function PermSelect({ value, onChange }: { value: string; onChange: (v: string) 
     };
 
     updatePosition();
-    
-    // Use requestAnimationFrame to re-check after render for height measurement
+
     const rafId = requestAnimationFrame(updatePosition);
-    
+
     const handler = (e: MouseEvent) => {
       const target = e.target as Node;
       if (
-        btnRef.current?.contains(target) || 
+        btnRef.current?.contains(target) ||
         dropdownRef.current?.contains(target)
       ) {
         return;
@@ -105,7 +105,7 @@ function PermSelect({ value, onChange }: { value: string; onChange: (v: string) 
     document.addEventListener('mousedown', handler);
     window.addEventListener('resize', updatePosition);
     window.addEventListener('scroll', updatePosition, true);
-    
+
     return () => {
       cancelAnimationFrame(rafId);
       document.removeEventListener('mousedown', handler);
@@ -115,30 +115,44 @@ function PermSelect({ value, onChange }: { value: string; onChange: (v: string) 
   }, [open]);
 
   return (
-    <div className="swm-perm-wrap">
-      <button ref={btnRef} className="swm-perm-btn" onClick={() => setOpen(o => !o)}>
+    <div className="relative shrink-0">
+      <button
+        ref={btnRef}
+        className="flex h-[34px] cursor-pointer items-center gap-1 whitespace-nowrap rounded-lg border border-border bg-muted/30 px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:border-border/60 hover:bg-muted/50 hover:text-foreground font-[inherit]"
+        onClick={() => setOpen(o => !o)}
+      >
         {getPermLabel(value)}
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M1.5 3.5l3.5 3.5 3.5-3.5" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
+          <path d="M1.5 3.5l3.5 3.5 3.5-3.5" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
       </button>
       {open && createPortal(
-        <div 
-          className="swm-perm-dropdown" 
+        <div
+          className="fixed z-[10300] w-60 rounded-xl border border-border bg-popover p-1 shadow-xl"
           ref={dropdownRef}
           style={{ top: coords.top, left: coords.left }}
         >
           {PERMISSION_OPTIONS.map(opt => (
             <button
               key={opt.value}
-              className={`swm-perm-option ${value === opt.value ? 'active' : ''}`}
+              className={cn(
+                'block w-full rounded-md px-3 py-2.5 text-left font-[inherit] transition-colors hover:bg-muted/60',
+                value === opt.value && 'bg-primary/10'
+              )}
               onClick={() => { onChange(opt.value); setOpen(false); }}
             >
-              <div className="swm-perm-opt-label">
+              <div className={cn(
+                'flex items-center justify-between text-[13px] font-medium',
+                value === opt.value ? 'text-primary' : 'text-foreground'
+              )}>
                 {opt.label}
                 {value === opt.value && (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
                 )}
               </div>
-              <div className="swm-perm-opt-desc">{opt.desc}</div>
+              <div className="mt-0.5 text-[11px] text-muted-foreground">{opt.desc}</div>
             </button>
           ))}
         </div>,
@@ -233,8 +247,7 @@ export default function ShareWorkModal({ isOpen, workId, workTitle, onClose, edi
 
   const handleCopyLink = () => {
     const url = `${window.location.origin}${editorPath}?workId=${workId}`;
-    
-    // 尝试使用 navigator.clipboard (仅在安全上下文 HTTPS/localhost 可用)
+
     if (navigator.clipboard && window.isSecureContext) {
       navigator.clipboard.writeText(url)
         .then(() => showToast('链接已复制'))
@@ -248,19 +261,18 @@ export default function ShareWorkModal({ isOpen, workId, workTitle, onClose, edi
     try {
       const textArea = document.createElement("textarea");
       textArea.value = text;
-      
-      // 避免滚动到底部
+
       textArea.style.position = "fixed";
       textArea.style.left = "-9999px";
       textArea.style.top = "0";
-      
+
       document.body.appendChild(textArea);
       textArea.focus();
       textArea.select();
-      
+
       const successful = document.execCommand('copy');
       document.body.removeChild(textArea);
-      
+
       if (successful) {
         showToast('链接已复制');
       } else {
@@ -285,143 +297,176 @@ export default function ShareWorkModal({ isOpen, workId, workTitle, onClose, edi
       className="swm-dialog"
       handleClassName=".swm-head"
     >
-        {/* Header */}
-        <div className="swm-head">
-          <span className="swm-head-title">共享</span>
-          <button className="swm-head-close" onClick={onClose}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
-        </div>
+      {/* Header */}
+      <div className="swm-head flex items-center justify-between px-5 pt-4">
+        <span className="text-[15px] font-semibold tracking-tight text-foreground">共享</span>
+        <button
+          className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border-none bg-transparent text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+          onClick={onClose}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
 
-        {/* Work name */}
-        <div className="swm-work-name">
-          <svg className="swm-doc-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-          <span>{workTitle}</span>
-        </div>
+      {/* Work name */}
+      <div className="flex items-center gap-1.5 overflow-hidden border-b border-border px-5 pb-3.5 pt-1.5 text-xs text-muted-foreground">
+        <svg className="shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+        </svg>
+        <span className="overflow-hidden text-ellipsis whitespace-nowrap">{workTitle}</span>
+      </div>
 
-        {/* Invite row */}
-        <div className="swm-invite-row">
-          <div className="swm-invite-input-wrap">
-            <svg className="swm-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input
-              ref={inputRef}
-              className="swm-invite-input"
-              placeholder="输入用户名或邮箱邀请协作者"
-              value={inputVal}
-              onChange={e => { setInputVal(e.target.value); setErrMsg(''); }}
-              onKeyDown={e => e.key === 'Enter' && handleInvite()}
-              disabled={adding}
-            />
+      {/* Invite row */}
+      <div className="flex items-center gap-2 px-5 py-3.5 flex-wrap sm:flex-nowrap">
+        <div className="relative min-w-0 flex-1 sm:min-w-0 w-full sm:w-auto">
+          <svg
+            className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+            width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <Input
+            ref={inputRef}
+            className="h-[34px] pl-8 text-[13px]"
+            placeholder="输入用户名或邮箱邀请协作者"
+            value={inputVal}
+            onChange={e => { setInputVal(e.target.value); setErrMsg(''); }}
+            onKeyDown={e => e.key === 'Enter' && handleInvite()}
+            disabled={adding}
+          />
+        </div>
+        <PermSelect value={newPerm} onChange={setNewPerm} />
+        <Button
+          className="h-[34px] shrink-0 px-4 text-[13px]"
+          onClick={handleInvite}
+          disabled={adding || !inputVal.trim()}
+        >
+          {adding ? '邀请中…' : '邀请'}
+        </Button>
+      </div>
+
+      {/* Error */}
+      {errMsg && (
+        <div className="mx-5 mb-2 rounded-md border border-destructive/20 bg-destructive/10 px-2.5 py-1.5 text-xs text-red-300">
+          {errMsg}
+        </div>
+      )}
+
+      {/* Pending Requests */}
+      {pendingCollaborators.length > 0 && (
+        <>
+          <div className="px-5 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            待审核申请
           </div>
-          <PermSelect value={newPerm} onChange={setNewPerm} />
-          <button className="swm-invite-btn" onClick={handleInvite} disabled={adding || !inputVal.trim()}>
-            {adding ? '邀请中…' : '邀请'}
-          </button>
-        </div>
-
-        {errMsg && <div className="swm-err">{errMsg}</div>}
-
-        {/* Pending Requests */}
-        {pendingCollaborators.length > 0 && (
-          <>
-            <div className="swm-section-label">待审核申请</div>
-            <div className="swm-list" style={{ marginBottom: '16px' }}>
-              {pendingCollaborators.map(c => {
-                 const displayName = c.display_name || c.username || c.user_id;
-                 return (
-                   <div key={c.user_id} className="swm-collab-row">
-                      <Avatar name={displayName} avatarUrl={c.avatar_url} size={32} />
-                      <div className="swm-collab-info">
-                        <span className="swm-collab-name">{displayName}</span>
-                        {c.username && c.display_name && (
-                          <span className="swm-collab-sub">@{c.username}</span>
-                        )}
-                      </div>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                         <button 
-                           onClick={() => handleApprove(c.user_id)}
-                           style={{
-                             padding: '4px 12px',
-                             background: 'var(--primary, #4e6ef2)',
-                             color: '#fff',
-                             border: 'none',
-                             borderRadius: '4px',
-                             fontSize: '12px',
-                             cursor: 'pointer'
-                           }}
-                         >
-                           批准
-                         </button>
-                         <button 
-                           onClick={() => handleRemove(c.user_id)}
-                           style={{
-                             padding: '4px 12px',
-                             background: 'rgba(255, 77, 79, 0.1)',
-                             color: '#ff4d4f',
-                             border: 'none',
-                             borderRadius: '4px',
-                             fontSize: '12px',
-                             cursor: 'pointer'
-                           }}
-                         >
-                           拒绝
-                         </button>
-                      </div>
-                   </div>
-                 );
-              })}
-            </div>
-          </>
-        )}
-
-        {/* Collaborators */}
-        <div className="swm-section-label">已共享</div>
-        <div className="swm-list">
-          {loading ? (
-            <div className="swm-list-empty">加载中…</div>
-          ) : activeCollaborators.length === 0 ? (
-            <div className="swm-list-empty">暂无协作者</div>
-          ) : (
-            activeCollaborators.map(c => {
+          <div className="mb-4 max-h-[400px] overflow-y-auto px-3">
+            {pendingCollaborators.map(c => {
               const displayName = c.display_name || c.username || c.user_id;
               return (
-                <div key={c.user_id} className="swm-collab-row">
+                <div key={c.user_id} className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-muted/40">
                   <Avatar name={displayName} avatarUrl={c.avatar_url} size={32} />
-                  <div className="swm-collab-info">
-                    <span className="swm-collab-name">{displayName}</span>
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-medium text-foreground">
+                      {displayName}
+                    </span>
                     {c.username && c.display_name && (
-                      <span className="swm-collab-sub">@{c.username}</span>
+                      <span className="text-[11px] text-muted-foreground">@{c.username}</span>
                     )}
                   </div>
-                  {c.permission === 'owner' ? (
-                    <span className="swm-owner-tag">所有者</span>
-                  ) : (
-                    <PermSelect value={c.permission} onChange={v => handlePermChange(c.user_id, v)} />
-                  )}
-                  {c.permission !== 'owner' && (
-                    <button className="swm-remove-btn" onClick={() => handleRemove(c.user_id)} title="移除">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleApprove(c.user_id)}
+                      className="cursor-pointer rounded border-none bg-primary px-3 py-1 text-xs text-white transition-opacity hover:opacity-80"
+                    >
+                      批准
                     </button>
-                  )}
+                    <button
+                      onClick={() => handleRemove(c.user_id)}
+                      className="cursor-pointer rounded border-none bg-destructive/10 px-3 py-1 text-xs text-destructive transition-opacity hover:opacity-80"
+                    >
+                      拒绝
+                    </button>
+                  </div>
                 </div>
               );
-            })
-          )}
-        </div>
+            })}
+          </div>
+        </>
+      )}
 
-        {/* Copy link */}
-        <div className="swm-footer">
-          <button className="swm-copy-link-btn" onClick={handleCopyLink}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-            复制链接
-          </button>
-        </div>
-
-        {/* Toast */}
-        {toast && createPortal(
-          <div className="swm-toast">{toast}</div>,
-          document.body
+      {/* Collaborators */}
+      <div className="px-5 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        已共享
+      </div>
+      <div className="max-h-[400px] overflow-y-auto px-3">
+        {loading ? (
+          <div className="py-5 text-center text-[13px] text-muted-foreground">加载中…</div>
+        ) : activeCollaborators.length === 0 ? (
+          <div className="py-5 text-center text-[13px] text-muted-foreground">暂无协作者</div>
+        ) : (
+          activeCollaborators.map(c => {
+            const displayName = c.display_name || c.username || c.user_id;
+            return (
+              <div key={c.user_id} className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-muted/40">
+                <Avatar name={displayName} avatarUrl={c.avatar_url} size={32} />
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-medium text-foreground">
+                    {displayName}
+                  </span>
+                  {c.username && c.display_name && (
+                    <span className="text-[11px] text-muted-foreground">@{c.username}</span>
+                  )}
+                </div>
+                {c.permission === 'owner' ? (
+                  <span className="shrink-0 whitespace-nowrap rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[11px] text-primary">
+                    所有者
+                  </span>
+                ) : (
+                  <PermSelect value={c.permission} onChange={v => handlePermChange(c.user_id, v)} />
+                )}
+                {c.permission !== 'owner' && (
+                  <button
+                    className="flex h-[26px] w-[26px] shrink-0 cursor-pointer items-center justify-center rounded-md border-none bg-transparent text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-red-300"
+                    onClick={() => handleRemove(c.user_id)}
+                    title="移除"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            );
+          })
         )}
+      </div>
+
+      {/* Copy link footer */}
+      <div className="mt-2 border-t border-border px-5 pb-4 pt-2.5">
+        <button
+          className="flex cursor-pointer items-center gap-1.5 rounded-lg border-none bg-transparent px-2 py-1.5 text-[13px] font-medium text-muted-foreground font-[inherit] transition-colors hover:bg-muted/40 hover:text-foreground"
+          onClick={handleCopyLink}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+          </svg>
+          复制链接
+        </button>
+      </div>
+
+      {/* Toast */}
+      {toast && createPortal(
+        <div className="pointer-events-none fixed left-1/2 top-10 z-[99999] flex -translate-x-1/2 items-center justify-center whitespace-nowrap rounded-full border border-white/10 bg-black/80 px-5 py-2.5 text-sm text-white shadow-lg backdrop-blur-md">
+          {toast}
+        </div>,
+        document.body
+      )}
     </DraggableResizableModal>
   );
 }

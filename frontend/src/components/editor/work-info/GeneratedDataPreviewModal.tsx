@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import DraggableResizableModal from '../../common/DraggableResizableModal';
 import { X, Code, Eye, User, MapPin, Box, Layers } from 'lucide-react';
-import './GeneratedDataPreviewModal.css';
 
 interface GeneratedDataPreviewModalProps {
   isOpen: boolean;

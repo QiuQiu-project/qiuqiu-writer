@@ -2,7 +2,6 @@
 import { useState } from 'react';
 import { Plus, Trash2, ChevronRight, ChevronDown, Layers } from 'lucide-react';
 import type { ComponentConfig, FactionData } from './types';
-import './FactionEditor.css';
 
 interface FactionEditorProps {
   component: ComponentConfig;
