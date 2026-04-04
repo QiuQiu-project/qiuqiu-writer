@@ -11,43 +11,12 @@ import { tokenApi } from './utils/tokenApi';
 
 // 路由懒加载 - 提升首屏加载性能
 const HomePage = lazy(() => import('./pages/HomePage'));
-const UserWorksPage = lazy(() => import('./pages/UserWorksPage'));
 const WorksPage = lazy(() => import('./pages/WorksPage'));
-const ScriptPage = lazy(() => import('./pages/ScriptPage'));
-const EditorPage = lazy(() => import('./pages/EditorPage'));
 const UGCPlaza = lazy(() => import('./pages/UGCPlaza'));
 const NovelEditorPage = lazy(() => import('./pages/NovelEditorPage'));
-const ScriptEditorPage = lazy(() => import('./pages/ScriptEditorPage'));
-const Editor = lazy(() => import('./components/Editor'));
 const PlansPage = lazy(() => import('./pages/PlansPage'));
 const TransactionsPage = lazy(() => import('./pages/TransactionsPage'));
 const DramaEditorPage = lazy(() => import('./pages/DramaEditorPage'));
-
-/** /works 重定向到当前用户的个人主页 /users/:userId */
-function RedirectToMyWorks() {
-  const [userId, setUserId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    const run = async () => {
-      if (authApi.isAuthenticated()) {
-        const u = authApi.getUserInfo();
-        if (u?.id) setUserId(u.id);
-        else {
-          try {
-            const user = await authApi.getCurrentUser();
-            if (user?.id) setUserId(user.id);
-          } catch {
-            // ignore error
-          }
-        }
-      }
-      setLoading(false);
-    };
-    run();
-  }, []);
-  if (loading) return <LoadingSpinner />;
-  return <Navigate to={userId ? `/users/${userId}` : '/'} replace />;
-}
 
 function AppContent() {
   return (
@@ -55,23 +24,15 @@ function AppContent() {
       <Routes>
         <Route element={<MainLayout />}>
           <Route path="/" element={<HomePage />} />
-          <Route path="/works" element={<RedirectToMyWorks />} />
-          <Route path="/users/:userId" element={<RequireAuth><UserWorksPage /></RequireAuth>} />
           <Route path="/novel" element={<WorksPage />} />
-          <Route path="/script" element={<ScriptPage />} />
-          <Route path="/editor" element={<EditorPage />} />
           <Route path="/ugc-plaza" element={<UGCPlaza />} />
           <Route path="/plans" element={<RequireAuth><PlansPage /></RequireAuth>} />
           <Route path="/transactions" element={<RequireAuth><TransactionsPage /></RequireAuth>} />
-          <Route path="/drama" element={<RequireAuth><Navigate to="/novel?type=video" replace /></RequireAuth>} />
+          <Route path="/drama" element={<RequireAuth><Navigate to="/novel?section=workbench&type=video" replace /></RequireAuth>} />
+          <Route path="/works" element={<Navigate to="/novel?section=workbench" replace />} />
         </Route>
         <Route path="/novel/editor" element={<RequireAuth><NovelEditorPage /></RequireAuth>} />
-        <Route path="/script/editor" element={<RequireAuth><ScriptEditorPage /></RequireAuth>} />
         <Route path="/drama/editor" element={<RequireAuth><DramaEditorPage /></RequireAuth>} />
-        <Route
-          path="/editor-old"
-          element={<Editor docId={null} onDocChange={() => {}} />}
-        />
       </Routes>
     </Suspense>
   );

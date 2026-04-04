@@ -16,7 +16,6 @@ import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -45,6 +44,7 @@ export default function WorksPage() {
   const [itemsPerPage, setItemsPerPage] = useState(12);
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [pendingTemplate, setPendingTemplate] = useState<WorkTemplate | null>(null);
   const [openExportMenuId, setOpenExportMenuId] = useState<string | null>(null);
   const exportMenuRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
@@ -139,6 +139,18 @@ export default function WorksPage() {
       loadTemplates();
     }
   }, [currentSection, loadTemplates]);
+
+  // 检测 ?action=create URL param（侧边栏新建作品触发）
+  useEffect(() => {
+    if (searchParams.get('action') === 'create') {
+      setShowCreateDialog(true);
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev);
+        next.delete('action');
+        return next;
+      }, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   // 点击外部关闭菜单
   useEffect(() => {
@@ -420,8 +432,9 @@ export default function WorksPage() {
   const handleCreateWork = async (workType: 'long' | 'video') => {
     try {
       setLoading(true);
+      const template = pendingTemplate;
       const workData = {
-        title: workType === 'video' ? '未命名剧本' : '未命名作品',
+        title: template ? template.name : (workType === 'video' ? '未命名剧本' : '未命名作品'),
         work_type: workType,
         is_public: false,
       };
@@ -429,8 +442,14 @@ export default function WorksPage() {
       if (!newWork || !newWork.id) {
         throw new Error('创建作品成功，但未返回作品ID');
       }
+      if (template) {
+        await worksApi.updateWork(newWork.id, {
+          metadata: { template_config: { templateId: template.id } },
+        });
+      }
       await loadWorks();
       setShowCreateDialog(false);
+      setPendingTemplate(null);
       navigate(workType === 'video' ? `/drama/editor?workId=${newWork.id}` : `/novel/editor?workId=${newWork.id}`);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : '创建作品失败';
@@ -439,6 +458,16 @@ export default function WorksPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const openCreateDialog = () => {
+    setPendingTemplate(null);
+    setShowCreateDialog(true);
+  };
+
+  const openCreateFromTemplate = (template: WorkTemplate) => {
+    setPendingTemplate(template);
+    setShowCreateDialog(true);
   };
 
   // 处理导入成功
@@ -522,7 +551,7 @@ export default function WorksPage() {
                           <div className="mb-3 text-xs font-black uppercase tracking-[0.18em] text-[#964900]">{getTemplateCategoryLabel(featuredTemplate)}</div>
                           <h3 className="mb-3 text-3xl font-bold leading-tight text-[#1f045a]">{featuredTemplate.name}</h3>
                           <p className="mb-6 text-sm leading-7 text-[#574235]">{featuredTemplate.description || '快速套用模板，构建章节结构、角色设定或剧本开发流程。'}</p>
-                          <Button className="mt-auto rounded-xl bg-[#ff8000] text-white hover:bg-[#e87400]" onClick={() => handleCreateWork(featuredTemplate.work_type === 'video' ? 'video' : 'long')}>
+                          <Button className="mt-auto rounded-xl bg-[#ff8000] text-white hover:bg-[#e87400]" onClick={() => openCreateFromTemplate(featuredTemplate)}>
                             使用模板
                           </Button>
                         </div>
@@ -542,7 +571,7 @@ export default function WorksPage() {
                         <div className="mb-2 text-xs font-black uppercase tracking-[0.18em] text-[#964900]">{getTemplateCategoryLabel(template)}</div>
                         <h3 className="mb-3 text-2xl font-bold text-[#1f045a]">{template.name}</h3>
                         <p className="mb-6 line-clamp-4 text-sm leading-7 text-[#574235]">{template.description || '适合用于快速起稿、结构搭建和灵感扩展。'}</p>
-                        <Button className="mt-auto rounded-xl bg-[#ff8000] text-white hover:bg-[#e87400]" onClick={() => handleCreateWork(template.work_type === 'video' ? 'video' : 'long')}>
+                        <Button className="mt-auto rounded-xl bg-[#ff8000] text-white hover:bg-[#e87400]" onClick={() => openCreateFromTemplate(template)}>
                           使用模板
                         </Button>
                       </div>
@@ -615,7 +644,7 @@ export default function WorksPage() {
                     ))}
                   </div>
                   <div className="ml-auto flex flex-wrap gap-2">
-                    <Button className="rounded-xl bg-[#964900] text-white hover:bg-[#7a3c00]" onClick={() => setShowCreateDialog(true)}>
+                    <Button className="rounded-xl bg-[#964900] text-white hover:bg-[#7a3c00]" onClick={() => openCreateDialog()}>
                       <Plus size={16} />
                       新建作品
                     </Button>
@@ -641,7 +670,7 @@ export default function WorksPage() {
                   <div className="flex flex-col items-center rounded-[2rem] border-2 border-dashed border-[#dfc1af]/30 bg-[#f8f1ff] px-6 py-16 text-center">
                     <p className="mb-4 text-lg font-semibold text-[#1f045a]">还没有作品</p>
                     <p className="mb-6 text-sm text-[#574235]">点击下方按钮开始你的第一部长篇或剧本创作。</p>
-                    <Button className="rounded-xl bg-[#964900] text-white hover:bg-[#7a3c00]" onClick={() => setShowCreateDialog(true)}>
+                    <Button className="rounded-xl bg-[#964900] text-white hover:bg-[#7a3c00]" onClick={() => openCreateDialog()}>
                       <Plus size={16} />
                       创建第一个作品
                     </Button>
@@ -812,7 +841,7 @@ export default function WorksPage() {
                 <button
                   type="button"
                   className="flex min-h-[280px] flex-col items-center justify-center gap-4 rounded-[2rem] border-4 border-dashed border-[#e7deff] bg-[#f8f1ff]/70 text-[#574235] transition-all hover:border-[#ff8000]/20 hover:bg-white hover:text-[#964900]"
-                  onClick={() => setShowCreateDialog(true)}
+                  onClick={() => openCreateDialog()}
                 >
                   <div className="flex size-16 items-center justify-center rounded-full bg-[#ede4ff] transition-colors group-hover:bg-[#ff8000] group-hover:text-white">
                     <Plus size={30} />
@@ -885,57 +914,50 @@ export default function WorksPage() {
         </div>
       </div>
 
-      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="max-w-[820px] gap-0 overflow-hidden border-none bg-transparent p-0 shadow-none">
-          <div className="overflow-hidden rounded-[32px] border border-[#ede4ff] bg-[#fdf7ff] shadow-[0px_32px_80px_rgba(31,4,90,0.16)]">
-          <DialogHeader className="border-b border-[#ede4ff] bg-[linear-gradient(180deg,#f8f1ff_0%,#fdf7ff_100%)] px-8 py-7">
-            <div className="mb-3 inline-flex w-fit items-center rounded-full bg-[#fff2e5] px-3 py-1 text-[11px] font-black uppercase tracking-[0.2em] text-[#964900]">
-              新建作品
+      <Dialog open={showCreateDialog} onOpenChange={(open) => { setShowCreateDialog(open); if (!open) setPendingTemplate(null); }}>
+        <DialogContent showCloseButton={false} className="max-w-[820px] gap-0 overflow-hidden border-none bg-transparent p-0 shadow-none">
+          <div className="max-h-[90dvh] overflow-y-auto rounded-[32px] border border-[#ede4ff] bg-[#fdf7ff] shadow-[0px_32px_80px_rgba(31,4,90,0.16)]">
+            <DialogHeader className="border-b border-[#ede4ff] bg-[linear-gradient(180deg,#f8f1ff_0%,#fdf7ff_100%)] px-6 py-5">
+              <DialogTitle className="text-2xl font-bold text-[#1f045a]">
+                {pendingTemplate ? `使用模板：${pendingTemplate.name}` : '新建作品'}
+              </DialogTitle>
+              {pendingTemplate && (
+                <p className="mt-1 text-sm text-[#574235]">选择创作类型，将以此模板创建新作品</p>
+              )}
+            </DialogHeader>
+            <div className="grid gap-4 bg-[#fdf7ff] px-6 py-6 md:grid-cols-2">
+              <button
+                type="button"
+                className="group flex flex-col items-start gap-4 rounded-[24px] border border-[#ede4ff] bg-white p-5 text-left shadow-[0px_20px_40px_rgba(31,4,90,0.04)] transition-all hover:-translate-y-1 hover:border-[#ff8000]/40 hover:bg-[#fffaf3] hover:shadow-[0px_28px_50px_rgba(255,128,0,0.08)]"
+                onClick={() => handleCreateWork('long')}
+              >
+                <div className="flex size-12 items-center justify-center rounded-xl shadow-sm" style={{ background: PALETTE.orangeSoft, color: PALETTE.orange }}>
+                  <BookOpen size={22} />
+                </div>
+                <div className="text-lg font-bold text-[#1f045a]">小说创作</div>
+                <div className="mt-1 inline-flex items-center gap-2 rounded-full bg-[#fff2e5] px-4 py-1.5 text-sm font-semibold text-[#964900] transition-colors group-hover:bg-[#ff8000] group-hover:text-white">
+                  {pendingTemplate ? '用此模板写小说' : '开始写小说'}
+                  <span>→</span>
+                </div>
+              </button>
+              <button
+                type="button"
+                className="group flex flex-col items-start gap-4 rounded-[24px] border border-[#ede4ff] bg-white p-5 text-left shadow-[0px_20px_40px_rgba(31,4,90,0.04)] transition-all hover:-translate-y-1 hover:border-[#6a58a7]/35 hover:bg-[#f7f3ff] hover:shadow-[0px_28px_50px_rgba(106,88,167,0.08)]"
+                onClick={() => handleCreateWork('video')}
+              >
+                <div className="flex size-12 items-center justify-center rounded-xl shadow-sm" style={{ background: PALETTE.indigoSoft, color: PALETTE.indigo }}>
+                  <Film size={22} />
+                </div>
+                <div className="text-lg font-bold text-[#1f045a]">剧本创作</div>
+                <div className="mt-1 inline-flex items-center gap-2 rounded-full bg-[#f0eef6] px-4 py-1.5 text-sm font-semibold text-[#554686] transition-colors group-hover:bg-[#6a58a7] group-hover:text-white">
+                  {pendingTemplate ? '用此模板写剧本' : '开始写剧本'}
+                  <span>→</span>
+                </div>
+              </button>
             </div>
-            <DialogTitle className="text-3xl font-bold text-[#1f045a]">选择创作类型</DialogTitle>
-            <DialogDescription className="mt-2 max-w-2xl text-sm leading-7 text-[#574235]">
-              小说与剧本都统一在当前工作台体系下管理，先选择创作方向，再进入对应编辑器开始写作。
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-5 bg-[#fdf7ff] px-8 py-8 md:grid-cols-2">
-            <button
-              type="button"
-              className="group flex min-h-[250px] flex-col items-start gap-5 rounded-[28px] border border-[#ede4ff] bg-white p-6 text-left shadow-[0px_20px_40px_rgba(31,4,90,0.04)] transition-all hover:-translate-y-1 hover:border-[#ff8000]/40 hover:bg-[#fffaf3] hover:shadow-[0px_28px_50px_rgba(255,128,0,0.08)]"
-              onClick={() => handleCreateWork('long')}
-            >
-              <div className="flex size-14 items-center justify-center rounded-2xl shadow-sm" style={{ background: PALETTE.orangeSoft, color: PALETTE.orange }}>
-                <BookOpen size={24} />
-              </div>
-              <div className="space-y-3">
-                <div className="text-xl font-bold text-[#1f045a]">小说创作</div>
-                <p className="text-sm leading-7 text-[#574235]">适合长篇章节写作、角色成长线推进与世界观设定，支持持续迭代内容结构。</p>
-              </div>
-              <div className="mt-auto inline-flex items-center gap-2 rounded-full bg-[#fff2e5] px-4 py-2 text-sm font-semibold text-[#964900] transition-colors group-hover:bg-[#ff8000] group-hover:text-white">
-                开始写小说
-                <span>→</span>
-              </div>
-            </button>
-            <button
-              type="button"
-              className="group flex min-h-[250px] flex-col items-start gap-5 rounded-[28px] border border-[#ede4ff] bg-white p-6 text-left shadow-[0px_20px_40px_rgba(31,4,90,0.04)] transition-all hover:-translate-y-1 hover:border-[#6a58a7]/35 hover:bg-[#f7f3ff] hover:shadow-[0px_28px_50px_rgba(106,88,167,0.08)]"
-              onClick={() => handleCreateWork('video')}
-            >
-              <div className="flex size-14 items-center justify-center rounded-2xl shadow-sm" style={{ background: PALETTE.indigoSoft, color: PALETTE.indigo }}>
-                <Film size={24} />
-              </div>
-              <div className="space-y-3">
-                <div className="text-xl font-bold text-[#1f045a]">剧本创作</div>
-                <p className="text-sm leading-7 text-[#574235]">适合分集开发、场景拆分、角色调度和影视化创作流程，便于后续继续扩展分镜。</p>
-              </div>
-              <div className="mt-auto inline-flex items-center gap-2 rounded-full bg-[#f0eef6] px-4 py-2 text-sm font-semibold text-[#554686] transition-colors group-hover:bg-[#6a58a7] group-hover:text-white">
-                开始写剧本
-                <span>→</span>
-              </div>
-            </button>
-          </div>
-          <DialogFooter className="border-t border-[#ede4ff] bg-[#f8f1ff] px-8 py-5">
-            <Button variant="outline" className="border-[#dfc1af] bg-white text-[#1f045a] hover:bg-[#fdf7ff]" onClick={() => setShowCreateDialog(false)}>取消</Button>
-          </DialogFooter>
+            <DialogFooter className="mx-0 mb-0 rounded-b-[32px] border-t border-[#ede4ff] bg-[#f8f1ff] px-6 py-4">
+              <Button variant="outline" className="border-[#dfc1af] bg-white text-[#1f045a] hover:bg-[#fdf7ff]" onClick={() => { setShowCreateDialog(false); setPendingTemplate(null); }}>取消</Button>
+            </DialogFooter>
           </div>
         </DialogContent>
       </Dialog>

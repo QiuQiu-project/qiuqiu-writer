@@ -82,11 +82,7 @@ export default function HomePage() {
       }
       return;
     }
-
-    const user = authApi.getUserInfo();
-    if (user) {
-      navigate(`/users/${user.id}`);
-    }
+    navigate('/novel?section=workbench');
   };
 
   return (
@@ -178,11 +174,11 @@ export default function HomePage() {
               className={cn(
                 'inline-flex items-center gap-2 px-[34px] py-[15px] rounded-full text-[15px] font-semibold tracking-[0.01em] cursor-pointer border-0 text-white',
                 'transition-all duration-[280ms] ease-[cubic-bezier(0.4,0,0.2,1)]',
-                'bg-gradient-to-br from-blue-500 to-blue-600',
-                'shadow-[0_4px_28px_rgba(59,130,246,0.38),0_1px_3px_rgba(0,0,0,0.3)]',
-                'hover:from-blue-400 hover:to-blue-500 hover:-translate-y-0.5',
-                'hover:shadow-[0_8px_36px_rgba(59,130,246,0.5),0_2px_6px_rgba(0,0,0,0.25)]',
-                'active:translate-y-0 active:shadow-[0_4px_18px_rgba(59,130,246,0.3)]',
+                'bg-gradient-to-br from-[#ff8000] to-[#964900]',
+                'shadow-[0_10px_30px_rgba(255,128,0,0.28),0_1px_3px_rgba(31,4,90,0.18)]',
+                'hover:from-[#ff922f] hover:to-[#a95506] hover:-translate-y-0.5',
+                'hover:shadow-[0_14px_38px_rgba(255,128,0,0.32),0_2px_6px_rgba(31,4,90,0.2)]',
+                'active:translate-y-0 active:shadow-[0_8px_20px_rgba(255,128,0,0.22)]',
                 'disabled:opacity-60 disabled:cursor-not-allowed',
                 'max-md:w-full max-md:justify-center',
               )}
@@ -344,7 +340,7 @@ export default function HomePage() {
                 <ul className="flex flex-col gap-[11px] list-none p-0 m-0">
                   {uc.items.map(item => (
                     <li key={item} className="flex items-center gap-2.5 text-sm leading-[1.5]" style={{ color: 'var(--text-tertiary)' }}>
-                      <Check size={15} className="text-emerald-400 shrink-0" />
+                <Check size={15} className="text-[#47b8ab] shrink-0" />
                       {item}
                     </li>
                   ))}
@@ -381,10 +377,10 @@ export default function HomePage() {
             className={cn(
               'inline-flex items-center gap-2 px-10 py-4 rounded-full text-[16px] font-semibold tracking-[0.01em] cursor-pointer border-0 text-white',
               'transition-all duration-[280ms] ease-[cubic-bezier(0.4,0,0.2,1)]',
-              'bg-gradient-to-br from-blue-500 to-blue-600',
-              'shadow-[0_4px_28px_rgba(59,130,246,0.38),0_1px_3px_rgba(0,0,0,0.3)]',
-              'hover:from-blue-400 hover:to-blue-500 hover:-translate-y-0.5',
-              'hover:shadow-[0_8px_36px_rgba(59,130,246,0.5)]',
+              'bg-gradient-to-br from-[#ff8000] to-[#964900]',
+              'shadow-[0_10px_30px_rgba(255,128,0,0.28),0_1px_3px_rgba(31,4,90,0.18)]',
+              'hover:from-[#ff922f] hover:to-[#a95506] hover:-translate-y-0.5',
+              'hover:shadow-[0_14px_38px_rgba(255,128,0,0.32)]',
               'active:translate-y-0 disabled:opacity-60 disabled:cursor-not-allowed',
             )}
           >

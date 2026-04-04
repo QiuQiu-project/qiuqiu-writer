@@ -33,7 +33,7 @@ class TemplatesApiClient extends BaseApiClient {
   /**
    * 保存作品的模板配置到数据库
    */
-  async saveWorkTemplateConfig(workId: number, templateConfig: TemplateConfig): Promise<{ message: string; work_id: number; template_config: TemplateConfig }> {
+  async saveWorkTemplateConfig(workId: string | number, templateConfig: TemplateConfig): Promise<{ message: string; work_id: number; template_config: TemplateConfig }> {
     return this.post<{ message: string; work_id: number; template_config: TemplateConfig }>(
       `/api/v1/templates/works/${workId}/template-config/`,
       templateConfig
@@ -43,7 +43,7 @@ class TemplatesApiClient extends BaseApiClient {
   /**
    * 获取作品的模板配置
    */
-  async getWorkTemplateConfig(workId: number): Promise<{ work_id: number; template_config: TemplateConfig | null; message?: string }> {
+  async getWorkTemplateConfig(workId: string | number): Promise<{ work_id: number; template_config: TemplateConfig | null; message?: string }> {
     return this.get<{ work_id: number; template_config: TemplateConfig | null; message?: string }>(
       `/api/v1/templates/works/${workId}/template-config/`
     );

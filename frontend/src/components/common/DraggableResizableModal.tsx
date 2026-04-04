@@ -49,19 +49,18 @@ export default function DraggableResizableModal({
 
   if (!isOpen) return null;
 
-  const overlayClass = `fixed inset-0 flex justify-center items-center z-[3200] backdrop-blur-[3px] ${overlayClassName}`;
-  const overlayStyle = { background: 'rgba(0,0,0,0.45)' };
+  const overlayClass = `fixed inset-0 flex items-center justify-center z-[3200] bg-black/20 supports-backdrop-filter:backdrop-blur-xs ${overlayClassName}`;
 
   if (isMobile) {
     return (
       <div
         className={overlayClass}
-        style={{ ...overlayStyle, padding: 0 }}
+        style={{ padding: 0 }}
         onClick={onClose}
         onWheel={(e) => e.stopPropagation()}
       >
         <div
-          className={className}
+          className={`border border-border bg-popover text-popover-foreground shadow-xl ${className}`}
           style={{
             width: '100%',
             height: '100%',
@@ -71,7 +70,6 @@ export default function DraggableResizableModal({
             overflowY: scrollable ? 'auto' : 'hidden',
             display: 'flex',
             flexDirection: 'column',
-            backgroundColor: 'var(--bg-primary, #ffffff)',
           }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -84,7 +82,6 @@ export default function DraggableResizableModal({
   return (
     <div
       className={overlayClass}
-      style={overlayStyle}
       onClick={onClose}
       onWheel={(e) => e.stopPropagation()}
     >
@@ -103,7 +100,7 @@ export default function DraggableResizableModal({
               setWidth(size.width);
               setHeight(size.height);
             }}
-            className={`relative box-border ${className}`}
+            className={`relative box-border overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-xl ring-1 ring-foreground/10 ${className}`}
             resizeHandles={['se']}
             handle={
               <span className="custom-resize-handle" onClick={(e) => e.stopPropagation()} />

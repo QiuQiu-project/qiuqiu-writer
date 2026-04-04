@@ -530,50 +530,50 @@ select.full-width {
    ============================================ */
 :root[data-theme="light"] {
   /* 页面背景 */
-  --page-gradient: linear-gradient(160deg, #eef2ff 0%, #e0eaff 45%, #f0f4ff 100%);
+  --page-gradient: linear-gradient(160deg, #fdf7ff 0%, #f6f0ff 45%, #fffaf3 100%);
 
   /* 核心背景/文字/边框（覆盖 :root 的黑色强调） */
   --bg-primary: #ffffff;
-  --bg-secondary: #f6f8fa;
-  --bg-tertiary: #eef1f5;
-  --bg-sidebar: #fafafb;
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-tertiary: #64748b;
+  --bg-secondary: #f8f1ff;
+  --bg-tertiary: #f2ebff;
+  --bg-sidebar: #fdf7ff;
+  --text-primary: #1f045a;
+  --text-secondary: #574235;
+  --text-tertiary: #6b5a7a;
   --text-inverse: #ffffff;
-  --border-color: #e2e8f0;
-  --border-light: #f1f5f9;
-  --border-hover: #94a3b8;
+  --border-color: #ede4ff;
+  --border-light: #f6f0ff;
+  --border-hover: #dfc1af;
 
   /* 蓝色强调 */
-  --accent-primary: #2563eb;
-  --accent-color: #2563eb;
-  --accent-secondary: #1d4ed8;
-  --accent-tertiary: #3b82f6;
-  --accent-hover: #1d4ed8;
-  --accent-light: rgba(37, 99, 235, 0.10);
-  --accent-gradient: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  --accent-primary: #ff8000;
+  --accent-color: #ff8000;
+  --accent-secondary: #964900;
+  --accent-tertiary: #6a58a7;
+  --accent-hover: #e87400;
+  --accent-light: rgba(255, 128, 0, 0.10);
+  --accent-gradient: linear-gradient(135deg, #ff8000 0%, #964900 100%);
 
   /* 毛玻璃（浅色） */
   --glass-bg: rgba(255, 255, 255, 0.72);
   --glass-bg-strong: rgba(255, 255, 255, 0.85);
   --glass-bg-hover: rgba(255, 255, 255, 0.92);
   --glass-bg-input: rgba(255, 255, 255, 0.80);
-  --glass-border: rgba(37, 99, 235, 0.12);
-  --glass-border-strong: rgba(37, 99, 235, 0.20);
-  --glass-border-hover: rgba(37, 99, 235, 0.30);
+  --glass-border: rgba(106, 88, 167, 0.12);
+  --glass-border-strong: rgba(106, 88, 167, 0.20);
+  --glass-border-hover: rgba(255, 128, 0, 0.24);
   --glass-dropdown-bg: rgba(255, 255, 255, 0.97);
 
   /* 落地页专用 */
-  --hero-badge-bg: rgba(37, 99, 235, 0.08);
-  --hero-badge-border: rgba(37, 99, 235, 0.25);
-  --hero-badge-color: #2563eb;
-  --hero-title-gradient: linear-gradient(135deg, #0f172a 0%, #1e40af 50%, #2563eb 100%);
-  --hero-subtitle-color: rgba(71, 85, 105, 0.9);
-  --section-label-color: #2563eb;
-  --section-title-color: #0f172a;
-  --feature-title-color: #1e293b;
-  --cta-title-color: #0f172a;
+  --hero-badge-bg: rgba(255, 128, 0, 0.08);
+  --hero-badge-border: rgba(255, 128, 0, 0.24);
+  --hero-badge-color: #964900;
+  --hero-title-gradient: linear-gradient(135deg, #1f045a 0%, #6a58a7 52%, #ff8000 100%);
+  --hero-subtitle-color: rgba(87, 66, 53, 0.9);
+  --section-label-color: #964900;
+  --section-title-color: #1f045a;
+  --feature-title-color: #1f045a;
+  --cta-title-color: #1f045a;
 }
 
 /* ============================================
@@ -1018,7 +1018,7 @@ body {
 }
 :root[data-theme="light"] .landing-bg {
   background:
-    linear-gradient(160deg, rgba(238,242,255,0.93) 0%, rgba(224,234,255,0.91) 45%, rgba(240,244,255,0.93) 100%),
+    linear-gradient(160deg, rgba(253,247,255,0.96) 0%, rgba(246,240,255,0.94) 45%, rgba(255,250,243,0.95) 100%),
     url('https://images.unsplash.com/photo-1501504905252-473c47e087f8?w=1920&q=80&auto=format&fit=crop') center/cover no-repeat;
 }
 

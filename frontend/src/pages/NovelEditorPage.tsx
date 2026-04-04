@@ -828,8 +828,7 @@ export default function NovelEditorPage() {
         try {
           await worksApi.deleteWork(workId);
           showMessage('作品已删除', 'success', undefined, undefined, { toast: true, autoCloseMs: 2000 });
-          const uid = authApi.getUserInfo()?.id;
-          navigate(uid ? `/users/${uid}` : '/');
+          navigate('/novel?section=workbench');
         } catch {
 
           showMessage('删除作品失败', 'error');
@@ -897,9 +896,9 @@ export default function NovelEditorPage() {
             )}
             <Button
               variant="outline"
-              onClick={() => navigate('/')}
+              onClick={() => navigate('/novel?section=workbench')}
             >
-              返回首页
+              返回工作台
             </Button>
           </div>
         </div>
@@ -909,19 +908,16 @@ export default function NovelEditorPage() {
 
   return (
     <div className="fixed inset-0 z-[2000] flex h-screen w-screen flex-col overflow-hidden bg-[linear-gradient(180deg,#f6f0ff_0%,#fdf7ff_100%)] text-foreground">
-      <header className="relative z-20 flex h-18 min-h-18 items-center justify-between gap-6 border-b border-[#ede4ff] bg-[#fdf7ff]/95 px-6 shadow-sm backdrop-blur max-md:h-16 max-md:min-h-16 max-md:gap-2 max-md:px-3">
-        <div className="relative z-[1] flex min-w-0 flex-1 items-center gap-4 max-md:gap-1">
+      <header className="relative z-20 flex min-h-[72px] items-center justify-between gap-4 border-b border-[#ede4ff] bg-[#fdf7ff]/95 px-5 py-3 shadow-sm backdrop-blur max-md:h-16 max-md:min-h-16 max-md:gap-2 max-md:px-3 max-md:py-2">
+        <div className="relative z-[1] flex min-w-0 flex-1 items-center gap-3 max-md:gap-1">
           <button className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-[#ede4ff] bg-white px-3 py-2 text-sm text-[#574235]/80 transition-colors hover:bg-[#f8f1ff] hover:text-[#1f045a] max-md:px-2 max-md:py-1.5" onClick={() => navigate('/novel?section=workbench')}>
             <ArrowLeft size={16} />
             <span className="max-md:hidden">返回工作台</span>
           </button>
-          <div className="relative flex min-w-0 flex-1 flex-col justify-center gap-1.5">
-            <div className="flex items-center gap-2 max-md:hidden">
-              <span className="rounded-full bg-[#fff2e5] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-[#964900]">工作台</span>
-            </div>
+          <div className="relative flex min-w-0 flex-1 flex-col justify-center">
             <h1 
               ref={titleEditableRef}
-              className="min-w-0 truncate rounded px-1 text-[17px] font-semibold leading-[1.3] text-[#1f045a] outline-none max-md:text-[15px]"
+              className="min-w-0 truncate rounded px-0.5 text-[18px] font-semibold leading-[1.2] text-[#1f045a] outline-none max-md:text-[15px]"
               contentEditable
               suppressContentEditableWarning
               onBlur={handleSaveTitle}
@@ -932,7 +928,7 @@ export default function NovelEditorPage() {
               {work?.title || ''}
             </h1>
             <div className="mt-0.5 flex min-w-0 items-center gap-2 max-md:hidden">
-              <div className="flex items-center gap-1.5 text-xs whitespace-nowrap text-[#574235]/70">
+              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#574235]/70">
                 <span className="font-medium text-[#574235]/70">
                   {isOnline ? '已同步' : '离线模式'}
                 </span>
@@ -976,8 +972,6 @@ export default function NovelEditorPage() {
             </div>
           </div>
         </div>
-        <div className="flex flex-1 items-center justify-center max-md:hidden">
-        </div>
         <div className="flex min-w-0 flex-none items-center gap-3 max-md:gap-1">
           {isMobile ? (
             <>
@@ -1016,10 +1010,10 @@ export default function NovelEditorPage() {
             </>
           ) : (
             <>
-              <div className="flex shrink-0 items-center gap-1.5">
+              <div className="flex shrink-0 items-center gap-2">
               {canEdit && (
               <button
-                className="relative inline-flex h-9 shrink-0 items-center gap-1 rounded-xl border border-[#dfc1af] bg-white px-3 text-[13px] font-medium text-[#1f045a] transition-colors hover:bg-[#f8f1ff] hover:text-[#ff8000]"
+                className="relative inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-[#dfc1af] bg-white px-3.5 text-[13px] font-medium text-[#1f045a] transition-colors hover:bg-[#f8f1ff] hover:text-[#ff8000]"
                 onClick={() => setIsShareModalOpen(true)}
                 title="共享作品"
               >
@@ -1028,10 +1022,10 @@ export default function NovelEditorPage() {
                 <span>分享</span>
               </button>
               )}
-              <div className="ml-3 flex items-center gap-1.5 border-l border-[#ede4ff] pl-3">
+              <div className="flex items-center gap-1 rounded-full border border-[#ede4ff] bg-white px-1.5 py-1 shadow-[0px_8px_20px_rgba(31,4,90,0.04)]">
                 <button
                   className={cn(
-                    'inline-flex size-8 items-center justify-center rounded-xl border border-[#ede4ff] bg-white text-[#574235]/70 transition-all hover:-translate-y-0.5 hover:bg-[#f8f1ff] hover:text-[#1f045a]',
+                    'inline-flex size-7 items-center justify-center rounded-full text-[#574235]/70 transition-all hover:-translate-y-0.5 hover:bg-[#f8f1ff] hover:text-[#1f045a]',
                     leftSidebarCollapsed && 'bg-[#ff8000] text-white shadow-[0_8px_18px_rgba(255,128,0,0.28)] hover:bg-[#e87400]',
                     leftSidebarCollapsed && 'fixed left-4 top-[108px] z-[1000] shadow-[0_4px_12px_rgba(0,0,0,0.2)]'
                   )}
@@ -1042,7 +1036,7 @@ export default function NovelEditorPage() {
                 </button>
                 <button
                   className={cn(
-                    'inline-flex size-8 items-center justify-center rounded-xl border border-[#ede4ff] bg-white text-[#574235]/70 transition-all hover:-translate-y-0.5 hover:bg-[#f8f1ff] hover:text-[#1f045a]',
+                    'inline-flex size-7 items-center justify-center rounded-full text-[#574235]/70 transition-all hover:-translate-y-0.5 hover:bg-[#f8f1ff] hover:text-[#1f045a]',
                     rightSidebarCollapsed && 'bg-[#ff8000] text-white shadow-[0_8px_18px_rgba(255,128,0,0.28)] hover:bg-[#e87400]',
                     rightSidebarCollapsed && 'fixed right-4 top-[108px] z-[1000] shadow-[0_4px_12px_rgba(0,0,0,0.2)]'
                   )}

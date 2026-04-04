@@ -123,8 +123,7 @@ export default function MainLayout() {
   };
 
   const isHomePage = location.pathname === '/';
-  const isUserPage = location.pathname.startsWith('/users/');
-  const isSpecialPage = isHomePage || isUserPage;
+  const isSpecialPage = isHomePage;
   const isEditorPage = location.pathname.startsWith('/novel/editor') || location.pathname.startsWith('/drama/editor');
   const showWorkspaceShell = !isSpecialPage && !isEditorPage;
   const workspaceSection = new URLSearchParams(location.search).get('section');
@@ -208,7 +207,7 @@ export default function MainLayout() {
             {isAuthenticated && (
               <button
                 className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[#964900] px-4 py-4 text-sm font-bold text-white shadow-xl transition-all hover:opacity-90"
-                onClick={() => navigate('/novel?section=workbench')}
+                onClick={() => navigate('/novel?section=workbench&action=create')}
               >
                 <Sparkles size={16} />
                 新建作品
@@ -284,7 +283,7 @@ export default function MainLayout() {
                   className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[#964900] px-4 py-4 text-sm font-bold text-white shadow-xl transition-all hover:opacity-90"
                   onClick={() => {
                     setMobileMenuOpen(false);
-                    navigate('/novel?section=workbench');
+                    navigate('/novel?section=workbench&action=create');
                   }}
                 >
                   <Sparkles size={16} />
