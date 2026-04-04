@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Eye, EyeOff, User, Lock, Mail, Tag, Feather } from 'lucide-react';
+import { X, Eye, EyeOff, User, Lock, Mail, Tag } from 'lucide-react';
 import { authApi, type LoginRequest, type RegisterRequest, type UserInfo } from '../../utils/authApi';
 import { cn } from '@/lib/utils';
 
@@ -149,20 +149,31 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
 
   return (
     <div className="fixed inset-0 z-[2000] overflow-hidden flex items-center justify-center"
-      style={{ background: 'linear-gradient(150deg, #070c1b 0%, #0c1430 40%, #060a17 100%)' }}
+      style={{ background: 'linear-gradient(145deg, #081226 0%, #102347 38%, #132d57 60%, #0a1730 100%)' }}
     >
+      <div
+        className="absolute inset-0 opacity-[0.07] mix-blend-screen"
+        style={{
+          backgroundImage: "url('/favicon.png')",
+          backgroundRepeat: 'no-repeat',
+          backgroundPosition: 'center',
+          backgroundSize: 'min(42vw, 420px)',
+        }}
+      />
       {/* Star field */}
       <div className="absolute inset-0 pointer-events-none" style={{ boxShadow: STAR_SHADOWS, width: 1, height: 1 }} />
 
       {/* Ambient glow */}
       <div className="absolute inset-0 pointer-events-none"
-        style={{ background: 'radial-gradient(ellipse 70% 50% at 50% 0%, rgba(99,120,255,0.08) 0%, transparent 70%)' }}
+        style={{ background: 'radial-gradient(ellipse 70% 50% at 50% 0%, rgba(86,165,255,0.14) 0%, transparent 70%)' }}
       />
+      <div className="absolute left-[8%] top-[15%] h-44 w-44 rounded-full bg-sky-400/12 blur-[70px] pointer-events-none" />
+      <div className="absolute right-[10%] bottom-[12%] h-56 w-56 rounded-full bg-fuchsia-300/10 blur-[80px] pointer-events-none" />
 
       {/* Logo — top left */}
       <div className="absolute top-6 left-8 flex items-center gap-2 z-10">
-        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-900/40">
-          <Feather size={16} className="text-white" />
+        <div className="w-9 h-9 rounded-2xl bg-white/10 flex items-center justify-center shadow-lg shadow-sky-950/30 backdrop-blur">
+          <img src="/favicon.png" alt="球球写作" className="h-6 w-6 object-contain" />
         </div>
         <span className="text-white/90 font-semibold text-base tracking-wide">球球写作</span>
       </div>
@@ -176,7 +187,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
       </button>
 
       {/* Decorative moon — right */}
-      <div className="absolute right-[-40px] top-1/2 -translate-y-1/2 w-[420px] h-[420px] opacity-70 pointer-events-none select-none hidden lg:block">
+      <div className="absolute right-[-40px] top-1/2 -translate-y-1/2 w-[420px] h-[420px] opacity-55 pointer-events-none select-none hidden lg:block">
         <Moon />
       </div>
 

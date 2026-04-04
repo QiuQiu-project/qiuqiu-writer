@@ -16,6 +16,8 @@ export interface UseUIStateReturn {
   // 侧边栏折叠状态
   leftSidebarCollapsed: boolean;
   rightSidebarCollapsed: boolean;
+  setLeftSidebarCollapsed: (collapsed: boolean) => void;
+  setRightSidebarCollapsed: (collapsed: boolean) => void;
   toggleLeftSidebar: () => void;
   toggleRightSidebar: () => void;
   
@@ -56,6 +58,8 @@ export function useUIState(): UseUIStateReturn {
     setActiveNav,
     leftSidebarCollapsed,
     rightSidebarCollapsed,
+    setLeftSidebarCollapsed,
+    setRightSidebarCollapsed,
     toggleLeftSidebar,
     toggleRightSidebar,
     mobileMenuOpen,

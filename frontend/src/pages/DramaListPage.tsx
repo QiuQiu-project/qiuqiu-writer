@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Film, Clock, FileText, Trash2, MoreHorizontal, Search } from 'lucide-react';
 import { worksApi, type Work } from '../utils/worksApi';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 export default function DramaListPage() {
   const navigate = useNavigate();
@@ -77,113 +80,74 @@ export default function DramaListPage() {
   );
 
   return (
-    <div
-      className="w-full min-h-[calc(100vh-62px)]"
-      style={{ background: 'var(--page-gradient)', color: 'var(--text-primary)' }}
-    >
-      <div className="max-w-[1280px] mx-auto px-8 py-10 max-md:px-4 max-md:py-6">
-        {/* 页头 */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-5 max-md:flex-col max-md:items-start max-md:gap-3">
-            <div className="flex items-center gap-3">
-              <Film size={24} className="text-violet-400/85" />
-              <h1
-                className="text-2xl font-bold m-0 tracking-tight"
-                style={{ color: 'var(--text-primary)' }}
-              >
-                剧本创作
-              </h1>
-              <span
-                className="text-[13px] font-medium border rounded-full px-2.5 py-0.5"
-                style={{
-                  color: 'var(--text-tertiary)',
-                  background: 'var(--glass-bg-strong, rgba(255,255,255,0.06))',
-                  borderColor: 'var(--glass-border, rgba(255,255,255,0.08))',
-                }}
-              >
-                {works.length}
-              </span>
+    <div className="min-h-[calc(100vh-62px)] bg-[var(--page-gradient)] px-8 py-10 max-md:px-4 max-md:py-6">
+      <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-6">
+        <div className="rounded-2xl border border-white/10 bg-background/90 p-6 shadow-sm backdrop-blur max-md:p-4">
+          <div className="mb-5 flex items-start justify-between gap-4 max-md:flex-col max-md:items-start">
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <Film size={24} className="text-violet-400/85" />
+                <h1 className="m-0 text-2xl font-bold tracking-tight text-foreground">剧本创作</h1>
+                <Badge variant="secondary" className="h-6 px-2.5 text-xs">{works.length}</Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">集中管理剧本项目，继续编辑、搜索和删除已有剧本。</p>
             </div>
-            <button
-              className="inline-flex items-center gap-1.5 h-9 px-4 text-sm font-medium text-white rounded-lg border-none cursor-pointer transition-all hover:-translate-y-px hover:shadow-[0_4px_20px_rgba(124,58,237,0.4)] hover:[background:linear-gradient(135deg,#8b5cf6_0%,#7c3aed_100%)]"
-              style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)' }}
+            <Button
+              className="bg-[linear-gradient(135deg,#7c3aed_0%,#6d28d9_100%)] text-white hover:bg-[linear-gradient(135deg,#8b5cf6_0%,#7c3aed_100%)] hover:text-white"
               onClick={handleCreate}
             >
               <Plus size={16} />
               新建剧本
-            </button>
+            </Button>
           </div>
 
-          {/* Search */}
           <div className="relative max-w-[360px] max-md:max-w-full">
-            <Search
-              size={15}
-              className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
-              style={{ color: 'var(--text-tertiary)' }}
-            />
-            <input
-              className="w-full h-9 pl-9 pr-3.5 text-sm rounded-lg outline-none transition-all border focus:border-violet-500/50 focus:shadow-[0_0_0_3px_rgba(124,58,237,0.12)]"
+            <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="h-10 bg-background pl-9"
               type="text"
               placeholder="搜索剧本..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              style={{
-                color: 'var(--text-primary)',
-                background: 'var(--glass-bg-input, rgba(255,255,255,0.05))',
-                borderColor: 'var(--glass-border, rgba(255,255,255,0.1))',
-              }}
             />
           </div>
         </div>
 
-        {/* 内容区 */}
         {loading ? (
-          <div className="text-center py-20 px-6 text-sm" style={{ color: 'var(--text-tertiary)' }}>
+          <div className="rounded-2xl border border-white/10 bg-background/90 px-6 py-20 text-center text-sm text-muted-foreground shadow-sm backdrop-blur">
             加载中...
           </div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-20 px-6 flex flex-col items-center gap-3">
-            <div className="text-violet-600/30 mb-2">
+          <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-white/10 bg-background/90 px-6 py-20 text-center shadow-sm backdrop-blur">
+            <div className="mb-2 text-violet-600/30">
               <Film size={48} />
             </div>
-            <p className="text-base font-semibold m-0" style={{ color: 'var(--text-secondary)' }}>
+            <p className="m-0 text-base font-semibold text-foreground">
               {searchQuery ? '没有找到匹配的剧本' : '还没有剧本'}
             </p>
             {!searchQuery && (
-              <p className="text-sm m-0 mb-2" style={{ color: 'var(--text-tertiary)' }}>
+              <p className="m-0 mb-2 text-sm text-muted-foreground">
                 点击「新建剧本」开始你的第一个剧本创作
               </p>
             )}
             {!searchQuery && (
-              <button
-                className="inline-flex items-center gap-1.5 h-9 px-4 text-sm font-medium text-white rounded-lg border-none cursor-pointer transition-all hover:-translate-y-px hover:shadow-[0_4px_20px_rgba(124,58,237,0.4)] hover:[background:linear-gradient(135deg,#8b5cf6_0%,#7c3aed_100%)]"
-                style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)' }}
+              <Button
+                className="bg-[linear-gradient(135deg,#7c3aed_0%,#6d28d9_100%)] text-white hover:bg-[linear-gradient(135deg,#8b5cf6_0%,#7c3aed_100%)] hover:text-white"
                 onClick={handleCreate}
               >
                 <Plus size={16} />
                 新建剧本
-              </button>
+              </Button>
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-5 max-md:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] max-md:gap-3.5">
-            {/* 新建卡片 */}
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(190px,220px))] justify-center gap-5 max-md:grid-cols-[repeat(auto-fit,minmax(150px,180px))] max-md:gap-3.5">
             <div
-              className="border border-dashed rounded-2xl overflow-hidden cursor-pointer transition-all duration-[250ms] min-h-[200px] flex items-center justify-center bg-transparent hover:border-violet-600/50 hover:bg-violet-600/5 hover:-translate-y-1 group"
-              style={{ borderColor: 'var(--glass-border-strong, rgba(255,255,255,0.12))' }}
+              className="group flex aspect-[3/4] w-full cursor-pointer items-center justify-center overflow-hidden rounded-2xl border border-dashed border-white/10 bg-background/60 transition-all duration-[250ms] hover:-translate-y-1 hover:border-violet-600/50 hover:bg-violet-600/5"
               onClick={handleCreate}
             >
-              <div
-                className="flex flex-col items-center gap-2.5 text-sm font-medium transition-colors group-hover:text-violet-300/90"
-                style={{ color: 'var(--text-tertiary)' }}
-              >
-                <div
-                  className="w-[52px] h-[52px] rounded-xl border flex items-center justify-center transition-all group-hover:bg-violet-600/15 group-hover:border-violet-600/30"
-                  style={{
-                    background: 'var(--glass-bg-strong, rgba(255,255,255,0.06))',
-                    borderColor: 'var(--glass-border, rgba(255,255,255,0.1))',
-                  }}
-                >
+              <div className="flex flex-col items-center gap-2.5 text-sm font-medium text-muted-foreground transition-colors group-hover:text-violet-300/90">
+                <div className="flex h-[52px] w-[52px] items-center justify-center rounded-xl border border-white/10 bg-background/80 transition-all group-hover:border-violet-600/30 group-hover:bg-violet-600/15">
                   <Plus size={28} />
                 </div>
                 <span>新建剧本</span>
@@ -193,17 +157,11 @@ export default function DramaListPage() {
             {filtered.map(work => (
               <div
                 key={work.id}
-                className="border rounded-2xl overflow-hidden cursor-pointer transition-all duration-[250ms] hover:-translate-y-1 hover:border-violet-600/35 hover:shadow-[0_12px_36px_rgba(0,0,0,0.25),0_0_0_1px_rgba(124,58,237,0.12)] group"
-                style={{
-                  background: 'var(--glass-bg, rgba(255,255,255,0.04))',
-                  borderColor: 'var(--glass-border, rgba(255,255,255,0.08))',
-                }}
+                className="group flex aspect-[3/4] w-full cursor-pointer flex-col overflow-hidden rounded-2xl border border-white/10 bg-background/90 transition-all duration-[250ms] hover:-translate-y-1 hover:border-violet-600/35 hover:shadow-[0_12px_36px_rgba(0,0,0,0.25),0_0_0_1px_rgba(124,58,237,0.12)]"
                 onClick={() => navigate(`/drama/editor?workId=${work.id}`)}
               >
-                {/* 封面区 */}
                 <div
-                  className="relative w-full overflow-hidden"
-                  style={{ aspectRatio: '16/9', background: 'var(--glass-bg-strong, rgba(255,255,255,0.06))' }}
+                  className="relative h-[58%] w-full overflow-hidden"
                 >
                   {work.cover_image ? (
                     <img src={work.cover_image} alt={work.title} className="w-full h-full object-cover" />
@@ -213,44 +171,35 @@ export default function DramaListPage() {
                     </div>
                   )}
                   <div className="absolute top-2.5 left-2.5">
-                    <span className="text-[11px] font-semibold text-violet-300/90 bg-violet-600/20 border border-violet-600/30 rounded-full px-2 py-0.5">
-                      剧本
-                    </span>
+                    <Badge className="bg-violet-600/20 text-violet-200 hover:bg-violet-600/20">剧本</Badge>
                   </div>
                 </div>
 
-                {/* 信息区 */}
-                <div className="p-4">
+                <div className="flex flex-1 flex-col p-4">
                   <div className="flex items-start gap-2 mb-1.5 relative">
                     <h3
-                      className="flex-1 text-[15px] font-semibold m-0 truncate transition-colors group-hover:text-violet-300/95"
-                      style={{ color: 'var(--text-primary)' }}
+                      className="m-0 flex-1 truncate text-[15px] font-semibold text-foreground transition-colors group-hover:text-violet-300/95"
                     >
                       {work.title || '未命名剧本'}
                     </h3>
-                    <button
-                      className="shrink-0 w-7 h-7 flex items-center justify-center border-none rounded-[6px] cursor-pointer transition-all -mt-0.5 bg-transparent hover:[background:var(--glass-bg-strong)] hover:[color:var(--text-secondary)]"
-                      style={{ color: 'var(--text-tertiary)' }}
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="-mt-0.5 shrink-0 text-muted-foreground hover:bg-muted/80 hover:text-foreground"
                       onClick={e => {
                         e.stopPropagation();
                         setOpenMenuId(openMenuId === work.id ? null : work.id);
                       }}
                     >
                       <MoreHorizontal size={16} />
-                    </button>
+                    </Button>
                     {openMenuId === work.id && (
                       <div
-                        className="absolute top-full right-0 min-w-[130px] rounded-[10px] border p-1 z-[100] backdrop-blur-xl"
-                        style={{
-                          background: 'var(--glass-dropdown-bg, rgba(10,20,45,0.95))',
-                          borderColor: 'var(--glass-border-strong, rgba(255,255,255,0.1))',
-                          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-                        }}
+                        className="absolute right-0 top-full z-[100] min-w-[130px] rounded-[10px] border border-white/10 bg-background/95 p-1 shadow-xl backdrop-blur-xl"
                         onMouseDown={e => e.stopPropagation()}
                       >
                         <button
-                          className="flex items-center gap-2 w-full px-2.5 py-2 text-[13px] bg-transparent border-none rounded-[7px] cursor-pointer text-left transition-all hover:bg-red-500/[0.12] hover:text-red-400 disabled:opacity-50"
-                          style={{ color: 'var(--text-secondary)' }}
+                          className="flex w-full items-center gap-2 rounded-[7px] px-2.5 py-2 text-left text-[13px] text-muted-foreground transition-all hover:bg-red-500/[0.12] hover:text-red-400 disabled:opacity-50"
                           onClick={e => {
                             e.stopPropagation();
                             setOpenMenuId(null);
@@ -267,19 +216,18 @@ export default function DramaListPage() {
 
                   {work.description && (
                     <p
-                      className="text-[13px] m-0 mb-2.5 leading-[1.5] line-clamp-2"
-                      style={{ color: 'var(--text-tertiary)' }}
+                      className="m-0 mb-2.5 line-clamp-3 text-[13px] leading-[1.5] text-muted-foreground"
                     >
                       {work.description}
                     </p>
                   )}
 
-                  <div className="flex items-center gap-3.5">
-                    <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                  <div className="mt-auto flex flex-col gap-2 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
                       <FileText size={12} />
                       {work.word_count || 0} 字
                     </span>
-                    <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Clock size={12} />
                       {formatDate(work.updated_at)}
                     </span>

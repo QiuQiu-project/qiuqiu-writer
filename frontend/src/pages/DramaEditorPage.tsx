@@ -7,7 +7,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Film, Users, Layers, BookOpen, MapPin,
   Plus, Trash2, Sparkles, X, Wifi, WifiOff,
-  Download, ChevronLeft, ChevronRight as ChevronRightIcon,
+  Download, ChevronLeft,
   PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Settings,
   Clapperboard, Check, Upload, Star, Image as ImageIcon
 } from 'lucide-react';
@@ -33,6 +33,9 @@ import StoryboardView from '../components/drama/StoryboardView';
 import type { WorkData } from '../components/editor/work-info/types';
 import type { DramaCharacter, DramaEpisode, DramaMeta, DramaScene, DramaStoryboard, LocalDramaTask, EpisodeProductionStatus, SubjectType } from '../components/drama/dramaTypes';
 import './DramaEditorPage.css';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 
 type LeftTab = 'work-info' | 'episodes' | 'subjects' | 'production';
 
@@ -980,6 +983,56 @@ export default function DramaEditorPage() {
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSaveErrorRef = useRef(false);
+  const leftPanelAutoCollapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rightPanelAutoCollapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearLeftPanelAutoCollapseTimer = useCallback(() => {
+    if (leftPanelAutoCollapseTimerRef.current) {
+      clearTimeout(leftPanelAutoCollapseTimerRef.current);
+      leftPanelAutoCollapseTimerRef.current = null;
+    }
+  }, []);
+
+  const clearRightPanelAutoCollapseTimer = useCallback(() => {
+    if (rightPanelAutoCollapseTimerRef.current) {
+      clearTimeout(rightPanelAutoCollapseTimerRef.current);
+      rightPanelAutoCollapseTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleLeftPanelAutoCollapse = useCallback(() => {
+    if (leftCollapsed) return;
+    clearLeftPanelAutoCollapseTimer();
+    leftPanelAutoCollapseTimerRef.current = setTimeout(() => {
+      setLeftCollapsed(true);
+    }, 1800);
+  }, [clearLeftPanelAutoCollapseTimer, leftCollapsed]);
+
+  const scheduleRightPanelAutoCollapse = useCallback(() => {
+    if (rightCollapsed) return;
+    clearRightPanelAutoCollapseTimer();
+    rightPanelAutoCollapseTimerRef.current = setTimeout(() => {
+      setRightCollapsed(true);
+    }, 1800);
+  }, [clearRightPanelAutoCollapseTimer, rightCollapsed]);
+
+  useEffect(() => {
+    if (!leftCollapsed) {
+      scheduleLeftPanelAutoCollapse();
+    } else {
+      clearLeftPanelAutoCollapseTimer();
+    }
+    return clearLeftPanelAutoCollapseTimer;
+  }, [clearLeftPanelAutoCollapseTimer, leftCollapsed, scheduleLeftPanelAutoCollapse]);
+
+  useEffect(() => {
+    if (!rightCollapsed) {
+      scheduleRightPanelAutoCollapse();
+    } else {
+      clearRightPanelAutoCollapseTimer();
+    }
+    return clearRightPanelAutoCollapseTimer;
+  }, [clearRightPanelAutoCollapseTimer, rightCollapsed, scheduleRightPanelAutoCollapse]);
 
   // 加载作品 + 当前用户
   useEffect(() => {
@@ -1207,10 +1260,6 @@ export default function DramaEditorPage() {
     input.click();
   };
 
-  // 集数导航
-  const episodeIndex = meta.episodes.findIndex(e => e.id === activeEpisodeId);
-  const prevEpisode = episodeIndex > 0 ? meta.episodes[episodeIndex - 1] : null;
-  const nextEpisode = episodeIndex < meta.episodes.length - 1 ? meta.episodes[episodeIndex + 1] : null;
   const activeEpisode = meta.episodes.find(e => e.id === activeEpisodeId) || null;
 
   // Yjs 协作编辑器（按集连接）
@@ -1651,7 +1700,7 @@ export default function DramaEditorPage() {
 
   if (loading) {
     return (
-      <div className="drama-editor-loading">
+      <div className="flex h-screen w-screen flex-col items-center justify-center gap-3 bg-[linear-gradient(160deg,#06091a_0%,#0c1630_45%,#06091a_100%)] text-white/80">
         <Film size={32} />
         <p>加载中...</p>
       </div>
@@ -1659,34 +1708,37 @@ export default function DramaEditorPage() {
   }
 
   return (
-    <div className="drama-editor-page">
-      {/* 顶部栏 */}
-      <header className="drama-editor-topbar">
-        <div className="drama-editor-topbar-left">
-          <button className="drama-back-btn" onClick={() => navigate('/drama')}>
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-[linear-gradient(180deg,#f6f0ff_0%,#fdf7ff_100%)] text-foreground">
+      <header className="flex h-18 min-h-18 items-center justify-between gap-4 border-b border-[#ede4ff] bg-[#fdf7ff]/95 px-6 shadow-sm backdrop-blur max-md:h-16 max-md:min-h-16 max-md:px-3">
+        <div className="flex min-w-0 flex-1 items-center gap-3 max-md:gap-2">
+          <button className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl border border-[#ede4ff] bg-white text-[#574235]/70 transition-colors hover:bg-[#f8f1ff] hover:text-[#1f045a]" onClick={() => navigate('/novel?section=workbench')}>
             <ArrowLeft size={16} />
           </button>
           <button
-            className="drama-sidebar-toggle"
+            className={cn(
+              'inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-[#ede4ff] bg-white text-[#574235]/70 transition-colors hover:bg-[#f8f1ff] hover:text-[#1f045a]',
+              leftCollapsed && 'bg-[#ff8000] text-white hover:bg-[#e87400]'
+            )}
             onClick={() => setLeftCollapsed(v => !v)}
             title={leftCollapsed ? '展开侧栏' : '收起侧栏'}
           >
             {leftCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
           </button>
-          <Film size={15} className="drama-editor-topbar-icon" />
-          <input
-            className="drama-title-input"
+          <span className="hidden rounded-full bg-[#fff2e5] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-[#964900] md:inline-flex">工作台</span>
+          <Film size={15} className="shrink-0 text-[#ff8000]" />
+          <Input
+            className="h-10 min-w-0 flex-1 border-0 bg-transparent px-0 text-base font-semibold text-[#1f045a] shadow-none focus-visible:ring-0"
             value={workTitle}
             onChange={e => setWorkTitle(e.target.value)}
             onBlur={e => { if (e.target.value !== work?.title) handleUpdateTitle(e.target.value); }}
             onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
             placeholder="剧本名称"
           />
-          <span className="drama-save-status">
+          <span className="shrink-0 text-xs text-[#574235]/70 max-md:hidden">
             {saving ? '保存中...' : savedAt ? `已保存 ${savedAt.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}` : ''}
           </span>
           {yjsDocumentId && (
-            <span className="drama-status-tag">
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[#ede4ff] bg-white px-2.5 py-1 text-xs text-[#574235]/70 max-md:hidden">
               {connectionStatus === 'connected' ? (
                 <Wifi size={12} />
               ) : connectionStatus === 'connecting' ? (
@@ -1698,19 +1750,24 @@ export default function DramaEditorPage() {
             </span>
           )}
         </div>
-        <div className="drama-editor-topbar-right">
+        <div className="flex shrink-0 items-center gap-2">
           {workId && (
-            <button
-              className="drama-share-btn"
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-[#dfc1af] bg-white text-[#1f045a] hover:bg-[#f8f1ff]"
               onClick={() => setShareModalOpen(true)}
               title="邀请协作者"
             >
               <Users size={15} />
               <span>分享</span>
-            </button>
+            </Button>
           )}
           <button
-            className="drama-sidebar-toggle"
+            className={cn(
+              'inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-[#ede4ff] bg-white text-[#574235]/70 transition-colors hover:bg-[#f8f1ff] hover:text-[#1f045a]',
+              rightCollapsed && 'bg-[#ff8000] text-white hover:bg-[#e87400]'
+            )}
             onClick={() => setRightCollapsed(v => !v)}
             title={rightCollapsed ? '展开 AI 面板' : '收起 AI 面板'}
           >
@@ -1719,38 +1776,48 @@ export default function DramaEditorPage() {
         </div>
       </header>
 
-      <div className="drama-editor-body">
-        {/* 左侧导航 */}
+      <div className="relative flex min-h-0 flex-1 overflow-hidden bg-transparent">
         {!leftCollapsed && (
-          <aside className="drama-editor-left">
-            <DramaSideNav
-              meta={meta}
-              activeEpisodeId={activeEpisodeId}
-              onSelectEpisode={id => {
-                setActiveEpisodeId(id);
-                setViewMode('script');
-                if (leftTab === 'work-info') setLeftTab('episodes');
+          <aside className="pointer-events-none absolute inset-y-4 left-4 z-40 w-[320px] transition-all duration-300 max-xl:w-[280px]">
+            <div
+              className="pointer-events-auto h-full overflow-hidden rounded-[28px] border border-[#ede4ff] bg-[#f8f1ff]/95 shadow-[0px_20px_40px_rgba(31,4,90,0.08)] backdrop-blur"
+              onMouseEnter={clearLeftPanelAutoCollapseTimer}
+              onMouseLeave={scheduleLeftPanelAutoCollapse}
+              onFocusCapture={clearLeftPanelAutoCollapseTimer}
+              onBlurCapture={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                  scheduleLeftPanelAutoCollapse();
+                }
               }}
-              activeTab={leftTab}
-              onTabChange={setLeftTab}
-              onAddEpisode={handleAddEpisode}
-              onAddEpisodeFromNovel={() => setEpisodeImportModalOpen(true)}
-              onDeleteEpisode={handleDeleteEpisode}
-              generatingCharacterImage={generatingCharacterImage}
-              onSelectCharacter={c => { setSelectedCharacter(c); setEditingCharacterData(c); }}
-              scenes={meta.scenes || []}
-              generatingSceneImage={generatingSceneImage}
-              onSelectScene={setSelectedScene}
-              onGenerateStoryboard={handleGenerateStoryboard}
-              onAddSubject={openCreateSubject}
-            />
+            >
+              <DramaSideNav
+                meta={meta}
+                activeEpisodeId={activeEpisodeId}
+                onSelectEpisode={id => {
+                  setActiveEpisodeId(id);
+                  setViewMode('script');
+                  if (leftTab === 'work-info') setLeftTab('episodes');
+                }}
+                activeTab={leftTab}
+                onTabChange={setLeftTab}
+                onAddEpisode={handleAddEpisode}
+                onAddEpisodeFromNovel={() => setEpisodeImportModalOpen(true)}
+                onDeleteEpisode={handleDeleteEpisode}
+                generatingCharacterImage={generatingCharacterImage}
+                onSelectCharacter={c => { setSelectedCharacter(c); setEditingCharacterData(c); }}
+                scenes={meta.scenes || []}
+                generatingSceneImage={generatingSceneImage}
+                onSelectScene={setSelectedScene}
+                onGenerateStoryboard={handleGenerateStoryboard}
+                onAddSubject={openCreateSubject}
+              />
+            </div>
           </aside>
         )}
 
-        {/* 主内容区 */}
-        <main className="drama-editor-main">
+        <main className="relative z-0 flex min-w-0 flex-1 flex-col overflow-hidden bg-transparent px-4 py-4">
           {leftTab === 'work-info' ? (
-            <div className="work-info-panel-wrapper">
+            <div className="min-h-0 flex-1 overflow-hidden">
               <WorkInfoManager
                 workId={workId}
                 workData={work ? { metadata: { ...(work.metadata || {}) } } as WorkData : undefined}
@@ -1774,40 +1841,18 @@ export default function DramaEditorPage() {
                 workId={workId}
                 selectedImageSize={selectedImageSize}
               />
-              {/* 集数导航 */}
-              <div className="drama-ep-nav-footer">
-                <button
-                  className="drama-ep-nav-btn"
-                  disabled={!prevEpisode}
-                  onClick={() => prevEpisode && setActiveEpisodeId(prevEpisode.id)}
-                >
-                  <ChevronLeft size={15} />
-                  {prevEpisode ? prevEpisode.title : '已是第一集'}
-                </button>
-                <span className="drama-ep-nav-indicator">
-                  {episodeIndex + 1} / {meta.episodes.length}
-                </span>
-                <button
-                  className="drama-ep-nav-btn"
-                  disabled={!nextEpisode}
-                  onClick={() => nextEpisode && setActiveEpisodeId(nextEpisode.id)}
-                >
-                  {nextEpisode ? nextEpisode.title : '已是最后一集'}
-                  <ChevronRightIcon size={15} />
-                </button>
-              </div>
             </>
           ) : (
-            <div className="drama-editor-welcome">
-              <div className="drama-editor-welcome-inner">
-                <Film size={48} className="drama-editor-welcome-icon" />
-                <h2>开始你的剧本创作</h2>
-                <p>在左侧添加集数，或从小说一键导入</p>
-                <div className="drama-editor-welcome-btns">
-                  <button className="drama-create-btn" onClick={handleAddEpisode}>
+            <div className="flex min-h-0 flex-1 items-center justify-center p-8">
+              <div className="flex max-w-xl flex-col items-center rounded-[28px] border border-[#ede4ff] bg-[#fdf7ff]/95 px-10 py-12 text-center shadow-[0px_20px_40px_rgba(31,4,90,0.06)]">
+                <Film size={48} className="mb-4 text-[#ff8000]" />
+                <h2 className="mb-3 text-2xl font-semibold text-[#1f045a]">开始你的剧本创作</h2>
+                <p className="mb-6 text-sm text-[#574235]/70">在左侧添加集数，或从小说一键导入</p>
+                <div className="flex gap-3">
+                  <button className="inline-flex items-center gap-2 rounded-lg bg-[#964900] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#7a3c00]" onClick={handleAddEpisode}>
                     <Plus size={16} /> 创建第一集
                   </button>
-                  <button className="drama-import-novel-btn drama-import-novel-btn-welcome"
+                  <button className="inline-flex items-center gap-2 rounded-lg border border-[#dfc1af] bg-white px-4 py-2.5 text-sm font-medium text-[#1f045a] transition-colors hover:bg-[#f8f1ff]"
                     onClick={() => setImportModalOpen(true)}>
                     <Download size={15} /> 从小说导入
                   </button>
@@ -1816,23 +1861,33 @@ export default function DramaEditorPage() {
             </div>
           )}
         </main>
-
-        {/* 右侧 AI 面板 */}
         {!rightCollapsed && workId && (
-          <aside className="drama-editor-right">
-            <CollabAIPanel
-              workId={workId}
-              chapters={chapterItems}
-              currentChapterId={activeEpisodeId || undefined}
-              currentUserId={currentUserId}
-              selectedModel={selectedModel}
-              onSelectedModelChange={setSelectedModel}
-              showBuiltInCommands={false}
-              localTasks={localTasks}
-              extraCommands={[...DRAMA_EXTRA_COMMANDS]}
-              onExtraCommand={handleDramaCommand}
-              onCancelLocalTask={handleCancelLocalTask}
-            />
+          <aside className="pointer-events-none absolute inset-y-4 right-4 z-40 w-[360px] transition-all duration-300 max-xl:w-[320px]">
+            <div
+              className="pointer-events-auto h-full overflow-hidden rounded-[28px] border border-[#ede4ff] bg-[#f8f1ff]/95 shadow-[0px_20px_40px_rgba(31,4,90,0.08)] backdrop-blur"
+              onMouseEnter={clearRightPanelAutoCollapseTimer}
+              onMouseLeave={scheduleRightPanelAutoCollapse}
+              onFocusCapture={clearRightPanelAutoCollapseTimer}
+              onBlurCapture={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                  scheduleRightPanelAutoCollapse();
+                }
+              }}
+            >
+              <CollabAIPanel
+                workId={workId ?? ''}
+                chapters={chapterItems}
+                currentChapterId={activeEpisodeId || undefined}
+                currentUserId={currentUserId}
+                selectedModel={selectedModel}
+                onSelectedModelChange={setSelectedModel}
+                showBuiltInCommands={false}
+                localTasks={localTasks}
+                extraCommands={[...DRAMA_EXTRA_COMMANDS]}
+                onExtraCommand={handleDramaCommand}
+                onCancelLocalTask={handleCancelLocalTask}
+              />
+            </div>
           </aside>
         )}
       </div>

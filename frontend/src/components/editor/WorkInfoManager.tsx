@@ -14,8 +14,9 @@ import MessageModal from '../common/MessageModal';
 import type { MessageType } from '../common/MessageModal';
 import { parseError } from '../../utils/errorUtils';
 // import GuideTip from '../common/GuideTip';
-import './WorkInfoManager.css';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 
 // Import refactored modules
 import ComponentEditorModal from './work-info/ComponentEditorModal';
@@ -239,6 +240,13 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
     };
   } | null>(null);
 
+  const fieldClassName =
+    'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-60';
+  const textareaClassName =
+    'min-h-20 w-full resize-y rounded-lg border border-input bg-background px-3 py-2 text-sm leading-6 text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-60';
+  const iconActionClassName =
+    'flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary disabled:pointer-events-none disabled:opacity-40';
+
   // 处理 activeModuleId prop 变化
   useEffect(() => {
     if (activeModuleId && template?.modules) {
@@ -438,11 +446,11 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
   }, [firstEmptyInfo, manualTabSelection, tipsEnabled]);
 
   if (loading) {
-    return <div className="loading-container">加载中...</div>;
+    return <div className="flex h-full items-center justify-center rounded-xl border border-border bg-muted/40 text-sm text-muted-foreground">加载中...</div>;
   }
 
   if (!template) {
-    return <div className="error-container">无法加载模板数据</div>;
+    return <div className="flex h-full items-center justify-center rounded-xl border border-destructive/20 bg-destructive/5 text-sm text-destructive">无法加载模板数据</div>;
   }
 
   const activeModule = template.modules[activeModuleIndex];
@@ -573,7 +581,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
             isActiveGuide={isActiveGuide}
             tipsEnabled={tipsEnabled}
             type="text"
-            className="comp-input"
+            className={fieldClassName}
             value={(comp.value as string) || ''}
             onChange={(e) => updateValue(e.target.value)}
             placeholder={comp.config.placeholder}
@@ -587,7 +595,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
             id={`guided-comp-${comp.id}`}
             isActiveGuide={isActiveGuide}
             tipsEnabled={tipsEnabled}
-            className="comp-textarea"
+            className={textareaClassName}
             value={(comp.value as string) || ''}
             onChange={(e) => updateValue(e.target.value)}
             placeholder={comp.config.placeholder}
@@ -617,13 +625,13 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
 
       case 'tags':
         return (
-            <div className="comp-tags-container" id={`guided-comp-${comp.id}`}>
-                 <div className="tags-list">
+            <div className="flex flex-col gap-3" id={`guided-comp-${comp.id}`}>
+                 <div className="flex flex-wrap gap-2">
                     {Array.isArray(comp.value) && (comp.value as string[]).map((tag, i) => (
-                        <span key={i} className="tag-item">
+                        <span key={i} className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground">
                             {tag}
                             {!readOnly && (
-                              <button onClick={() => {
+                              <button className="rounded-full bg-white/20 p-0.5 transition-colors hover:bg-white/40" onClick={() => {
                                   const newTags = (comp.value as string[]).filter((_, idx) => idx !== i);
                                   updateValue(newTags);
                               }}><X size={12} /></button>
@@ -647,7 +655,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
                               }
                           }
                       }}
-                      className="comp-input"
+                      className={fieldClassName}
                    />
                  )}
             </div>
@@ -689,19 +697,19 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
 
       case 'image':
         return (
-          <div className="comp-image-uploader" id={`guided-comp-${comp.id}`}>
+          <div className="w-full" id={`guided-comp-${comp.id}`}>
              {comp.value ? (
-               <div className="image-preview">
-                 <img src={comp.value as string} alt="Uploaded" />
-                 {!readOnly && <button className="remove-btn" onClick={() => updateValue('')}><X size={14} /></button>}
+               <div className="relative max-w-[300px] overflow-hidden rounded-lg">
+                 <img src={comp.value as string} alt="Uploaded" className="block h-auto w-full" />
+                 {!readOnly && <button className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full bg-black/60 text-white transition-colors hover:bg-destructive" onClick={() => updateValue('')}><X size={14} /></button>}
                </div>
              ) : (
                !readOnly && (
-                 <div className="upload-placeholder" onClick={() => {
+                 <div className="flex h-[150px] w-[200px] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-muted/40 text-sm text-muted-foreground transition-colors hover:border-primary hover:bg-primary/10 hover:text-primary" onClick={() => {
                       setCurrentImageId(comp.id);
                       fileInputRef.current?.click();
                  }}>
-                     <div className="icon"><span className="lucide lucide-image"></span></div>
+                     <div className="text-lg"><span className="lucide lucide-image"></span></div>
                      <span>点击上传封面</span>
                  </div>
                )
@@ -810,7 +818,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
           };
 
           return (
-            <div className="comp-relation-graph" id={`guided-comp-${comp.id}`} style={{ width: '100%', height: '600px', minHeight: '600px' }}>
+            <div className="w-full min-h-[600px]" id={`guided-comp-${comp.id}`} style={{ width: '100%', height: '600px', minHeight: '600px' }}>
               <CharacterRelations 
                 key={`relation-graph-${comp.id}`}
                 data={graphData}
@@ -1025,29 +1033,34 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
   };
 
   return (
-    <div className="work-info-manager">
-      <div className="work-info-sidebar">
+    <div className="flex h-full gap-6 overflow-hidden bg-muted/40 p-6 max-md:flex-col max-md:gap-3 max-md:p-3">
+      <div className="group flex w-14 shrink-0 flex-col gap-2 overflow-x-hidden overflow-y-auto rounded-2xl border border-border bg-background p-1.5 shadow-sm transition-[width,padding] duration-300 hover:w-60 hover:p-3 max-md:w-full max-md:flex-row max-md:overflow-x-auto max-md:overflow-y-hidden max-md:rounded-xl max-md:p-2 max-md:hover:w-full">
         {template.modules.map((module, index) => (
           <button
             key={module.id}
-            className={`module-btn ${activeModuleIndex === index ? 'active' : ''}`}
+            className={cn(
+              'flex items-center justify-center gap-3 rounded-xl border-0 bg-transparent px-3 py-3 text-left text-sm font-medium whitespace-nowrap text-muted-foreground transition-all hover:bg-muted hover:text-foreground max-md:min-w-16 max-md:flex-col max-md:gap-1 max-md:px-3 max-md:py-2',
+              'group-hover:justify-start',
+              activeModuleIndex === index && 'bg-muted text-foreground font-semibold',
+            )}
             onClick={() => {
               setActiveModuleIndex(index);
               if (onActiveModuleChange) {
                 onActiveModuleChange(module.id);
               }
             }}
-            style={{ borderColor: module.color }}
+            style={{ boxShadow: activeModuleIndex === index ? `inset 3px 0 0 ${module.color}` : undefined }}
           >
-            {IconMap[module.icon] || <LayoutGrid size={18} />}
-            <span>{module.name}</span>
+            <span className="shrink-0 opacity-80">{IconMap[module.icon] || <LayoutGrid size={18} />}</span>
+            <span className="hidden opacity-0 transition-opacity delay-75 group-hover:inline group-hover:opacity-100 max-md:inline max-md:text-[10px] max-md:opacity-100">{module.name}</span>
+            {activeModuleIndex === index && <span className="ml-auto hidden size-1.5 rounded-full bg-current group-hover:block max-md:ml-0 max-md:block" />}
           </button>
         ))}
       </div>
-      <div className="work-info-content">
-        <div className="module-header">
-           <h2>{activeModule?.name}</h2>
-           <div className="header-actions">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-sm">
+        <div className="flex items-center justify-between gap-4 border-b border-border bg-background px-6 py-4 max-lg:flex-col max-lg:items-start max-lg:px-4 max-lg:py-3">
+           <h2 className="min-w-0 flex-1 truncate text-lg font-semibold text-foreground max-lg:w-full max-lg:text-base">{activeModule?.name}</h2>
+           <div className="flex w-full shrink-0 items-center gap-2 overflow-x-auto max-lg:pb-1 lg:w-auto">
              {/* <GuideTip
                id="work-info-template-market"
                content={
@@ -1107,21 +1120,20 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
              )}
            </div>
         </div>
-        <div className="module-components">
+        <div className="mx-auto flex w-full max-w-[900px] flex-1 flex-col gap-6 overflow-y-auto p-6 max-md:p-4">
           {activeModule?.components.map((comp, index) => {
              const showGenerateBtn = ['text', 'textarea', 'list', 'character-card', 'rank-system', 'keyvalue'].includes(comp.type);
              
              // AI生成按钮
              const generateBtn = (
                 <button 
-                  className="icon-btn"
+                  className={iconActionClassName}
                   onClick={() => handleGenerateData(comp, activeModule.id)}
                   disabled={generatingComponents[comp.id] || readOnly}
                   title="AI生成内容"
-                  style={{ padding: '4px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#3b82f6' }}
                 >
                   {generatingComponents[comp.id] ? (
-                    <span className="loading-spinner small" style={{ width: '16px', height: '16px', border: '2px solid #e2e8f0', borderTopColor: '#3b82f6', borderRadius: '50%', display: 'block', animation: 'spin 1s linear infinite' }}></span>
+                    <span className="block size-4 animate-spin rounded-full border-2 border-slate-200 border-t-primary"></span>
                   ) : (
                     <Sparkles size={16} />
                   )}
@@ -1131,7 +1143,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
              // 编辑按钮
              const settingsBtn = (
                 <button 
-                  className="comp-edit-btn"
+                  className={iconActionClassName}
                   title="编辑组件"
                   onClick={() => {
                   setEditingComponentId(comp.id);
@@ -1145,8 +1157,8 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
              );
 
              return (
-             <div key={comp.id} className="comp-wrapper">
-                <div className="comp-header">
+             <div key={comp.id} className="rounded-xl border border-border bg-background p-5 shadow-sm transition-shadow hover:shadow-md">
+                <div className="mb-4 flex items-center justify-between gap-2 border-b border-border pb-3 max-md:gap-2">
                   {/* Sequential Guide: Show tip only for the first empty component */}
                   {comp.id === firstEmptyComponentId ? (
                     //  <GuideTip
@@ -1165,7 +1177,7 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
                   ) : (
                      <label>{comp.label}</label>
                   )}
-                 <div className="header-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                 <div className="ml-auto flex shrink-0 items-center gap-2">
                     {showGenerateBtn && (
                       index === 0 ? (
                         <>
@@ -1186,14 +1198,14 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
                     )}
                  </div>
                </div>
-               <div className="comp-content">
+               <div className="flex flex-col gap-3">
                  {renderComponent(comp, activeModule.id)}
                </div>
              </div>
              );
           })}
           {isEditMode && (
-            <div className="add-comp-wrapper" onClick={() => {
+            <div className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-border bg-muted/40 p-8 text-muted-foreground transition-colors hover:border-primary hover:bg-primary/10 hover:text-primary" onClick={() => {
                 setEditingComponentId(null);
                 setEditingComponentData(undefined);
                 setShowAddComponent(true);
@@ -1211,18 +1223,17 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
         onClose={() => setShowAddModule(false)}
         initialWidth={480}
         initialHeight={400}
-        className="add-module-modal-content"
+        className="overflow-hidden rounded-2xl border border-border bg-background shadow-2xl"
         handleClassName=".modal-header"
       >
-        <div className="modal-header">
-          <h3>添加新模块</h3>
-          <button className="close-btn" onClick={() => setShowAddModule(false)}><X size={18} /></button>
+        <div className="modal-header flex items-center justify-between border-b border-border px-5 py-4">
+          <h3 className="text-base font-semibold text-foreground">添加新模块</h3>
+          <Button variant="ghost" size="icon-sm" onClick={() => setShowAddModule(false)}><X size={18} /></Button>
         </div>
-        <div className="modal-body">
-          <div className="form-group">
-            <label>模块名称</label>
-            <input
-              type="text"
+        <div className="flex flex-col gap-5 p-5">
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-muted-foreground">模块名称</label>
+            <Input
               value={newModuleForm.name}
               onChange={(e) => setNewModuleForm({ ...newModuleForm, name: e.target.value })}
               placeholder="例如：世界观、人物设定"
@@ -1230,13 +1241,16 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
               onKeyDown={(e) => e.key === 'Enter' && handleAddModule()}
             />
           </div>
-          <div className="form-group">
-            <label>图标</label>
-            <div className="icon-selector">
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-muted-foreground">图标</label>
+            <div className="mt-1 grid grid-cols-[repeat(auto-fill,minmax(44px,1fr))] gap-3 p-1">
               {Object.keys(IconMap).map(iconName => (
                 <button
                   key={iconName}
-                  className={`icon-btn ${newModuleForm.icon === iconName ? 'active' : ''}`}
+                  className={cn(
+                    'flex aspect-square w-full items-center justify-center rounded-lg border border-border bg-muted/40 text-muted-foreground transition-all hover:-translate-y-0.5 hover:border-primary hover:bg-background hover:text-primary hover:shadow-sm',
+                    newModuleForm.icon === iconName && 'border-primary bg-primary/10 text-primary ring-2 ring-primary/10'
+                  )}
                   onClick={() => setNewModuleForm({ ...newModuleForm, icon: iconName })}
                   title={iconName}
                 >
@@ -1246,9 +1260,9 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
             </div>
           </div>
         </div>
-        <div className="modal-footer">
-          <button onClick={() => setShowAddModule(false)}>取消</button>
-          <button className="primary" onClick={handleAddModule}>确认添加</button>
+        <div className="flex items-center justify-end gap-2 border-t border-border px-5 py-4">
+          <Button variant="outline" onClick={() => setShowAddModule(false)}>取消</Button>
+          <Button onClick={handleAddModule}>确认添加</Button>
         </div>
       </DraggableResizableModal>
 

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Plus, Edit2, Trash2, ChevronDown, ChevronRight, X, Users } from 'lucide-react';
 import DraggableResizableModal from '../common/DraggableResizableModal';
-import './Factions.css';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 interface Faction {
   id: string;
@@ -87,6 +88,13 @@ export default function Factions({ readOnly }: { readOnly?: boolean }) {
     levels: [],
   });
   const [newLevel, setNewLevel] = useState('');
+
+  const textareaClassName =
+    'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50';
+  const surfaceCardClassName =
+    'rounded-lg border border-border bg-background p-4 transition-all hover:border-primary/40 hover:shadow-sm';
+  const infoPanelClassName =
+    'mt-3 rounded-lg border-l-[3px] border-primary/70 bg-muted/50 px-3 py-3';
 
   const toggleFaction = (factionId: string) => {
     setExpandedFactions((prev) => ({
@@ -253,56 +261,55 @@ export default function Factions({ readOnly }: { readOnly?: boolean }) {
       const isEditing = editingFaction === faction.id;
 
       return (
-        <div key={faction.id} className="faction-tree-item">
+        <div key={faction.id} className="flex flex-col">
           <div
-            className="faction-tree-row"
+            className="mb-2 flex items-start gap-2"
             style={{ paddingLeft: `${level * 24 + 12}px` }}
           >
             {hasChildren ? (
-              <button
-                className="faction-toggle-btn"
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                className="mt-1 shrink-0 text-muted-foreground"
                 onClick={() => toggleFaction(faction.id)}
               >
                 {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-              </button>
+              </Button>
             ) : (
-              <div className="faction-toggle-placeholder" />
+              <div className="w-6 shrink-0" />
             )}
-            <div className="faction-tree-content">
+            <div className="min-w-0 flex-1">
               {isEditing ? (
-                <div className="faction-edit-form">
-                  <input
-                    type="text"
-                    className="faction-name-input"
+                <div className="flex flex-col gap-3 rounded-lg border border-primary/40 bg-background p-4">
+                  <Input
                     value={factionForm.name}
                     onChange={(e) => setFactionForm({ ...factionForm, name: e.target.value })}
                     placeholder="势力名称"
                     autoFocus
                   />
                   <textarea
-                    className="faction-info-textarea"
+                    className={textareaClassName}
                     value={factionForm.summary}
                     onChange={(e) => setFactionForm({ ...factionForm, summary: e.target.value })}
                     placeholder="势力简述..."
                     rows={2}
                   />
                   <textarea
-                    className="faction-info-textarea"
+                    className={textareaClassName}
                     value={factionForm.details}
                     onChange={(e) => setFactionForm({ ...factionForm, details: e.target.value })}
                     placeholder="详细信息..."
                     rows={4}
                   />
-                  <div className="faction-levels-section">
-                    <div className="levels-header">
-                      <span className="levels-title">等级阶梯</span>
-                      <div className="add-level-input">
-                        <input
-                          type="text"
+                  <div className="mt-1 flex flex-col gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <span className="text-sm font-semibold text-foreground">等级阶梯</span>
+                      <div className="flex min-w-[200px] flex-1 gap-2">
+                        <Input
                           value={newLevel}
                           onChange={(e) => setNewLevel(e.target.value)}
                           placeholder="输入等级名称"
-                          onKeyPress={(e) => {
+                          onKeyDown={(e) => {
                             if (e.key === 'Enter' && newLevel.trim()) {
                               setFactionForm({
                                 ...factionForm,
@@ -312,8 +319,8 @@ export default function Factions({ readOnly }: { readOnly?: boolean }) {
                             }
                           }}
                         />
-                        <button
-                          className="add-level-btn"
+                        <Button
+                          size="icon-sm"
                           onClick={() => {
                             if (newLevel.trim()) {
                               setFactionForm({
@@ -325,16 +332,20 @@ export default function Factions({ readOnly }: { readOnly?: boolean }) {
                           }}
                         >
                           <Plus size={14} />
-                        </button>
+                        </Button>
                       </div>
                     </div>
-                    <div className="levels-list">
+                    <div className="flex flex-col gap-2">
                       {factionForm.levels.map((level, index) => (
-                        <div key={index} className="level-item">
-                          <span className="level-order">{index + 1}</span>
-                          <span className="level-name">{level}</span>
-                          <button
-                            className="remove-level-btn"
+                        <div key={index} className="flex items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-2">
+                          <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                            {index + 1}
+                          </span>
+                          <span className="flex-1 text-sm text-foreground">{level}</span>
+                          <Button
+                            variant="ghost"
+                            size="icon-xs"
+                            className="shrink-0 text-muted-foreground hover:text-destructive"
                             onClick={() => {
                               setFactionForm({
                                 ...factionForm,
@@ -344,17 +355,18 @@ export default function Factions({ readOnly }: { readOnly?: boolean }) {
                             title="删除"
                           >
                             <X size={12} />
-                          </button>
+                          </Button>
                         </div>
                       ))}
                     </div>
                   </div>
-                  <div className="faction-actions">
-                    <button className="save-faction-btn" onClick={handleSaveFaction}>
+                  <div className="mt-1 flex gap-2">
+                    <Button className="flex-1" onClick={handleSaveFaction}>
                       保存
-                    </button>
-                    <button
-                      className="cancel-faction-btn"
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1"
                       onClick={() => {
                         setEditingFaction(null);
                         setFactionForm({ name: '', summary: '', details: '', levels: [] });
@@ -362,67 +374,70 @@ export default function Factions({ readOnly }: { readOnly?: boolean }) {
                       }}
                     >
                       取消
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ) : (
-                <>
-                  <div className="faction-display">
-                    <div className="faction-name-display">{faction.name}</div>
+                <div className={surfaceCardClassName}>
+                    <div className="mb-3 text-base font-semibold text-foreground">{faction.name}</div>
                     {faction.summary && (
-                      <div className="faction-summary-display">
-                        <span className="faction-info-label-text">简述：</span>
-                        <p className="faction-info-text">{faction.summary}</p>
+                      <div className={infoPanelClassName}>
+                        <span className="mb-1 block text-xs font-semibold text-muted-foreground">简述</span>
+                        <p className="m-0 whitespace-pre-wrap break-words text-sm leading-6 text-foreground">{faction.summary}</p>
                       </div>
                     )}
                     {faction.details && (
-                      <div className="faction-details-display">
-                        <span className="faction-info-label-text">详细信息：</span>
-                        <p className="faction-info-text">{faction.details}</p>
+                      <div className={infoPanelClassName}>
+                        <span className="mb-1 block text-xs font-semibold text-muted-foreground">详细信息</span>
+                        <p className="m-0 whitespace-pre-wrap break-words text-sm leading-6 text-foreground">{faction.details}</p>
                       </div>
                     )}
                     {faction.levels.length > 0 && (
-                      <div className="faction-levels-display">
+                      <div className="mt-3 flex flex-wrap gap-2">
                         {faction.levels.map((level, index) => (
-                          <div key={index} className="level-badge">
-                            <span className="level-order-small">{index + 1}</span>
+                          <div key={index} className="inline-flex items-center gap-1.5 rounded-md bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                            <span className="inline-flex size-[18px] items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
+                              {index + 1}
+                            </span>
                             <span>{level}</span>
                           </div>
                         ))}
                       </div>
                     )}
                     {!readOnly && (
-                      <div className="faction-actions-display">
-                        <button
-                          className="edit-faction-btn"
+                      <div className="mt-3 flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="icon-sm"
                           onClick={() => handleEditFaction(faction.id)}
                           title="编辑"
                         >
                           <Edit2 size={14} />
-                        </button>
-                        <button
-                          className="add-child-btn"
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon-sm"
                           onClick={() => handleAddFaction(faction.id)}
                           title="添加子势力"
                         >
                           <Plus size={14} />
-                        </button>
-                        <button
-                          className="delete-faction-btn"
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="icon-sm"
                           onClick={() => handleDeleteFaction(faction.id)}
                           title="删除"
                         >
                           <Trash2 size={14} />
-                        </button>
+                        </Button>
                       </div>
                     )}
                   </div>
-                </>
               )}
             </div>
           </div>
           {hasChildren && isExpanded && (
-            <div className="faction-children">
+            <div className="mt-2 border-l-2 border-border pl-4">
               {renderFactionTree(faction.children!, level + 1)}
             </div>
           )}
@@ -432,33 +447,31 @@ export default function Factions({ readOnly }: { readOnly?: boolean }) {
   };
 
   return (
-    <div className="factions-page">
-      <div className="factions-header">
-        <h2 className="factions-title">势力管理</h2>
+    <div className="flex h-full w-full flex-col overflow-hidden bg-background">
+      <div className="flex items-center justify-between border-b border-border px-6 py-5">
+        <h2 className="text-xl font-bold text-foreground">势力管理</h2>
         {!readOnly && (
-          <button
-            className="add-faction-btn"
+          <Button
             onClick={() => handleAddFaction()}
             title="添加顶级势力"
           >
             <Plus size={16} />
             <span>添加势力</span>
-          </button>
+          </Button>
         )}
       </div>
 
-      <div className="factions-content">
+      <div className="flex-1 overflow-y-auto p-6">
         {factions.length === 0 ? (
-          <div className="empty-factions">
-            <Users size={48} />
+          <div className="flex h-full flex-col items-center justify-center gap-4 text-muted-foreground">
+            <Users size={48} className="opacity-50" />
             <p>暂无势力，点击上方按钮添加</p>
           </div>
         ) : (
-          <div className="factions-tree">{renderFactionTree(factions)}</div>
+          <div className="flex flex-col gap-3">{renderFactionTree(factions)}</div>
         )}
       </div>
 
-      {/* 添加势力弹窗 */}
       <DraggableResizableModal
         isOpen={addingFaction}
         onClose={() => {
@@ -470,49 +483,62 @@ export default function Factions({ readOnly }: { readOnly?: boolean }) {
         title={parentFactionId ? '添加子势力' : '添加势力'}
         initialWidth={600}
         initialHeight={700}
+        className="overflow-hidden rounded-xl border border-border bg-background shadow-xl"
       >
-        <div className="modal-form">
-          <label>
-            <span>势力名称</span>
-            <input
-              type="text"
+        <div className="flex flex-col gap-4 p-5">
+          <div className="flex items-center justify-between border-b border-border pb-4">
+            <h3 className="text-base font-semibold text-foreground">{parentFactionId ? '添加子势力' : '添加势力'}</h3>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => {
+                setAddingFaction(false);
+                setFactionForm({ name: '', summary: '', details: '', levels: [] });
+                setNewLevel('');
+                setParentFactionId(null);
+              }}
+            >
+              <X size={16} />
+            </Button>
+          </div>
+          <label className="flex flex-col gap-2">
+            <span className="text-sm font-medium text-muted-foreground">势力名称</span>
+            <Input
               value={factionForm.name}
               onChange={(e) => setFactionForm({ ...factionForm, name: e.target.value })}
-              className="edit-input"
               placeholder="势力名称"
               autoFocus
             />
           </label>
-          <label>
-            <span>势力简述</span>
+          <label className="flex flex-col gap-2">
+            <span className="text-sm font-medium text-muted-foreground">势力简述</span>
             <textarea
               value={factionForm.summary}
               onChange={(e) => setFactionForm({ ...factionForm, summary: e.target.value })}
-              className="edit-textarea"
+              className={textareaClassName}
               placeholder="输入势力简述..."
               rows={3}
             />
           </label>
-          <label>
-            <span>详细信息</span>
+          <label className="flex flex-col gap-2">
+            <span className="text-sm font-medium text-muted-foreground">详细信息</span>
             <textarea
               value={factionForm.details}
               onChange={(e) => setFactionForm({ ...factionForm, details: e.target.value })}
-              className="edit-textarea"
+              className={textareaClassName}
               placeholder="输入详细信息..."
               rows={5}
             />
           </label>
-          <div className="faction-levels-section">
-            <div className="levels-header">
-              <span className="levels-title">等级阶梯</span>
-              <div className="add-level-input">
-                <input
-                  type="text"
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span className="text-sm font-semibold text-foreground">等级阶梯</span>
+              <div className="flex min-w-[200px] flex-1 gap-2">
+                <Input
                   value={newLevel}
                   onChange={(e) => setNewLevel(e.target.value)}
                   placeholder="输入等级名称"
-                  onKeyPress={(e) => {
+                  onKeyDown={(e) => {
                     if (e.key === 'Enter' && newLevel.trim()) {
                       setFactionForm({
                         ...factionForm,
@@ -522,8 +548,8 @@ export default function Factions({ readOnly }: { readOnly?: boolean }) {
                     }
                   }}
                 />
-                <button
-                  className="add-level-btn"
+                <Button
+                  size="icon-sm"
                   onClick={() => {
                     if (newLevel.trim()) {
                       setFactionForm({
@@ -535,16 +561,20 @@ export default function Factions({ readOnly }: { readOnly?: boolean }) {
                   }}
                 >
                   <Plus size={14} />
-                </button>
+                </Button>
               </div>
             </div>
-            <div className="levels-list">
+            <div className="flex flex-col gap-2 rounded-lg bg-muted/40 p-3">
               {factionForm.levels.map((level, index) => (
-                <div key={index} className="level-item">
-                  <span className="level-order">{index + 1}</span>
-                  <span className="level-name">{level}</span>
-                  <button
-                    className="remove-level-btn"
+                <div key={index} className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2">
+                  <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                    {index + 1}
+                  </span>
+                  <span className="flex-1 text-sm text-foreground">{level}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    className="shrink-0 text-muted-foreground hover:text-destructive"
                     onClick={() => {
                       setFactionForm({
                         ...factionForm,
@@ -554,14 +584,17 @@ export default function Factions({ readOnly }: { readOnly?: boolean }) {
                     title="删除"
                   >
                     <X size={12} />
-                  </button>
+                  </Button>
                 </div>
               ))}
+              {factionForm.levels.length === 0 && (
+                <div className="py-4 text-center text-sm text-muted-foreground">还没有等级阶梯</div>
+              )}
             </div>
           </div>
-          <div className="modal-actions">
-            <button
-              className="cancel-btn"
+          <div className="flex items-center gap-2 border-t border-border pt-4">
+            <Button
+              variant="outline"
               onClick={() => {
                 setAddingFaction(false);
                 setFactionForm({ name: '', summary: '', details: '', levels: [] });
@@ -570,15 +603,14 @@ export default function Factions({ readOnly }: { readOnly?: boolean }) {
               }}
             >
               取消
-            </button>
-            <div className="footer-spacer" />
-            <button className="save-btn" onClick={handleSaveNewFaction}>
+            </Button>
+            <div className="flex-1" />
+            <Button onClick={handleSaveNewFaction}>
               保存
-            </button>
+            </Button>
           </div>
         </div>
       </DraggableResizableModal>
     </div>
   );
 }
-

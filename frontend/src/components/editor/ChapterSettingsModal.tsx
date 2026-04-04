@@ -7,7 +7,9 @@ import { formatOutlineForEditor, formatDetailedOutlineForEditor } from '../../ut
 import LoadingSpinner from '../common/LoadingSpinner';
 import MessageModal from '../common/MessageModal';
 import type { MessageType } from '../common/MessageModal';
-import './ChapterSettingsModal.css';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 
 interface Character {
   id: string;
@@ -122,73 +124,64 @@ function CharacterSelectionCard({ character, isSelected, onToggle, disabled }: C
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <div className={`character-selection-card ${isSelected ? 'selected' : ''} ${disabled ? 'disabled' : ''}`}>
+    <div
+      className={cn(
+        'overflow-hidden rounded-xl border bg-background transition-all',
+        isSelected ? 'border-primary bg-primary/10 shadow-sm' : 'border-border hover:border-border/80 hover:shadow-sm',
+        disabled && 'opacity-60'
+      )}
+    >
       <div 
-        className="card-header" 
+        className="flex cursor-pointer items-center justify-between px-4 py-4"
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        <div className="header-left">
+        <div className="flex min-w-0 items-center gap-3">
           <div 
-            className="checkbox-wrapper"
+            className="flex items-center justify-center"
             onClick={(e) => {
               if (disabled) return;
               e.stopPropagation();
               onToggle();
             }}
-            style={{ cursor: disabled ? 'not-allowed' : 'pointer', display: 'flex', opacity: disabled ? 0.6 : 1 }}
+            style={{ cursor: disabled ? 'not-allowed' : 'pointer' }}
           >
             {isSelected ? (
-              <div style={{ 
-                width: '18px', 
-                height: '18px', 
-                background: 'var(--accent-primary)', 
-                borderRadius: '4px', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                color: 'white'
-              }}>
+              <div className="flex size-[18px] items-center justify-center rounded bg-primary text-primary-foreground">
                 <Check size={12} strokeWidth={3} />
               </div>
             ) : (
-              <div style={{ 
-                width: '18px', 
-                height: '18px', 
-                border: '2px solid var(--border-color)', 
-                borderRadius: '4px',
-                background: 'var(--bg-secondary)'
-              }} />
+              <div className="size-[18px] rounded border-2 border-border bg-muted" />
             )}
           </div>
-          <span className="character-name">{character.name}</span>
-          {character.gender && <span className="character-tag">{character.gender}</span>}
-          {character.type && <span className="character-tag">{character.type}</span>}
+          <span className="truncate text-[15px] font-semibold text-foreground">{character.name}</span>
+          {character.gender && <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">{character.gender}</span>}
+          {character.type && <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">{character.type}</span>}
         </div>
         
-        <div className="header-right">
+        <div className="text-muted-foreground">
           {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
         </div>
       </div>
       
       {isExpanded && (
-        <div className="card-content">
+        <div className="border-t border-border bg-muted/40 p-4 text-sm">
           {character.description && (
-            <div className="detail-section">
-              <div className="detail-title">简介</div>
-              <div style={{ lineHeight: '1.5', color: 'var(--text-secondary)' }}>
+            <div className="mb-3">
+              <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.5px] text-muted-foreground">简介</div>
+              <div className="leading-6 text-muted-foreground">
                 {character.description}
               </div>
             </div>
           )}
           
           {character.appearance && Object.keys(character.appearance).length > 0 && (
-            <div className="detail-section">
-              <div className="detail-title">外貌</div>
-              <div className="detail-grid">
+            <div className="mb-3">
+              <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.5px] text-muted-foreground">外貌</div>
+              <div className="space-y-1">
                 {Object.entries(character.appearance).map(([key, value]) => (
-                  <div key={key} className="detail-row">
-                    <span className="detail-key">{key}:</span>
-                    <span className="detail-value">{String(value)}</span>
+                  <div key={key} className="flex gap-2 text-sm">
+                    <span className="shrink-0 font-medium text-muted-foreground">{key}:</span>
+                    <span className="text-foreground">{String(value)}</span>
                   </div>
                 ))}
               </div>
@@ -196,13 +189,13 @@ function CharacterSelectionCard({ character, isSelected, onToggle, disabled }: C
           )}
           
           {character.personality && Object.keys(character.personality).length > 0 && (
-            <div className="detail-section">
-              <div className="detail-title">性格</div>
-              <div className="detail-grid">
+            <div>
+              <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.5px] text-muted-foreground">性格</div>
+              <div className="space-y-1">
                 {Object.entries(character.personality).map(([key, value]) => (
-                  <div key={key} className="detail-row">
-                    <span className="detail-key">{key}:</span>
-                    <span className="detail-value">{String(value)}</span>
+                  <div key={key} className="flex gap-2 text-sm">
+                    <span className="shrink-0 font-medium text-muted-foreground">{key}:</span>
+                    <span className="text-foreground">{String(value)}</span>
                   </div>
                 ))}
               </div>
@@ -270,6 +263,9 @@ export default function ChapterSettingsModal({
   
   // 是否显示卷号选择器（编辑章节时）
   const showVolumeSelector = mode === 'edit';
+  const fieldClassName =
+    'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-60';
+  const iconGhostClassName = 'h-8 w-8 rounded-md border-0 bg-transparent p-0 text-primary hover:bg-primary/10 hover:text-primary';
 
   // 角色列表：可配置数据 key，优先从 work 的 metadata 对应 key 取，否则用本章已出现角色
   const charactersFromWork = workMetadata && characterDataKey
@@ -617,61 +613,71 @@ export default function ChapterSettingsModal({
       onClose={onClose}
       initialWidth={800}
       initialHeight={600}
-      className="chapter-modal"
+      className="overflow-hidden rounded-2xl border border-border bg-background shadow-2xl"
       handleClassName=".chapter-modal-header"
     >
-        <div className="chapter-modal-header">
-            <div className="modal-header-content">
+        <div className="chapter-modal-header flex items-center justify-between border-b border-border bg-background px-6 py-5">
+            <div className="flex items-center gap-3">
             <BookOpen size={20} />
-            <h2>{mode === 'create' ? '新建章节' : '编辑章节'}</h2>
-            <span className="volume-badge">{volumeTitle}</span>
+            <h2 className="text-lg font-semibold text-foreground">{mode === 'create' ? '新建章节' : '编辑章节'}</h2>
+            <span className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">{volumeTitle}</span>
           </div>
-          <button className="modal-close-btn" onClick={onClose}>
+          <Button variant="ghost" size="icon-sm" onClick={onClose}>
             <X size={20} />
-          </button>
+          </Button>
         </div>
 
-        <div className="chapter-modal-tabs">
+        <div className="flex gap-4 overflow-x-auto border-b border-border bg-muted/40 px-6">
           <button
-            className={`modal-tab ${activeTab === 'basic' ? 'active' : ''}`}
+            className={cn(
+              'relative flex items-center gap-2 border-0 bg-transparent px-1 py-4 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground',
+              activeTab === 'basic' && 'text-primary'
+            )}
             onClick={() => setActiveTab('basic')}
           >
             <FileText size={16} />
             <span>基本信息</span>
+            {activeTab === 'basic' && <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-t bg-primary" />}
           </button>
           <button
-            className={`modal-tab ${activeTab === 'outline' ? 'active' : ''}`}
+            className={cn(
+              'relative flex items-center gap-2 border-0 bg-transparent px-1 py-4 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground',
+              activeTab === 'outline' && 'text-primary'
+            )}
             onClick={() => setActiveTab('outline')}
           >
             <BookOpen size={16} />
             <span>大纲细纲</span>
+            {activeTab === 'outline' && <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-t bg-primary" />}
           </button>
           <button
-            className={`modal-tab ${activeTab === 'characters' ? 'active' : ''}`}
+            className={cn(
+              'relative flex items-center gap-2 border-0 bg-transparent px-1 py-4 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground',
+              activeTab === 'characters' && 'text-primary'
+            )}
             onClick={() => setActiveTab('characters')}
           >
             <Users size={16} />
             <span>角色信息</span>
+            {activeTab === 'characters' && <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-t bg-primary" />}
           </button>
         </div>
 
-        <div className="chapter-modal-content">
+        <div className="flex-1 overflow-y-auto bg-muted/40 p-6">
           {isLoading && (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
+            <div className="flex min-h-[300px] items-center justify-center">
               <LoadingSpinner message="正在加载章节信息..." />
             </div>
           )}
           {!isLoading && activeTab === 'basic' && (
-            <div className="modal-section-content">
-              {/* 章节名称 */}
-              <div className="form-group">
-                <label className="form-label">
+            <div className="max-w-full animate-in fade-in-0">
+              <div className="mb-6">
+                <label className="mb-2 flex items-center gap-2 text-sm font-medium text-muted-foreground">
                   <FileText size={16} />
                   章节名称
                 </label>
-                <input
-                  type="text"
-                  className="form-input"
+                <Input
+                  className="h-10 bg-background"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="请输入章节名称，如：第1章 初遇"
@@ -680,17 +686,16 @@ export default function ChapterSettingsModal({
                 />
               </div>
 
-              <div className="form-row">
-                {/* 卷号选择器 - 只在长篇作品编辑章节时显示 */}
+              <div className="mb-6 flex gap-6 max-md:flex-col">
                 {showVolumeSelector && (
-                  <div className="form-group half">
-                    <label className="form-label">
+                  <div className="flex-1">
+                    <label className="mb-2 flex items-center gap-2 text-sm font-medium text-muted-foreground">
                       <BookOpen size={16} />
                       所属卷
                     </label>
-                    <div className="select-wrapper">
+                    <div className="relative">
                       <select
-                        className="form-select"
+                        className={cn(fieldClassName, 'h-10 appearance-none pr-10')}
                         value={selectedVolumeId}
                         onChange={(e) => setSelectedVolumeId(e.target.value)}
                         disabled={readOnly}
@@ -701,40 +706,37 @@ export default function ChapterSettingsModal({
                           </option>
                         ))}
                       </select>
-                      <ChevronDown className="select-arrow" size={16} />
+                      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
                     </div>
                   </div>
                 )}
 
-                {/* 章节序号 */}
-                <div className={`form-group ${showVolumeSelector ? 'half' : ''}`}>
-                  <label className="form-label">
-                    <span className="hashtag-icon">#</span>
+                <div className={cn('flex-1', !showVolumeSelector && 'max-w-sm')}>
+                  <label className="mb-2 flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                    <span className="w-4 text-center font-mono text-base font-bold">#</span>
                     章节序号
                   </label>
                   <input
                     type="number"
-                    className="form-input"
+                    className={cn(fieldClassName, 'h-10')}
                     value={chapterNumber || ''}
                     onChange={(e) => setChapterNumber(parseInt(e.target.value) || undefined)}
                     placeholder="自动生成"
                     disabled={readOnly}
                   />
-                  <div className="form-hint">留空则自动顺延</div>
+                  <div className="mt-1.5 text-xs text-muted-foreground">留空则自动顺延</div>
                 </div>
               </div>
 
-              {/* 地点设置 */}
-              <div className="form-group">
-                <label className="form-label">
+              <div>
+                <label className="mb-2 flex items-center gap-2 text-sm font-medium text-muted-foreground">
                   <MapPin size={16} />
                   相关地点
                 </label>
                 
-                <div className="location-input-group">
-                  <input
-                    type="text"
-                    className="form-input"
+                <div className="mb-4 flex gap-2">
+                  <Input
+                    className="h-10 bg-background"
                     value={newLocation}
                     onChange={(e) => setNewLocation(e.target.value)}
                     onKeyDown={(e) => {
@@ -747,27 +749,27 @@ export default function ChapterSettingsModal({
                     disabled={readOnly}
                   />
                   {!readOnly && (
-                    <button 
+                    <Button 
                       type="button"
-                      className="icon-btn add-location-btn"
+                      variant="outline"
+                      size="icon"
                       onClick={handleAddLocation}
                       disabled={!newLocation.trim()}
                     >
                       <Plus size={18} />
-                    </button>
+                    </Button>
                   )}
                 </div>
 
-                {/* 已选地点标签 */}
                 {locations.length > 0 && (
-                  <div className="location-tags">
+                  <div className="mb-4 flex flex-wrap gap-2">
                     {locations.map((loc, index) => (
-                      <span key={index} className="location-tag">
+                      <span key={index} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-sm text-muted-foreground">
                         <MapPin size={12} />
                         {loc}
                         {!readOnly && (
-                          <button 
-                            className="tag-remove-btn"
+                          <button
+                            className="rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                             onClick={() => handleRemoveLocation(loc)}
                           >
                             <X size={12} />
@@ -778,18 +780,17 @@ export default function ChapterSettingsModal({
                   </div>
                 )}
 
-                {/* 推荐地点 */}
                 {!readOnly && locationsToShow.length > 0 && (
-                  <div className="suggested-locations">
-                    <span className="suggestion-label">推荐：</span>
-                    <div className="suggestion-list">
+                  <div className="mt-2">
+                    <span className="mb-2 block text-xs text-muted-foreground">推荐：</span>
+                    <div className="flex flex-wrap gap-2">
                       {locationsToShow
                         .filter(l => !locations.includes(l.name))
                         .slice(0, 5)
                         .map(loc => (
                           <button
                             key={loc.id}
-                            className="suggestion-chip"
+                            className="rounded-full border border-dashed border-border bg-transparent px-3 py-1 text-xs text-muted-foreground transition-colors hover:border-primary hover:bg-primary/10 hover:text-primary"
                             onClick={() => handleSelectPresetLocation(loc.name)}
                           >
                             {loc.name}
@@ -804,23 +805,22 @@ export default function ChapterSettingsModal({
           )}
 
           {!isLoading && activeTab === 'outline' && (
-            <div className="modal-section-content">
-              <div className="form-group">
-                <div className="label-with-action">
-                  <label className="form-label">
+            <div className="max-w-full animate-in fade-in-0">
+              <div className="mb-6">
+                <div className="mb-2 flex items-center justify-between">
+                  <label className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                     <BookOpen size={16} />
                     章节大纲
                   </label>
                   {!readOnly && (
-                    <button 
-                      className="icon-btn"
+                    <button
+                      className={iconGhostClassName}
                       onClick={handleGenerateOutline}
                       disabled={isGeneratingOutline}
                       title="AI生成大纲"
-                      style={{ padding: '4px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#3b82f6' }}
                     >
                       {isGeneratingOutline ? (
-                        <span className="loading-spinner small" style={{ width: '16px', height: '16px', border: '2px solid #e2e8f0', borderTopColor: '#3b82f6', borderRadius: '50%', display: 'block', animation: 'spin 1s linear infinite' }}></span>
+                        <span className="block size-4 animate-spin rounded-full border-2 border-slate-200 border-t-primary" />
                       ) : (
                         <Sparkles size={16} />
                       )}
@@ -828,7 +828,7 @@ export default function ChapterSettingsModal({
                   )}
                 </div>
                 <textarea
-                  className="form-textarea outline-textarea"
+                  className={cn(fieldClassName, 'min-h-[144px] resize-y bg-background leading-6')}
                   value={outline}
                   onChange={(e) => setOutline(e.target.value)}
                   placeholder="在此输入本章的故事梗概..."
@@ -837,22 +837,21 @@ export default function ChapterSettingsModal({
                 />
               </div>
 
-              <div className="form-group">
-                <div className="label-with-action">
-                  <label className="form-label">
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <label className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                     <FileText size={16} />
                     详细细纲
                   </label>
                   {!readOnly && (
-                    <button 
-                      className="icon-btn"
+                    <button
+                      className={iconGhostClassName}
                       onClick={handleGenerateDetailOutline}
                       disabled={isGeneratingDetail}
                       title="AI生成细纲"
-                      style={{ padding: '4px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#3b82f6' }}
                     >
                       {isGeneratingDetail ? (
-                        <span className="loading-spinner small" style={{ width: '16px', height: '16px', border: '2px solid #e2e8f0', borderTopColor: '#3b82f6', borderRadius: '50%', display: 'block', animation: 'spin 1s linear infinite' }}></span>
+                        <span className="block size-4 animate-spin rounded-full border-2 border-slate-200 border-t-primary" />
                       ) : (
                         <Sparkles size={16} />
                       )}
@@ -860,7 +859,7 @@ export default function ChapterSettingsModal({
                   )}
                 </div>
                 <textarea
-                  className="form-textarea detail-textarea"
+                  className={cn(fieldClassName, 'min-h-[240px] resize-y bg-background leading-6')}
                   value={detailOutline}
                   onChange={(e) => setDetailOutline(e.target.value)}
                   placeholder="在此输入详细的场景描写、对话要点等..."
@@ -935,16 +934,16 @@ export default function ChapterSettingsModal({
           )}
 
           {!isLoading && activeTab === 'characters' && (
-            <div className="modal-section-content">
+            <div className="max-w-full animate-in fade-in-0">
               {workMetadata && (
-                <div className="form-group character-data-key-group">
-                  <label className="form-label">
+                <div className="mb-6">
+                  <label className="mb-2 flex items-center gap-2 text-sm font-medium text-muted-foreground">
                     <Users size={16} />
                     角色数据来源
                   </label>
-                  <div className="select-wrapper">
+                  <div className="relative">
                     <select
-                      className="form-select"
+                      className={cn(fieldClassName, 'h-10 appearance-none bg-background pr-10')}
                       value={characterDataKey}
                       onChange={(e) => setCharacterDataKey(e.target.value)}
                       title="选择从作品设定中读取角色列表的数据 key"
@@ -956,15 +955,15 @@ export default function ChapterSettingsModal({
                         </option>
                       ))}
                     </select>
-                    <ChevronDown className="select-arrow" size={16} />
+                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
                   </div>
-                  <div className="form-hint">
+                  <div className="mt-1.5 text-xs text-muted-foreground">
                     选择「作品角色」可看到作品设定中的全部角色并勾选本章出场角色
                   </div>
                 </div>
               )}
               {charactersToShow.length > 0 ? (
-                <div className="character-selection-grid">
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
                   {charactersToShow.map(char => (
                     <CharacterSelectionCard
                       key={char.id}
@@ -976,10 +975,10 @@ export default function ChapterSettingsModal({
                   ))}
                 </div>
               ) : (
-                <div className="empty-state">
+                <div className="flex flex-col items-center justify-center py-15 text-center text-muted-foreground">
                   <Users size={48} />
-                  <p>暂无可用角色</p>
-                  <span className="empty-hint">
+                  <p className="mt-4 text-base font-medium">暂无可用角色</p>
+                  <span className="mt-2 text-sm opacity-80">
                     {workMetadata
                       ? '请在上方选择「作品角色」数据来源，或在作品信息/角色管理中添加角色'
                       : '请先在角色管理中添加角色'}
@@ -990,15 +989,15 @@ export default function ChapterSettingsModal({
           )}
         </div>
 
-        <div className="chapter-modal-footer">
-          <button className="modal-btn cancel" onClick={onClose}>
+        <div className="flex items-center justify-end gap-3 border-t border-border bg-background px-6 py-5 max-md:flex-col">
+          <Button variant="outline" onClick={onClose} className="max-md:w-full">
             取消
-          </button>
-          <div className="footer-spacer" />
+          </Button>
+          <div className="flex-1 max-md:hidden" />
           {!readOnly && (
-            <button className="modal-btn save" onClick={handleSave}>
+            <Button onClick={handleSave} className="max-md:w-full">
               {mode === 'create' ? '创建章节' : '保存修改'}
-            </button>
+            </Button>
           )}
         </div>
       </DraggableResizableModal>
@@ -1019,5 +1018,4 @@ export default function ChapterSettingsModal({
     </>
   );
 }
-
 

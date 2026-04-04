@@ -11,7 +11,8 @@ import { worksApi } from '../../utils/worksApi';
 import MarkdownIt from 'markdown-it';
 import { copyToClipboard } from '../../utils/clipboard';
 import ChatInputContentEditable from './ChatInputContentEditable';
-import './AIAssistant.css';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 interface ChapterAnalysisCommandResult {
   chapterId: number;
@@ -120,6 +121,9 @@ export default function AIAssistant({
 
   const user = authApi.getUserInfo();
   const userInitial = getAvatarInitial(user?.username, user?.display_name);
+  const mentionTypeLabelClassName = 'rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground';
+  const chapterMentionClassName = 'mx-0.5 inline-block rounded border border-border bg-muted px-2 py-0.5 text-[13px] font-medium text-muted-foreground';
+  const characterMentionClassName = 'mx-0.5 inline-block rounded border border-primary/10 bg-primary/10 px-2 py-0.5 text-[13px] font-medium text-primary';
 
   // 检查登录状态
   useEffect(() => {
@@ -712,14 +716,14 @@ export default function AIAssistant({
           parts.push(
             <span
               key={match.index}
-              className="mention-tag mention-chapter"
+              className={chapterMentionClassName}
               title={tooltip}
             >
               📖 {mention.name}{rangeLabel}
             </span>
           );
         } else {
-          parts.push(<span key={match.index} className="mention-tag mention-chapter">📖 {title}{rangeLabel}</span>);
+          parts.push(<span key={match.index} className={chapterMentionClassName}>📖 {title}{rangeLabel}</span>);
         }
       } else if (characterMatch) {
         const identifier = characterMatch[1];
@@ -737,7 +741,7 @@ export default function AIAssistant({
             tooltip = '角色信息';
           }
           parts.push(
-            <span key={match.index} className={`mention-tag mention-character`} title={tooltip}>
+            <span key={match.index} className={characterMentionClassName} title={tooltip}>
               👤 {mention.name}
             </span>
           );
@@ -782,7 +786,7 @@ export default function AIAssistant({
         const chapter = chapters.find(ch => ch.id === chapterId);
         const name = chapter ? chapter.title : `章节#${chapterId}`;
         parts.push(
-          <span key={match.index} className="mention-tag mention-chapter" title={`${name}${rangeLabel}`}>
+          <span key={match.index} className={chapterMentionClassName} title={`${name}${rangeLabel}`}>
             📖 {name}{rangeLabel}
           </span>
         );
@@ -801,7 +805,7 @@ export default function AIAssistant({
           tooltip = '角色信息';
         }
         parts.push(
-          <span key={match.index} className="mention-tag mention-character" title={tooltip}>
+          <span key={match.index} className={characterMentionClassName} title={tooltip}>
             👤 {name}
           </span>
         );
@@ -1006,42 +1010,39 @@ export default function AIAssistant({
   };
 
   return (
-    <aside className="ai-assistant">
-      <div className="assistant-header">
-
-      </div>
-
-      <div className="chat-content">
-          <div className="chat-header">
-            <div className="planet-avatar">
-              <span className="planet-icon">
+    <aside className="flex h-full w-full flex-col rounded-xl bg-background shadow-md">
+      <div className="flex flex-1 flex-col overflow-hidden p-4">
+          <div className="relative mb-6 flex gap-3">
+            <div className="flex size-12 shrink-0 items-center justify-center rounded-full">
+              <span className="text-[28px]">
                 <img src="/favicon.png" width={50} height={50} alt="球球" />
               </span>
             </div>
-            <div className="planet-greeting">
-              <p className="greeting-text">
+            <div className="flex-1">
+              <p className="mb-2 text-sm leading-6 text-foreground">
                 嗨!我是球球。今天想写什么故事?
               </p>
-              <p className="disclaimer">内容由AI生成,仅供参考</p>
+              <p className="text-xs text-muted-foreground">内容由AI生成,仅供参考</p>
             </div>
             {messages.length > 0 && (
-              <button
-                className="chat-clear-btn"
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="absolute right-0 top-0"
                 onClick={handleClearMessages}
                 title="清空对话"
                 disabled={readOnly}
               >
                 <Trash2 size={16} />
-              </button>
+              </Button>
             )}
           </div>
 
-          {/* 对话消息列表 */}
-          <div className="chat-messages">
+          <div className="mb-4 flex-1 overflow-y-auto pr-2 scroll-smooth">
             {messages.length === 0 && (
-              <div className="chat-empty">
-                <div className="chat-empty-icon">💬</div>
-                <p>还没有对话，先问问星球今天写什么吧～</p>
+              <div className="flex flex-col items-center justify-center px-5 py-10 text-center text-muted-foreground">
+                <div className="mb-3 text-5xl opacity-60">💬</div>
+                <p className="m-0 text-sm">还没有对话，先问问星球今天写什么吧～</p>
               </div>
             )}
             {messages.map((msg, idx) => {
@@ -1049,34 +1050,42 @@ export default function AIAssistant({
               return (
                 <div
                   key={idx}
-                  className={`chat-message chat-message-${msg.role === 'user' ? 'user' : 'assistant'}`}
+                  className={cn('group mb-5 flex gap-2.5 animate-in fade-in-0 slide-in-from-bottom-2', msg.role === 'user' && 'flex-row-reverse')}
                 >
                   {msg.role === 'assistant' && (
-                    <div className="chat-message-avatar">
-                        <span className="planet-icon-small">
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-transparent">
+                        <span className="text-lg">
                           <img src="/favicon.png" width={50} height={50} alt="球球" />
                         </span>
                     </div>
                   )}
-                  <div className="chat-message-content">
-                    <div className={`chat-message-bubble ${msg.role === 'user' ? 'user-bubble' : 'assistant-bubble'}`}>
+                  <div className="flex max-w-[calc(100%-50px)] flex-1 flex-col gap-1">
+                    <div
+                      className={cn(
+                        'rounded-2xl px-3 py-2.5 text-sm leading-6 break-words',
+                        msg.role === 'user'
+                          ? 'rounded-br-sm bg-primary text-primary-foreground'
+                          : 'rounded-bl-sm border border-border bg-muted/40 text-foreground'
+                      )}
+                    >
                       {msg.role === 'assistant' ? (
                         (msg as MessageWithTime).continueChapterResult ? (
-                          <div className="continue-chapter-cards">
-                            <p className="continue-chapter-hint">{msg.content}</p>
-                            <div className="continue-chapter-card-list">
+                          <div className="w-full">
+                            <p className="mb-3 text-sm text-muted-foreground">{msg.content}</p>
+                            <div className="flex flex-col gap-3">
                               {(msg as MessageWithTime).continueChapterResult!.recommendations.map((rec, recIdx) => (
-                                <div key={recIdx} className="continue-chapter-card">
-                                  <div className="continue-chapter-card-title">{rec.title}</div>
-                                  <div className="continue-chapter-card-outline">
+                                <div key={recIdx} className="rounded-lg border border-border bg-background px-3.5 py-3 transition-colors hover:border-primary hover:shadow-sm">
+                                  <div className="mb-2 text-[15px] font-semibold text-foreground">{rec.title}</div>
+                                  <div className="mb-1.5 text-[13px] leading-6 text-muted-foreground">
                                     {formatOutlineSummary(rec.outline)}
                                   </div>
-                                  <div className="continue-chapter-card-detail">
+                                  <div className="mb-2.5 text-xs leading-5 text-muted-foreground">
                                     {formatOutlineSummary(rec.detailed_outline, 80)}
                                   </div>
-                                  <button
+                                  <Button
                                     type="button"
-                                    className="continue-chapter-card-action"
+                                    variant="outline"
+                                    className="w-full border-primary text-primary hover:bg-primary hover:text-primary-foreground"
                                     onClick={() => onUseContinueRecommendation?.({
                                       title: rec.title,
                                       outline: rec.outline,
@@ -1086,14 +1095,14 @@ export default function AIAssistant({
                                     disabled={readOnly}
                                   >
                                     使用此方案创建章节
-                                  </button>
+                                  </Button>
                                 </div>
                               ))}
                             </div>
                           </div>
                         ) : (
                           <div 
-                            className="markdown-content"
+                            className="leading-7 [&_a]:text-primary [&_a:hover]:underline [&_blockquote]:my-2 [&_blockquote]:border-l-3 [&_blockquote]:border-primary [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-muted-foreground [&_code]:rounded [&_code]:bg-muted [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[0.9em] [&_h1]:my-3 [&_h1]:text-2xl [&_h1]:font-semibold [&_h2]:my-3 [&_h2]:text-xl [&_h2]:font-semibold [&_h3]:my-2 [&_h3]:text-lg [&_h3]:font-semibold [&_li]:my-1 [&_ol]:my-2 [&_ol]:pl-6 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-muted [&_pre]:p-3 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_ul]:my-2 [&_ul]:pl-6"
                             dangerouslySetInnerHTML={{ __html: md.render(msg.content) }}
                           />
                         )
@@ -1103,10 +1112,10 @@ export default function AIAssistant({
                         </div>
                       )}
                     </div>
-                    <div className="chat-message-footer">
-                      <span className="chat-message-time">{formatTime(messageTime)}</span>
+                    <div className="flex items-center gap-2 px-1">
+                      <span className="text-[11px] text-muted-foreground">{formatTime(messageTime)}</span>
                       <button
-                        className="chat-message-copy"
+                        className="flex size-5 items-center justify-center rounded bg-transparent text-muted-foreground opacity-0 transition-all hover:bg-background hover:text-primary group-hover:opacity-100"
                         onClick={() => handleCopy(msg.content, idx)}
                         title="复制消息"
                       >
@@ -1119,23 +1128,23 @@ export default function AIAssistant({
                     </div>
                   </div>
                   {msg.role === 'user' && (
-                    <div className="chat-message-avatar user-avatar">
-                      <span className="user-avatar-initial" aria-hidden>{userInitial}</span>
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,var(--text-tertiary)_0%,var(--text-secondary)_100%)]">
+                      <span className="flex h-full w-full items-center justify-center text-sm font-semibold leading-none text-white" aria-hidden>{userInitial}</span>
                     </div>
                   )}
                 </div>
               );
             })}
             {isSending && (
-              <div className="chat-message chat-message-assistant">
-                <div className="chat-message-avatar">
-                  <span className="planet-icon-small">
+              <div className="flex gap-2.5">
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-transparent">
+                  <span className="text-lg">
                     <img src="/favicon.png" width={50} height={50} alt="球球" />
                   </span>
                 </div>
-                <div className="chat-message-content">
-                  <div className="chat-message-bubble assistant-bubble chat-message-loading">
-                    <Loader2 className="loading-spinner" size={16} />
+                <div className="flex flex-1 flex-col gap-1">
+                  <div className="flex items-center gap-2 rounded-2xl rounded-bl-sm border border-border bg-muted/40 px-3 py-2.5 text-sm text-muted-foreground">
+                    <Loader2 className="animate-spin" size={16} />
                     <span>正在思考中…</span>
                   </div>
                 </div>
@@ -1144,13 +1153,12 @@ export default function AIAssistant({
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="chat-input-area">
+          <div className="mb-4">
             {!readOnly && (
-            <div className="input-actions">
+            <div className="mb-2 flex gap-2">
               <button 
-                className="input-action-btn"
+                className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary hover:bg-primary/10 hover:text-primary"
                 onClick={() => {
-                  // 点击时也主动刷新一次章节列表，确保最新
                   loadData();
                   if (chatInputRef.current) {
                     const cursorPos = cursorOffsetRef.current;
@@ -1172,20 +1180,20 @@ export default function AIAssistant({
             </div>
             )}
             {readOnly ? (
-              <div className="chat-login-prompt">
+              <div className="rounded-lg border border-dashed border-border bg-muted/40 p-5 text-center text-[13px] text-muted-foreground">
                 <p>当前为只读模式，无法使用AI助手</p>
               </div>
             ) : !isAuthenticated ? (
-              <div className="chat-login-prompt">
+              <div className="rounded-lg border border-dashed border-border bg-muted/40 p-5 text-center text-[13px] text-muted-foreground">
                 <p>请先登录后再使用球球AI功能</p>
               </div>
             ) : !workId ? (
-              <div className="chat-login-prompt">
+              <div className="rounded-lg border border-dashed border-border bg-muted/40 p-5 text-center text-[13px] text-muted-foreground">
                 <p>请先选择作品后再使用球球AI功能</p>
               </div>
             ) : (
               <>
-                <div className="chat-input-wrapper">
+                <div className="relative mb-2">
                   <ChatInputContentEditable
                     inputRef={chatInputRef}
                     value={message}
@@ -1199,31 +1207,34 @@ export default function AIAssistant({
                     disabled={!isAuthenticated || !workId || isSending}
                     cursorOffsetRef={cursorOffsetRef}
                     cursorAfterUpdateRef={cursorAfterUpdateRef}
-                    className="chat-input"
+                    className="min-h-[60px] max-h-[200px] w-full overflow-y-auto rounded-lg border-2 border-border bg-background px-2.5 py-2.5 text-sm leading-6 transition-colors focus-within:border-primary"
                   />
                   {showMentionMenu && mentionOptions.length > 0 && createPortal(
                     <div
                       ref={mentionMenuRef}
-                      className="mention-menu"
+                      className="fixed z-[3000] min-w-[280px] max-w-[320px] overflow-hidden rounded-lg border border-border bg-background shadow-lg"
                       style={{
                         top: `${mentionPosition.top}px`,
                         left: `${mentionPosition.left}px`,
                       }}
                     >
-                      <div className="mention-menu-header">
+                      <div className="border-b border-border bg-muted px-3 py-2 text-xs font-medium text-muted-foreground">
                         <span>选择要引用的内容</span>
                       </div>
                       {mentionOptions.length > 0 ? (
                         <>
-                          <div className="mention-menu-list">
+                          <div className="max-h-[240px] overflow-y-auto">
                             {mentionOptions.map((option, idx) => (
                               <div
                                 key={`${option.type}-${option.id}`}
-                                className={`mention-option ${idx === selectedMentionIndex ? 'selected' : ''}`}
+                                className={cn(
+                                  'flex cursor-pointer items-center gap-2.5 border-b border-border px-3 py-2.5 transition-colors last:border-b-0',
+                                  idx === selectedMentionIndex ? 'bg-primary/10' : 'hover:bg-primary/10'
+                                )}
                                 onClick={() => handleSelectMention(option)}
                                 onMouseEnter={() => setSelectedMentionIndex(idx)}
                               >
-                                <div className="mention-option-icon">
+                                <div className="flex size-6 shrink-0 items-center justify-center rounded bg-muted text-primary">
                                   {option.isCommand ? (
                                     <span style={{ fontSize: '16px' }}>⚡</span>
                                   ) : option.type === 'chapter' ? (
@@ -1232,19 +1243,19 @@ export default function AIAssistant({
                                     <User size={16} />
                                   )}
                                 </div>
-                                <div className="mention-option-content">
-                                  <div className="mention-option-name">{option.name}</div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="truncate text-sm font-medium text-foreground">{option.name}</div>
                                   {option.subtitle && (
-                                    <div className="mention-option-subtitle">{option.subtitle}</div>
+                                    <div className="truncate text-xs text-muted-foreground">{option.subtitle}</div>
                                   )}
                                 </div>
-                                <div className="mention-option-type">
+                                <div className={mentionTypeLabelClassName}>
                                   {option.isCommand ? '指令' : option.type === 'chapter' ? '章节' : '角色'}
                                 </div>
                               </div>
                             ))}
                           </div>
-                          <div className="mention-menu-footer">
+                          <div className="flex items-center justify-center gap-2 border-t border-border bg-muted px-3 py-1.5 text-[11px] text-muted-foreground">
                             <span>↑↓ 选择</span>
                             <kbd>Tab</kbd>
                             <span>/</span>
@@ -1255,7 +1266,7 @@ export default function AIAssistant({
                           </div>
                         </>
                       ) : (
-                        <div className="mention-menu-empty">
+                        <div className="p-5 text-center text-[13px] text-muted-foreground">
                           <span>没有找到匹配的内容</span>
                         </div>
                       )}
@@ -1263,16 +1274,16 @@ export default function AIAssistant({
                     document.body
                   )}
                 </div>
-                <div className="input-footer">
-                  <span className="char-count">{charCount}/50000</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">{charCount}/50000</span>
                   <button
-                    className="send-button"
+                    className="inline-flex items-center gap-1.5 rounded-md border border-primary bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
                     onClick={handleSend}
                     disabled={isSending || !message.trim() || !isAuthenticated || !workId}
                   >
                     {isSending ? (
                       <>
-                        <Loader2 className="send-spinner" size={16} />
+                        <Loader2 className="animate-spin" size={16} />
                         <span>发送中...</span>
                       </>
                     ) : (
@@ -1290,4 +1301,3 @@ export default function AIAssistant({
     </aside>
   );
 }
-

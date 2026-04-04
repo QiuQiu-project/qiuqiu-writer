@@ -49,7 +49,7 @@ export default function DraggableResizableModal({
 
   if (!isOpen) return null;
 
-  const overlayClass = `fixed inset-0 flex justify-center items-center z-[1000] backdrop-blur-[3px] ${overlayClassName}`;
+  const overlayClass = `fixed inset-0 flex justify-center items-center z-[3200] backdrop-blur-[3px] ${overlayClassName}`;
   const overlayStyle = { background: 'rgba(0,0,0,0.45)' };
 
   if (isMobile) {

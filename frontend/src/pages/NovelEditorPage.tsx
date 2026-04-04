@@ -3,7 +3,7 @@
  * 模块化重构版本 - 控制在1000行以内
  */
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Info, Menu, X, MessageSquare, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, MessageCircleQuestion, Share2 } from 'lucide-react';
 import { EditorContent } from '@tiptap/react';
@@ -51,6 +51,8 @@ import { countCharacters } from '../utils/textUtils';
 import { chaptersApi } from '../utils/chaptersApi';
 import { createYjsSnapshotFromEditor, restoreYjsSnapshotToEditor, getTextFromProsemirrorJSON } from '../utils/yjsSnapshot';
 import { sendChatMessage } from '../utils/chatApi';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 // 样式
 import './NovelEditorPage.css';
@@ -204,6 +206,8 @@ export default function NovelEditorPage() {
     setActiveNav,
     leftSidebarCollapsed,
     rightSidebarCollapsed,
+    setLeftSidebarCollapsed,
+    setRightSidebarCollapsed,
     toggleLeftSidebar,
     toggleRightSidebar,
     mobileMenuOpen,
@@ -215,6 +219,52 @@ export default function NovelEditorPage() {
     headingMenuOpen,
     setHeadingMenuOpen,
   } = useUIState();
+  const leftSidebarAutoCollapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rightSidebarAutoCollapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearLeftSidebarAutoCollapseTimer = useCallback(() => {
+    if (leftSidebarAutoCollapseTimerRef.current) {
+      clearTimeout(leftSidebarAutoCollapseTimerRef.current);
+      leftSidebarAutoCollapseTimerRef.current = null;
+    }
+  }, []);
+  const clearRightSidebarAutoCollapseTimer = useCallback(() => {
+    if (rightSidebarAutoCollapseTimerRef.current) {
+      clearTimeout(rightSidebarAutoCollapseTimerRef.current);
+      rightSidebarAutoCollapseTimerRef.current = null;
+    }
+  }, []);
+  const scheduleLeftSidebarAutoCollapse = useCallback(() => {
+    if (isMobile || leftSidebarCollapsed) return;
+    clearLeftSidebarAutoCollapseTimer();
+    leftSidebarAutoCollapseTimerRef.current = setTimeout(() => {
+      setLeftSidebarCollapsed(true);
+    }, 1800);
+  }, [clearLeftSidebarAutoCollapseTimer, isMobile, leftSidebarCollapsed, setLeftSidebarCollapsed]);
+  const scheduleRightSidebarAutoCollapse = useCallback(() => {
+    if (isMobile || rightSidebarCollapsed) return;
+    clearRightSidebarAutoCollapseTimer();
+    rightSidebarAutoCollapseTimerRef.current = setTimeout(() => {
+      setRightSidebarCollapsed(true);
+    }, 1800);
+  }, [clearRightSidebarAutoCollapseTimer, isMobile, rightSidebarCollapsed, setRightSidebarCollapsed]);
+
+  useEffect(() => {
+    if (!isMobile && !leftSidebarCollapsed) {
+      scheduleLeftSidebarAutoCollapse();
+    } else {
+      clearLeftSidebarAutoCollapseTimer();
+    }
+    return clearLeftSidebarAutoCollapseTimer;
+  }, [clearLeftSidebarAutoCollapseTimer, isMobile, leftSidebarCollapsed, scheduleLeftSidebarAutoCollapse]);
+
+  useEffect(() => {
+    if (!isMobile && !rightSidebarCollapsed) {
+      scheduleRightSidebarAutoCollapse();
+    } else {
+      clearRightSidebarAutoCollapseTimer();
+    }
+    return clearRightSidebarAutoCollapseTimer;
+  }, [clearRightSidebarAutoCollapseTimer, isMobile, rightSidebarCollapsed, scheduleRightSidebarAutoCollapse]);
   
   // ===== 模态框状态 =====
   const {
@@ -406,7 +456,6 @@ export default function NovelEditorPage() {
     return Array.from(charSet);
   }, [chaptersData]);
 
-  // ===== 章节顺序导航 =====
   const orderedChapters = useMemo(() => volumes.flatMap(vol => vol.chapters), [volumes]);
   const currentChapterIndex = useMemo(
     () => (selectedChapter ? orderedChapters.findIndex(c => c.id === selectedChapter) : -1),
@@ -796,25 +845,24 @@ export default function NovelEditorPage() {
   // ===== 渲染 =====
   if (loading) {
     return (
-      <div className="novel-editor-page">
-        <div style={{ padding: '40px', textAlign: 'center' }}>加载中...</div>
+      <div className="fixed inset-0 z-[2000] flex h-screen w-screen flex-col overflow-hidden bg-[linear-gradient(180deg,#f6f0ff_0%,#fdf7ff_100%)] text-foreground">
+        <div className="p-10 text-center text-sm text-[#574235]">加载中...</div>
       </div>
     );
   }
   
   if (error && !work) {
     return (
-      <div className="novel-editor-page">
-        <div style={{ padding: '40px', textAlign: 'center', color: 'var(--error, #666666)' }}>
+      <div className="fixed inset-0 z-[2000] flex h-screen w-screen flex-col overflow-hidden bg-[linear-gradient(180deg,#f6f0ff_0%,#fdf7ff_100%)] text-foreground">
+        <div className="p-10 text-center text-destructive">
           {error}
-          <button 
+          <button
             onClick={() => {
-              const uid = authApi.getUserInfo()?.id;
-              navigate(uid ? `/users/${uid}` : '/');
+              navigate('/novel?section=workbench');
             }} 
-            style={{ marginTop: '16px', padding: '8px 16px' }}
+            className="mt-4 rounded-xl border border-[#dfc1af] bg-white px-4 py-2 text-[#1f045a] transition-colors hover:bg-[#f8f1ff]"
           >
-            返回作品列表
+            返回工作台
           </button>
         </div>
       </div>
@@ -825,45 +873,34 @@ export default function NovelEditorPage() {
 
   if (work && !canView) {
     return (
-      <div className="novel-editor-page" style={{ justifyContent: 'center', alignItems: 'center' }}>
-        <div style={{ 
-          textAlign: 'center', 
-          padding: '40px', 
-          background: 'var(--bg-secondary, #252b3b)', 
-          borderRadius: '8px',
-          maxWidth: '500px',
-          width: '90%'
-        }}>
-          <h2 style={{ marginBottom: '16px', color: 'var(--text-primary, #e1e1e1)' }}>{work.title}</h2>
-          <p style={{ marginBottom: '24px', color: 'var(--text-secondary, #a0a0a0)' }}>
+      <div className="fixed inset-0 z-[2000] flex h-screen w-screen items-center justify-center overflow-hidden bg-[linear-gradient(180deg,#f6f0ff_0%,#fdf7ff_100%)] text-foreground">
+        <div className="w-[90%] max-w-[500px] rounded-[28px] border border-[#ede4ff] bg-white/95 p-10 text-center shadow-[0px_28px_60px_rgba(31,4,90,0.12)] backdrop-blur">
+          <h2 className="mb-4 text-2xl font-semibold text-[#1f045a]">{work.title}</h2>
+          <p className="mb-6 text-sm leading-6 text-[#574235]/80">
             您没有访问该作品的权限，无法查看内容。
           </p>
-          <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
+          <div className="flex justify-center gap-4">
             {isPending ? (
-              <button 
-                className="secondary-btn"
+              <Button
+                variant="outline"
                 disabled
-                style={{ padding: '8px 24px', opacity: 0.7, cursor: 'not-allowed' }}
               >
                 申请审核中
-              </button>
+              </Button>
             ) : (
-              <button 
-                className="primary-btn"
+              <Button
                 onClick={handleApply}
                 disabled={isApplying}
-                style={{ padding: '8px 24px' }}
               >
                 {isApplying ? '发送中...' : '申请访问权限'}
-              </button>
+              </Button>
             )}
-            <button 
-              className="secondary-btn"
+            <Button
+              variant="outline"
               onClick={() => navigate('/')}
-              style={{ padding: '8px 24px' }}
             >
               返回首页
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -871,25 +908,20 @@ export default function NovelEditorPage() {
   }
 
   return (
-    <div className="novel-editor-page">
-      {/* 顶部工具栏 */}
-      <header className="novel-editor-header">
-        <div className="header-left">
-          <button className="exit-btn" onClick={() => {
-            const currentUser = authApi.getUserInfo();
-            if (currentUser?.id) {
-              navigate(`/users/${currentUser.id}`);
-            } else {
-              navigate('/');
-            }
-          }}>
+    <div className="fixed inset-0 z-[2000] flex h-screen w-screen flex-col overflow-hidden bg-[linear-gradient(180deg,#f6f0ff_0%,#fdf7ff_100%)] text-foreground">
+      <header className="relative z-20 flex h-18 min-h-18 items-center justify-between gap-6 border-b border-[#ede4ff] bg-[#fdf7ff]/95 px-6 shadow-sm backdrop-blur max-md:h-16 max-md:min-h-16 max-md:gap-2 max-md:px-3">
+        <div className="relative z-[1] flex min-w-0 flex-1 items-center gap-4 max-md:gap-1">
+          <button className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-[#ede4ff] bg-white px-3 py-2 text-sm text-[#574235]/80 transition-colors hover:bg-[#f8f1ff] hover:text-[#1f045a] max-md:px-2 max-md:py-1.5" onClick={() => navigate('/novel?section=workbench')}>
             <ArrowLeft size={16} />
-            <span>退出</span>
+            <span className="max-md:hidden">返回工作台</span>
           </button>
-          <div className="work-info">
+          <div className="relative flex min-w-0 flex-1 flex-col justify-center gap-1.5">
+            <div className="flex items-center gap-2 max-md:hidden">
+              <span className="rounded-full bg-[#fff2e5] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-[#964900]">工作台</span>
+            </div>
             <h1 
               ref={titleEditableRef}
-              className="work-title work-title-editable"
+              className="min-w-0 truncate rounded px-1 text-[17px] font-semibold leading-[1.3] text-[#1f045a] outline-none max-md:text-[15px]"
               contentEditable
               suppressContentEditableWarning
               onBlur={handleSaveTitle}
@@ -899,17 +931,17 @@ export default function NovelEditorPage() {
             >
               {work?.title || ''}
             </h1>
-            <div className="work-info-row">
-              <div className="work-stats-inline">
-                <span className="sync-status-text">
+            <div className="mt-0.5 flex min-w-0 items-center gap-2 max-md:hidden">
+              <div className="flex items-center gap-1.5 text-xs whitespace-nowrap text-[#574235]/70">
+                <span className="font-medium text-[#574235]/70">
                   {isOnline ? '已同步' : '离线模式'}
                 </span>
-                <span className="stats-divider">·</span>
+                <span className="mx-0.5 font-bold text-[#dfc1af]">·</span>
                 <span>本章字数：{currentChapterWordCount}</span>
-                <span className="stats-divider">·</span>
+                <span className="mx-0.5 font-bold text-[#dfc1af]">·</span>
                 <span>总字数：{Object.values(apiChapterWordCounts).reduce((sum, n) => sum + n, 0)}</span>
                 <span 
-                  className="word-count-tooltip-wrapper"
+                  className="inline-flex shrink-0 cursor-help items-center justify-center rounded p-0.5 text-[#574235]/70 transition-colors hover:bg-[#f2ebff] hover:text-[#1f045a]"
                   data-tooltip-visible={showWordCountTooltip}
                   onMouseEnter={() => {
                     if (!isMobile) {
@@ -927,12 +959,12 @@ export default function NovelEditorPage() {
                   <Info size={13} />
                   {showWordCountTooltip && (
                     <div 
-                      className="word-count-tooltip"
+                      className="fixed left-6 top-[65px] z-[2000000] w-[300px] rounded-2xl border border-[#ede4ff] bg-white/95 p-4 text-[13px] text-[#1f045a] shadow-[0px_20px_40px_rgba(31,4,90,0.1)] backdrop-blur-xl"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <div className="tooltip-section">
-                        <div className="tooltip-title">原创保护</div>
-                        <div className="tooltip-content">
+                      <div className="flex flex-col gap-2">
+                        <div className="text-sm font-bold text-[#1f045a]">原创保护</div>
+                        <div className="leading-6 text-[#574235]/80">
                           球球写作尊重每一位作者的创作成果和知识权，不会将作者上传或发布在本平台上的任何内容用于AI训练或其他机器学习用途。<br />
                           生成结果仅供您参考，内容由AI大模型输出，不代表我们的态度或观点。
                         </div>
@@ -944,25 +976,25 @@ export default function NovelEditorPage() {
             </div>
           </div>
         </div>
-        <div className="header-center">
+        <div className="flex flex-1 items-center justify-center max-md:hidden">
         </div>
-        <div className="header-right">
+        <div className="flex min-w-0 flex-none items-center gap-3 max-md:gap-1">
           {isMobile ? (
             <>
               <button
-                className="mobile-share-btn"
+                className="inline-flex size-10 items-center justify-center rounded-xl border border-[#ede4ff] bg-white text-[#574235]/70 transition-colors hover:bg-[#f8f1ff] hover:text-[#1f045a]"
                 onClick={() => setIsShareModalOpen(true)}
               >
                 <Share2 size={24} />
               </button>
               <button
-                className="mobile-menu-btn"
+                className="inline-flex size-10 items-center justify-center rounded-xl border border-[#ede4ff] bg-white text-[#574235]/70 transition-colors hover:bg-[#f8f1ff] hover:text-[#1f045a]"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               >
                 {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
               </button>
               <button
-                className="mobile-chat-btn"
+                className="inline-flex size-10 items-center justify-center rounded-xl border border-[#ede4ff] bg-white text-[#574235]/70 transition-colors hover:bg-[#f8f1ff] hover:text-[#1f045a]"
                 onClick={() => setMobileChatOpen(!mobileChatOpen)}
               >
                 <MessageSquare size={24} />
@@ -984,28 +1016,36 @@ export default function NovelEditorPage() {
             </>
           ) : (
             <>
-              <div className="header-actions">
+              <div className="flex shrink-0 items-center gap-1.5">
               {canEdit && (
               <button
-                className="header-share-btn"
+                className="relative inline-flex h-9 shrink-0 items-center gap-1 rounded-xl border border-[#dfc1af] bg-white px-3 text-[13px] font-medium text-[#1f045a] transition-colors hover:bg-[#f8f1ff] hover:text-[#ff8000]"
                 onClick={() => setIsShareModalOpen(true)}
                 title="共享作品"
               >
-                {hasPendingRequests && <div className="share-badge" />}
+                {hasPendingRequests && <div className="absolute -right-0.5 -top-0.5 size-2 rounded-full border border-white bg-[#ff4d4f]" />}
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
                 <span>分享</span>
               </button>
               )}
-              <div className="sidebar-toggle-buttons">
+              <div className="ml-3 flex items-center gap-1.5 border-l border-[#ede4ff] pl-3">
                 <button
-                  className={`sidebar-toggle-btn-header left-toggle-header ${leftSidebarCollapsed ? 'collapsed' : ''}`}
+                  className={cn(
+                    'inline-flex size-8 items-center justify-center rounded-xl border border-[#ede4ff] bg-white text-[#574235]/70 transition-all hover:-translate-y-0.5 hover:bg-[#f8f1ff] hover:text-[#1f045a]',
+                    leftSidebarCollapsed && 'bg-[#ff8000] text-white shadow-[0_8px_18px_rgba(255,128,0,0.28)] hover:bg-[#e87400]',
+                    leftSidebarCollapsed && 'fixed left-4 top-[108px] z-[1000] shadow-[0_4px_12px_rgba(0,0,0,0.2)]'
+                  )}
                   onClick={toggleLeftSidebar}
                   title={leftSidebarCollapsed ? '展开左侧边栏' : '折叠左侧边栏'}
                 >
                   {leftSidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
                 </button>
                 <button
-                  className={`sidebar-toggle-btn-header right-toggle-header ${rightSidebarCollapsed ? 'collapsed' : ''}`}
+                  className={cn(
+                    'inline-flex size-8 items-center justify-center rounded-xl border border-[#ede4ff] bg-white text-[#574235]/70 transition-all hover:-translate-y-0.5 hover:bg-[#f8f1ff] hover:text-[#1f045a]',
+                    rightSidebarCollapsed && 'bg-[#ff8000] text-white shadow-[0_8px_18px_rgba(255,128,0,0.28)] hover:bg-[#e87400]',
+                    rightSidebarCollapsed && 'fixed right-4 top-[108px] z-[1000] shadow-[0_4px_12px_rgba(0,0,0,0.2)]'
+                  )}
                   onClick={toggleRightSidebar}
                   title={rightSidebarCollapsed ? '展开右侧边栏' : '折叠右侧边栏'}
                 >
@@ -1034,54 +1074,69 @@ export default function NovelEditorPage() {
         </div>
       </header>
 
-      <div className={`novel-editor-body ${leftSidebarCollapsed ? 'left-collapsed' : ''} ${rightSidebarCollapsed ? 'right-collapsed' : ''} ${isMobile ? 'mobile' : ''}`}>
-        {/* 左侧边栏 - 桌面端 */}
+      <div className="relative flex min-h-0 flex-1 overflow-hidden bg-[linear-gradient(180deg,#f6f0ff_0%,#fdf7ff_100%)]">
         {!isMobile && (
-          <div className={`sidebar-wrapper left-sidebar-wrapper ${leftSidebarCollapsed ? 'collapsed' : ''}`}>
-            <SideNav
-              activeNav={activeNav}
-              onNavChange={setActiveNav}
-              selectedChapter={selectedChapter}
-              onChapterSelect={handleChapterSelect}
-              onOpenChapterModal={handleOpenChapterModal}
-              onOpenVolumeModal={handleOpenVolumeModal}
-              onChapterDelete={handleDeleteChapter}
-              deletedChapters={deletedChapters}
-              loadDeletedChapters={loadDeletedChapters}
-              onRestoreChapter={async (id) => {
-                await restoreChapter(id);
-                loadDeletedChapters();
+          <div
+            className={cn(
+              'pointer-events-none absolute inset-y-4 left-4 z-40 transition-all duration-300',
+              leftSidebarCollapsed ? 'w-0 opacity-0' : 'w-[clamp(220px,22vw,320px)] opacity-100'
+            )}
+          >
+            <div
+              className="pointer-events-auto h-full overflow-hidden rounded-[28px] border border-[#ede4ff] bg-[#f8f1ff]/95 shadow-[0px_20px_40px_rgba(31,4,90,0.08)] backdrop-blur"
+              onMouseEnter={clearLeftSidebarAutoCollapseTimer}
+              onMouseLeave={scheduleLeftSidebarAutoCollapse}
+              onFocusCapture={clearLeftSidebarAutoCollapseTimer}
+              onBlurCapture={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                  scheduleLeftSidebarAutoCollapse();
+                }
               }}
-              volumes={volumes}
-              onVolumesChange={setVolumes}
-              workType="long"
-              readOnly={!canEdit}
-            />
+            >
+              <SideNav
+                activeNav={activeNav}
+                onNavChange={setActiveNav}
+                selectedChapter={selectedChapter}
+                onChapterSelect={handleChapterSelect}
+                onOpenChapterModal={handleOpenChapterModal}
+                onOpenVolumeModal={handleOpenVolumeModal}
+                onChapterDelete={handleDeleteChapter}
+                deletedChapters={deletedChapters}
+                loadDeletedChapters={loadDeletedChapters}
+                onRestoreChapter={async (id) => {
+                  await restoreChapter(id);
+                  loadDeletedChapters();
+                }}
+                volumes={volumes}
+                onVolumesChange={setVolumes}
+                workType="long"
+                readOnly={!canEdit}
+              />
+            </div>
           </div>
         )}
         
-        {/* 移动端菜单抽屉 */}
         {isMobile && mobileMenuOpen && (
-          <div className="mobile-menu-overlay" onClick={() => setMobileMenuOpen(false)}>
-            <div className="mobile-menu-drawer" onClick={(e) => e.stopPropagation()}>
-              <div className="mobile-menu-header">
-                <div className="mobile-menu-header-top">
-                  <h2 className="mobile-menu-title">{work?.title ?? '作品信息'}</h2>
-                  <button className="mobile-menu-close" onClick={() => setMobileMenuOpen(false)}>
+          <div className="fixed inset-0 z-[2100] bg-black/40 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)}>
+            <div className="h-full w-[85vw] max-w-[360px] overflow-hidden bg-[#fdf7ff] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="border-b border-[#ede4ff] px-4 py-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="truncate text-lg font-semibold text-foreground">{work?.title ?? '作品信息'}</h2>
+                  <button className="inline-flex size-9 items-center justify-center rounded-lg text-[#574235]/70 transition-colors hover:bg-[#f2ebff] hover:text-[#1f045a]" onClick={() => setMobileMenuOpen(false)}>
                     <X size={24} />
                   </button>
                 </div>
-                <div className="mobile-menu-stats work-stats-inline">
-                  <span className="sync-status-text">
+                <div className="mt-2 flex items-center gap-1.5 text-xs text-[#574235]/70">
+                  <span className="font-medium text-[#574235]/70">
                     {isOnline ? '已同步' : '离线模式'}
                   </span>
-                  <span className="stats-divider">·</span>
+                  <span className="font-bold text-border">·</span>
                   <span>本章字数：{currentChapterWordCount}</span>
-                  <span className="stats-divider">·</span>
+                  <span className="font-bold text-border">·</span>
                   <span>总字数：{work?.word_count ?? 0}</span>
                 </div>
               </div>
-              <div className="mobile-menu-content">
+              <div className="h-[calc(100%-88px)] overflow-y-auto">
                 <SideNav
                   activeNav={activeNav}
                   onNavChange={(nav) => {
@@ -1108,8 +1163,7 @@ export default function NovelEditorPage() {
           </div>
         )}
 
-        {/* 主编辑区 */}
-        <div className="novel-editor-main">
+        <div className="relative z-0 flex h-full min-w-0 flex-1 flex-col overflow-visible bg-transparent">
           {activeNav === 'work-info' && selectedChapter === null && (
             <WorkInfoManager 
               workId={workId} 
@@ -1148,20 +1202,19 @@ export default function NovelEditorPage() {
           )}
           {activeNav === 'factions' && <Factions readOnly={!canEdit} />}
           {activeNav === 'settings' && (
-            <div className="placeholder-content">
-              <h2>设置</h2>
+            <div className="flex min-h-[400px] flex-1 flex-col items-center justify-center text-muted-foreground">
+              <h2 className="mb-4 text-2xl font-semibold text-foreground">设置</h2>
               <p>功能开发中...</p>
             </div>
           )}
           
           {/* 文本编辑器 */}
           {selectedChapter !== null && !['tags', 'outline', 'map', 'characters', 'settings', 'factions'].includes(activeNav) && (
-            <div className="chapter-editor-container">
-              <div className="novel-editor-wrapper">
-                <div className="chapter-content-wrapper" style={{ width: '100%', maxWidth: '800px', margin: '0 auto' }}>
-                  <div className="editor-with-header">
-                      {/* 工具栏 */}
-                      <div className="embedded-toolbar">
+            <div className="flex min-h-0 flex-1">
+              <div className="flex min-h-0 flex-1">
+                <div className="mx-auto flex h-full w-full max-w-[900px]">
+                  <div className="flex h-full w-full flex-col overflow-hidden bg-transparent">
+                      <div className="shrink-0">
                         <ChapterEditorToolbar
                           editor={editor}
                           onManualSave={handleManualSave}
@@ -1173,13 +1226,15 @@ export default function NovelEditorPage() {
                         />
                       </div>
                       
-                      <div className="editor-scroll-container">
-                        {/* 章节头部 */}
+                      <div className="min-h-0 flex-1 overflow-y-auto bg-transparent">
                         {selectedChapter && chaptersData[selectedChapter] && (
-                          <div className="chapter-header-info">
+                          <div className="px-6 pb-5 pt-8 max-md:px-4">
                             <div
                               ref={chapterNumberInputRef}
-                              className={`chapter-number ${canEdit ? 'chapter-number-editable' : ''}`}
+                              className={cn(
+                                'mb-2 text-sm font-medium tracking-[0.18em] text-[#964900] outline-none',
+                                canEdit && 'cursor-text'
+                              )}
                               contentEditable={canEdit}
                               suppressContentEditableWarning
                               onBlur={handleSaveChapterNumber}
@@ -1191,7 +1246,7 @@ export default function NovelEditorPage() {
                             </div>
                             <h2
                               ref={chapterNameInputRef}
-                              className="chapter-title"
+                              className="text-[28px] font-semibold leading-tight text-[#1f045a] outline-none max-md:text-[24px]"
                               contentEditable={canEdit}
                               suppressContentEditableWarning
                               onBlur={handleSaveChapterName}
@@ -1202,41 +1257,40 @@ export default function NovelEditorPage() {
                           </div>
                         )}
                         
-                        {/* 编辑器内容：key 随章节变化强制挂载，确保切换章节时显示对应 fragment */}
-                        <div className="editor-content-area" key={documentId ?? 'no-chapter'}>
+                        <div className="px-6 pb-10 max-md:px-4" key={documentId ?? 'no-chapter'}>
                           <EditorContent editor={editor} />
                         </div>
                       </div>
 
-                      {/* 章节导航 - 固定在编辑器底部 */}
                       {(prevChapter || nextChapter) && (
-                        <div className="chapter-nav-footer">
+                        <div className="grid shrink-0 grid-cols-2 gap-0 border-t border-[#ede4ff] bg-[#fdf7ff]/92 px-6 py-3 backdrop-blur max-md:px-4">
                           {prevChapter ? (
                             <button
-                              className="chapter-nav-btn prev"
+                              className="flex min-w-0 items-center gap-3 py-3 pr-4 text-left transition-colors hover:text-[#ff8000]"
                               onClick={() => handleChapterSelect(prevChapter.id)}
                             >
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-                              <div className="chapter-nav-info">
-                                <span className="chapter-nav-label">上一章</span>
-                                <span className="chapter-nav-title">{prevChapter.title || '未命名章节'}</span>
+                              <div className="flex min-w-0 flex-col">
+                                <span className="text-xs text-[#574235]/70">上一章</span>
+                                <span className="truncate text-sm font-medium text-[#1f045a]">{prevChapter.title || '未命名章节'}</span>
                               </div>
                             </button>
-                          ) : <div className="chapter-nav-placeholder" />}
+                          ) : <div />}
                           {nextChapter ? (
                             <button
-                              className="chapter-nav-btn next"
+                              className="flex min-w-0 items-center justify-end gap-3 py-3 pl-4 text-right transition-colors hover:text-[#ff8000]"
                               onClick={() => handleChapterSelect(nextChapter.id)}
                             >
-                              <div className="chapter-nav-info">
-                                <span className="chapter-nav-label">下一章</span>
-                                <span className="chapter-nav-title">{nextChapter.title || '未命名章节'}</span>
+                              <div className="flex min-w-0 flex-col">
+                                <span className="text-xs text-[#574235]/70">下一章</span>
+                                <span className="truncate text-sm font-medium text-[#1f045a]">{nextChapter.title || '未命名章节'}</span>
                               </div>
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
                             </button>
-                          ) : <div className="chapter-nav-placeholder" />}
+                          ) : <div />}
                         </div>
                       )}
+
                     </div>
                 </div>
               </div>
@@ -1367,31 +1421,46 @@ export default function NovelEditorPage() {
           )}
         </div>
 
-        {/* 右侧边栏 - 桌面端（AI对话窗口） */}
         {!isMobile && (
-          <div className={`sidebar-wrapper right-sidebar-wrapper ${rightSidebarCollapsed ? 'collapsed' : ''}`}>
-            <CollabAIPanel
-              workId={workId ?? ''}
-              chapters={orderedChapters}
-              currentChapterId={selectedChapter ?? undefined}
-              onUseContinueRecommendation={handleUseContinueRecommendation}
-              onWriteToEditor={handleGenerateContent}
-              currentUserId={currentUser?.id}
-            />
+          <div
+            className={cn(
+              'pointer-events-none absolute inset-y-4 right-4 z-40 transition-all duration-300',
+              rightSidebarCollapsed ? 'w-0 opacity-0' : 'w-[clamp(260px,26vw,360px)] opacity-100'
+            )}
+          >
+            <div
+              className="pointer-events-auto h-full overflow-hidden rounded-[28px] border border-[#ede4ff] bg-[#f8f1ff]/95 shadow-[0px_20px_40px_rgba(31,4,90,0.08)] backdrop-blur"
+              onMouseEnter={clearRightSidebarAutoCollapseTimer}
+              onMouseLeave={scheduleRightSidebarAutoCollapse}
+              onFocusCapture={clearRightSidebarAutoCollapseTimer}
+              onBlurCapture={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                  scheduleRightSidebarAutoCollapse();
+                }
+              }}
+            >
+              <CollabAIPanel
+                workId={workId ?? ''}
+                chapters={orderedChapters}
+                currentChapterId={selectedChapter ?? undefined}
+                onUseContinueRecommendation={handleUseContinueRecommendation}
+                onWriteToEditor={handleGenerateContent}
+                currentUserId={currentUser?.id}
+              />
+            </div>
           </div>
         )}
 
-        {/* 移动端对话抽屉 */}
         {isMobile && mobileChatOpen && (
-          <div className="mobile-chat-overlay" onClick={() => setMobileChatOpen(false)}>
-            <div className="mobile-chat-drawer" onClick={(e) => e.stopPropagation()}>
-              <div className="mobile-chat-header">
-                <h2>球球AI</h2>
-                <button className="mobile-chat-close" onClick={() => setMobileChatOpen(false)}>
+          <div className="fixed inset-0 z-[2100] bg-black/40 backdrop-blur-sm" onClick={() => setMobileChatOpen(false)}>
+            <div className="ml-auto flex h-full w-[85vw] max-w-[380px] flex-col overflow-hidden bg-background shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between border-b border-border px-4 py-4">
+                <h2 className="text-lg font-semibold text-foreground">球球AI</h2>
+                <button className="inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" onClick={() => setMobileChatOpen(false)}>
                   <X size={24} />
                 </button>
               </div>
-              <div className="mobile-chat-content">
+              <div className="min-h-0 flex-1 overflow-y-auto p-3">
                 <CollabAIPanel
                   workId={workId ?? ''}
                   chapters={orderedChapters}
@@ -1475,7 +1544,7 @@ export default function NovelEditorPage() {
 
       {/* 问题反馈按钮（右下角固定） */}
       <button
-        className="feedback-fab"
+        className="fixed bottom-6 right-6 z-[2100] inline-flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-all hover:-translate-y-0.5 hover:bg-primary/90"
         onClick={() => setFeedbackOpen(true)}
         title="问题反馈"
       >
@@ -1521,7 +1590,7 @@ export default function NovelEditorPage() {
       {/* 移动端侧边栏遮罩 */}
       {isMobile && (!leftSidebarCollapsed || !rightSidebarCollapsed) && (
         <div 
-          className="sidebar-overlay"
+          className="fixed inset-0 z-[2050] bg-black/20 backdrop-blur-[1px]"
           onClick={() => {
             if (!leftSidebarCollapsed) toggleLeftSidebar();
             if (!rightSidebarCollapsed) toggleRightSidebar();

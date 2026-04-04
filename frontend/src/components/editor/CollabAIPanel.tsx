@@ -21,7 +21,8 @@ import {
 import { formatOutlineSummary } from '../../utils/outlineFormat';
 import type { LocalDramaTask } from '../drama/dramaTypes';
 import RatingWidget from '../common/RatingWidget';
-import './CollabAIPanel.css';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 /** 面板只需要章节的最基本字段 */
 interface ChapterItem {
@@ -64,7 +65,7 @@ interface CollabAIPanelProps {
 
 function UserAvatar({ name }: { name: string }) {
   const initial = (name || '?').charAt(0).toUpperCase();
-  return <div className="task-user-avatar">{initial}</div>;
+  return <div className="flex size-[18px] shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">{initial}</div>;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -75,13 +76,28 @@ function StatusBadge({ status }: { status: string }) {
     cancelled: '已取消',
     error: '出错',
   };
-  return <span className={`task-status-badge ${status}`}>{labels[status] ?? status}</span>;
+  return (
+    <span
+      className={cn(
+        'ml-auto rounded px-[7px] py-[2px] text-[11px] font-medium',
+        status === 'queued' && 'bg-amber-500/15 text-amber-500',
+        status === 'running' && 'bg-primary/12 text-primary',
+        status === 'done' && 'bg-emerald-500/12 text-emerald-600',
+        status === 'error' && 'bg-destructive/12 text-destructive',
+        status === 'cancelled' && 'bg-muted text-muted-foreground'
+      )}
+    >
+      {labels[status] ?? status}
+    </span>
+  );
 }
 
 function LoadingDots() {
   return (
-    <div className="loading-dots">
-      <span /><span /><span />
+    <div className="flex gap-[3px]">
+      <span className="size-[5px] animate-pulse rounded-full bg-primary [animation-delay:0ms]" />
+      <span className="size-[5px] animate-pulse rounded-full bg-primary [animation-delay:200ms]" />
+      <span className="size-[5px] animate-pulse rounded-full bg-primary [animation-delay:400ms]" />
     </div>
   );
 }
@@ -126,11 +142,11 @@ function MessageContent({ content, streaming }: { content: string, streaming?: b
         if (part.type === 'think') {
           const isLastAndStreaming = streaming && idx === parts.length - 1;
           return (
-            <details key={idx} className="ai-think-block" open={isLastAndStreaming}>
-              <summary className="ai-think-summary">
+            <details key={idx} className="my-1.5 overflow-hidden rounded-md border border-border bg-black/[0.03] dark:bg-white/[0.03]" open={isLastAndStreaming}>
+              <summary className="flex cursor-pointer items-center bg-black/[0.02] px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground hover:bg-black/[0.04] dark:bg-white/[0.02] dark:hover:bg-white/[0.04]">
                 {isLastAndStreaming ? '思考中...' : '已深度思考'}
               </summary>
-              <div className="ai-think-content">{part.content}</div>
+              <div className="border-t border-dashed border-border px-2.5 py-2 text-xs whitespace-pre-wrap text-muted-foreground opacity-90">{part.content}</div>
             </details>
           );
         }
@@ -155,51 +171,55 @@ function TaskCard({ task, canCancel, onCancel, onUseContinueRecommendation }: Ta
     : task.query;
 
   return (
-    <div className={`collab-ai-task ${task.status}`}>
-      {/* 任务头部 */}
-      <div className="task-header">
+    <div
+      className={cn(
+        'flex flex-col gap-2 rounded-lg border p-3 transition-colors',
+        task.status === 'running' && 'border-primary bg-primary/10',
+        task.status === 'error' && 'border-destructive bg-destructive/5',
+        task.status === 'cancelled' && 'opacity-60',
+        task.status !== 'running' && task.status !== 'error' && 'border-border bg-muted/40'
+      )}
+    >
+      <div className="flex flex-wrap items-center gap-2">
         <UserAvatar name={task.user_name} />
-        <span className="task-user-badge">{task.user_name}</span>
-        <span className="task-chapter-badge">
+        <span className="text-xs font-medium text-muted-foreground">{task.user_name}</span>
+        <span className="rounded bg-muted px-[7px] py-[2px] text-[11px] whitespace-nowrap text-muted-foreground">
           {task.chapter_title ? task.chapter_title : `章节 ${task.chapter_id}`}
         </span>
         <StatusBadge status={task.status} />
         {canCancel && (task.status === 'queued' || task.status === 'running') && (
-          <button
-            className="task-cancel-btn"
+          <Button
+            variant="outline"
+            size="xs"
             onClick={() => onCancel(task.request_id)}
             title="取消任务"
           >
             取消
-          </button>
+          </Button>
         )}
       </div>
 
-      {/* 排队提示 */}
       {task.status === 'queued' && typeof task.queue_position === 'number' && task.queue_position > 0 && (
-        <div className="task-queue-hint">
+        <div className="flex items-center gap-1 text-[11px] text-amber-500">
           ⏳ 等待前方 {task.queue_position} 个任务完成
         </div>
       )}
 
-      {/* 查询摘要 */}
-      <div className="task-query-summary" title={task.query}>{queryShort}</div>
+      <div className="truncate text-xs text-muted-foreground" title={task.query}>{queryShort}</div>
 
-      {/* 流式内容 */}
       {task.status === 'running' && !task.streamContent && (
-        <div className="task-loading">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <LoadingDots />
           <span>AI 正在思考…</span>
         </div>
       )}
 
       {task.streamContent && (
-        <div className="task-stream-content">
+        <div className="max-h-[200px] overflow-y-auto rounded-md bg-background px-2.5 py-2 text-[13px] leading-6 whitespace-pre-wrap break-words text-foreground">
           <MessageContent content={task.streamContent} streaming={task.status === 'running'} />
         </div>
       )}
 
-      {/* 完成后评分 */}
       {task.status === 'done' && (
         <RatingWidget
           promptTemplateId={task.prompt_template_id}
@@ -211,22 +231,23 @@ function TaskCard({ task, canCancel, onCancel, onUseContinueRecommendation }: Ta
       )}
 
       {task.status === 'error' && (
-        <div className="task-error" style={{ fontSize: 12, color: 'var(--error)', marginTop: 6 }}>
+        <div className="mt-1 text-xs text-destructive">
           {task.error || '执行失败，请重试'}
         </div>
       )}
 
-      {/* 续写推荐卡片 */}
       {task.continueChapterResult && onUseContinueRecommendation && (
-        <div className="task-recommendation-cards">
+        <div className="flex flex-col gap-2">
           {task.continueChapterResult.recommendations.map((rec, i) => (
-            <div key={i} className="recommendation-card">
-              <div className="recommendation-card-title">方案 {i + 1}：{rec.title}</div>
-              <div className="recommendation-card-outline">
+            <div key={i} className="rounded-lg border border-border bg-background p-3 transition-colors hover:border-primary hover:bg-primary/10">
+              <div className="mb-1 text-[13px] font-semibold text-foreground">方案 {i + 1}：{rec.title}</div>
+              <div className="text-xs leading-5 text-muted-foreground">
                 {formatOutlineSummary(rec.outline)}
               </div>
-              <button
-                className="recommendation-use-btn"
+              <Button
+                variant="outline"
+                size="xs"
+                className="mt-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground"
                 onClick={() => onUseContinueRecommendation({
                   title: rec.title,
                   outline: rec.outline,
@@ -235,7 +256,7 @@ function TaskCard({ task, canCancel, onCancel, onUseContinueRecommendation }: Ta
                 })}
               >
                 使用此方案
-              </button>
+              </Button>
             </div>
           ))}
         </div>
@@ -260,46 +281,51 @@ function LocalTaskCard({
   onCancel?: (localId: string) => void;
 }) {
   return (
-    <div className={`collab-ai-task ${task.status}`}>
-      <div className="task-header">
-        <div className="task-user-avatar"><Bot size={12} /></div>
-        <span className="task-chapter-badge">{task.episode_title}</span>
+    <div
+      className={cn(
+        'flex flex-col gap-2 rounded-lg border p-3 transition-colors',
+        task.status === 'running' && 'border-primary bg-primary/10',
+        task.status === 'error' && 'border-destructive bg-destructive/5',
+        task.status === 'cancelled' && 'opacity-60',
+        task.status !== 'running' && task.status !== 'error' && 'border-border bg-muted/40'
+      )}
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex size-[18px] items-center justify-center rounded-full bg-primary text-primary-foreground"><Bot size={12} /></div>
+        <span className="rounded bg-muted px-[7px] py-[2px] text-[11px] whitespace-nowrap text-muted-foreground">{task.episode_title}</span>
         <StatusBadge status={task.status} />
         {task.status === 'running' && onCancel && (
-          <button className="task-cancel-btn" onClick={() => onCancel(task.local_id)} title="取消">
+          <Button variant="outline" size="xs" onClick={() => onCancel(task.local_id)} title="取消">
             取消
-          </button>
+          </Button>
         )}
       </div>
-      <div className="task-query-summary">{LOCAL_TASK_LABELS[task.type] ?? task.query}</div>
+      <div className="truncate text-xs text-muted-foreground">{LOCAL_TASK_LABELS[task.type] ?? task.query}</div>
 
-      {/* gen-script：流式文本 */}
       {task.type === 'gen-script' && (
         <>
           {task.status === 'running' && !task.streamContent && (
-            <div className="task-loading"><LoadingDots /><span>生成剧本中…</span></div>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><LoadingDots /><span>生成剧本中…</span></div>
           )}
           {task.streamContent && (
-            <div className="task-stream-content">
+            <div className="max-h-[200px] overflow-y-auto rounded-md bg-background px-2.5 py-2 text-[13px] leading-6 whitespace-pre-wrap break-words text-foreground">
               <MessageContent content={task.streamContent} streaming={task.status === 'running'} />
             </div>
           )}
         </>
       )}
 
-      {/* extract：完成摘要 */}
       {task.status === 'done' && task.type !== 'gen-script' && Array.isArray(task.result) && (
-        <div className="task-result-summary" style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 6 }}>
+        <div className="mt-1 text-xs text-muted-foreground">
           已提取 {task.result.length} 个{task.type === 'extract-characters' ? '角色' : '场景'}，已应用到侧边栏
         </div>
       )}
       {task.status === 'done' && task.type !== 'gen-script' && !Array.isArray(task.result) && (
-        <div className="task-result-summary" style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 6 }}>
+        <div className="mt-1 text-xs text-muted-foreground">
           提取完成
         </div>
       )}
 
-      {/* 完成后评分（仅 gen-script） */}
       {task.status === 'done' && task.type === 'gen-script' && (
         <RatingWidget
           context={{ generation_type: 'drama_gen_script' }}
@@ -308,7 +334,7 @@ function LocalTaskCard({
       )}
 
       {task.status === 'error' && (
-        <div className="task-error" style={{ fontSize: 12, color: 'var(--error)', marginTop: 6 }}>
+        <div className="mt-1 text-xs text-destructive">
           {task.error || '执行失败，请重试'}
         </div>
       )}
@@ -334,23 +360,31 @@ function ChatBubble({
     : message.content;
 
   return (
-    <div className={`chat-message ${isAI ? 'is-ai' : ''} ${isMine ? 'is-mine' : ''}`}>
-      <div className="chat-avatar">
+    <div className="flex items-start gap-2">
+      <div className="shrink-0">
         {isAI
-          ? <div className="chat-avatar-ai"><Bot size={12} /></div>
-          : <div className={`chat-avatar-user ${isMine ? 'mine' : ''}`}>{(message.user_name || '?').charAt(0).toUpperCase()}</div>
+          ? <div className="flex size-[26px] items-center justify-center rounded-full bg-[linear-gradient(135deg,#4096ff,#722ed1)] text-white"><Bot size={12} /></div>
+          : <div className={cn('flex size-[26px] items-center justify-center rounded-full text-xs font-semibold text-white', isMine ? 'bg-emerald-500' : 'bg-primary')}>{(message.user_name || '?').charAt(0).toUpperCase()}</div>
         }
       </div>
-      <div className="chat-bubble-wrap">
-        <div className="chat-sender-name">
+      <div className="flex max-w-[78%] flex-col gap-[3px]">
+        <div className="flex items-center gap-1.5 px-1 text-[11px] text-muted-foreground">
           {message.user_name}
           {(isMine || isAI) && !message.streaming && onDelete && (
-            <button className="chat-delete-btn" onClick={() => onDelete(message.id)} title="删除消息">
+            <button className="flex items-center justify-center rounded p-0.5 text-muted-foreground opacity-60 transition-all hover:bg-destructive/10 hover:text-destructive hover:opacity-100" onClick={() => onDelete(message.id)} title="删除消息">
               <Trash2 size={12} />
             </button>
           )}
         </div>
-        <div className={`chat-bubble ${isAI ? 'ai' : isMine ? 'mine' : 'other'} ${message.streaming ? 'streaming' : ''}`}>
+        <div
+          className={cn(
+            'rounded-xl px-3 py-2 text-[13px] leading-6 break-words whitespace-pre-wrap',
+            isAI && 'border border-primary/20 bg-[linear-gradient(135deg,rgba(64,150,255,0.1),rgba(114,46,209,0.08))] text-foreground rounded-bl-sm',
+            isMine && 'bg-primary text-primary-foreground rounded-br-sm',
+            !isAI && !isMine && 'bg-muted text-foreground rounded-bl-sm',
+            message.streaming && 'after:ml-0.5 after:inline-block after:animate-pulse after:text-primary after:content-["▋"]'
+          )}
+        >
           {displayContent ? (
             <MessageContent content={displayContent} streaming={message.streaming} />
           ) : (
@@ -403,20 +437,20 @@ function ModelPicker({
   const modelLabel = selectedModelObj ? selectedModelObj.name : '默认模型';
 
   return (
-    <div className="chapter-picker" ref={dropdownRef}>
+    <div className="relative shrink-0" ref={dropdownRef}>
       <button
-        className="toolbar-chip"
+        className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[11px] font-medium whitespace-nowrap text-muted-foreground transition-colors hover:border-primary hover:bg-primary/10 hover:text-primary"
         onClick={() => setIsOpen(o => !o)}
         title={selectedModelObj?.description || '选择 AI 模型'}
       >
         <Bot size={10} />
         <span style={{ maxWidth: 70, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{modelLabel}</span>
-        <span className="chip-arrow">▾</span>
+        <span className="text-[9px] opacity-60">▾</span>
       </button>
       {isOpen && (
-        <div className="chapter-dropdown">
+        <div className="absolute bottom-[calc(100%+4px)] left-0 z-[200] max-h-[200px] min-w-[160px] max-w-[220px] overflow-y-auto rounded-lg border border-border bg-background shadow-lg">
           <div
-            className={`chapter-option ${selectedModel === '' ? 'selected' : ''}`}
+            className={cn('cursor-pointer truncate px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary', selectedModel === '' && 'bg-primary/10 text-primary')}
             onMouseDown={e => { e.preventDefault(); onSelectModel(''); setIsOpen(false); }}
           >
             默认模型
@@ -424,7 +458,7 @@ function ModelPicker({
           {availableModels.map(m => (
             <div
               key={m.id}
-              className={`chapter-option ${selectedModel === m.model_id ? 'selected' : ''}`}
+              className={cn('cursor-pointer truncate px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary', selectedModel === m.model_id && 'bg-primary/10 text-primary')}
               onMouseDown={e => { e.preventDefault(); onSelectModel(m.model_id); setIsOpen(false); }}
               title={m.description}
             >
@@ -783,51 +817,54 @@ export default function CollabAIPanel({
   ].sort((a, b) => b.task.created_at - a.task.created_at);
 
   return (
-    <div className="collab-ai-panel">
-      {/* 头部 */}
-      <div className="collab-ai-header">
-        <div className="collab-ai-title">
+    <div className="flex h-full w-full flex-col rounded-xl bg-background shadow-md">
+      <div className="flex items-center justify-between border-b border-border px-4 py-3">
+        <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
           <Users size={15} />
           协作 AI
         </div>
-        <div className="collab-ai-status">
-          <div className={`status-dot ${connected ? 'connected' : ''}`} />
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <div className={cn('size-2 rounded-full bg-muted-foreground shrink-0', connected && 'bg-emerald-500')} />
           {connected ? '已连接' : '连接中…'}
           {hasActiveTasks && (
             <>
               <span>·</span>
-              <Loader2 size={11} className="spinning" />
+              <Loader2 size={11} className="animate-spin" />
               <span>运行中</span>
             </>
           )}
         </div>
       </div>
 
-      {/* Tab 切换 */}
-      <div className="collab-ai-tabs">
+      <div className="flex border-b border-border">
         <button
-          className={`collab-ai-tab ${activeTab === 'chat' ? 'active' : ''}`}
+          className={cn(
+            'relative flex flex-1 items-center justify-center gap-1 border-b-2 border-transparent px-3 py-2 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground',
+            activeTab === 'chat' && 'border-primary text-primary'
+          )}
           onClick={() => setActiveTab('chat')}
         >
           <MessageSquare size={13} />
           聊天
         </button>
         <button
-          className={`collab-ai-tab ${activeTab === 'tasks' ? 'active' : ''}`}
+          className={cn(
+            'relative flex flex-1 items-center justify-center gap-1 border-b-2 border-transparent px-3 py-2 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground',
+            activeTab === 'tasks' && 'border-primary text-primary'
+          )}
           onClick={() => setActiveTab('tasks')}
         >
           <Zap size={13} />
           AI 任务
-          {hasActiveTasks && <span className="tab-badge" />}
+          {hasActiveTasks && <span className="size-1.5 rounded-full bg-primary" />}
         </button>
       </div>
 
-      {/* ── 聊天 Tab ── */}
       {activeTab === 'chat' && (
         <>
-          <div className="chat-messages">
+          <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-3">
             {chatMessages.length === 0 ? (
-              <div className="collab-ai-empty">
+              <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 py-10 text-center text-[13px] text-muted-foreground">
                 <MessageSquare size={28} strokeWidth={1.5} />
                 <span>暂无消息</span>
                 <span>输入 @球球 让 AI 参与对话</span>
@@ -840,19 +877,19 @@ export default function CollabAIPanel({
             <div ref={chatEndRef} />
           </div>
 
-          <div className="chat-input-area">
-            <div className="chat-input-box">
+          <div className="shrink-0 px-3 pb-3 pt-2">
+            <div className="flex flex-col rounded-xl border border-border bg-muted/40 transition-colors focus-within:border-primary">
               <textarea
                 ref={chatTextareaRef}
-                className="chat-input-textarea"
+                className="min-h-[54px] max-h-[120px] w-full resize-none border-0 bg-transparent px-3 py-2 text-[13px] leading-6 text-foreground outline-none placeholder:text-muted-foreground"
                 placeholder={'发消息…'}
                 value={chatInput}
                 onChange={e => setChatInput(e.target.value)}
                 onKeyDown={handleChatKeyDown}
                 rows={2}
               />
-              <div className="chat-input-toolbar">
-                <button className="toolbar-chip" onClick={handleInsertAtAI} title="插入 @球球">
+              <div className="flex items-center gap-1.5 border-t border-border px-2 py-1.5">
+                <button className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[11px] font-medium whitespace-nowrap text-muted-foreground transition-colors hover:border-primary hover:bg-primary/10 hover:text-primary" onClick={handleInsertAtAI} title="插入 @球球">
                   @球球
                 </button>
                 <ModelPicker
@@ -860,9 +897,9 @@ export default function CollabAIPanel({
                   selectedModel={selectedModel}
                   onSelectModel={setSelectedModel}
                 />
-                <span className="toolbar-sep" />
+                <span className="flex-1" />
                 <button
-                  className="chat-input-send"
+                  className="flex size-[30px] items-center justify-center rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
                   onClick={handleSendChat}
                   disabled={!chatInput.trim()}
                   title="发送 (Enter)"
@@ -875,12 +912,11 @@ export default function CollabAIPanel({
         </>
       )}
 
-      {/* ── AI 任务 Tab ── */}
       {activeTab === 'tasks' && (
         <>
-          <div className="collab-ai-tasks">
+          <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto p-3">
             {combinedTaskItems.length === 0 ? (
-              <div className="collab-ai-empty">
+              <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 py-10 text-center text-[13px] text-muted-foreground">
                 <Zap size={28} strokeWidth={1.5} />
                 <span>暂无 AI 任务</span>
                 <span>输入 / 查看可用指令</span>
@@ -907,30 +943,31 @@ export default function CollabAIPanel({
             <div ref={tasksEndRef} />
           </div>
 
-          <div className="collab-ai-input-area">
-            {/* 查询输入（含 slash 菜单） */}
-            <div className="chat-input-box" style={{ position: 'relative' }}>
-              {/* slash 命令下拉菜单 */}
+          <div className="shrink-0 px-3 pb-3 pt-2">
+            <div className="relative flex flex-col rounded-xl border border-border bg-muted/40 transition-colors focus-within:border-primary">
               {cmdMenuOpen && cmdMenuItems.length > 0 && (
-                <div className="slash-cmd-menu" ref={cmdMenuRef}>
+                <div className="absolute bottom-[calc(100%+6px)] left-0 right-0 z-[200] overflow-hidden rounded-lg border border-border bg-background shadow-lg" ref={cmdMenuRef}>
                   {cmdMenuItems.map((cmd, idx) => (
                     <div
                       key={cmd.id}
-                      className={`slash-cmd-option ${idx === cmdMenuIndex ? 'selected' : ''}`}
+                      className={cn(
+                        'flex cursor-pointer flex-col gap-0.5 border-b border-border px-3 py-2 transition-colors last:border-b-0',
+                        idx === cmdMenuIndex ? 'bg-primary/10' : 'hover:bg-primary/10'
+                      )}
                       onMouseDown={e => { e.preventDefault(); handleSelectCmd(cmd); }}
                     >
-                      <span className="slash-cmd-name">{cmd.name}</span>
-                      <span className="slash-cmd-subtitle">{cmd.subtitle}</span>
+                      <span className="text-[13px] font-medium text-primary">{cmd.name}</span>
+                      <span className="text-[11px] leading-4 text-muted-foreground">{cmd.subtitle}</span>
                     </div>
                   ))}
-                  <div className="slash-cmd-footer">
+                  <div className="flex items-center gap-1.5 bg-muted px-2.5 py-1.5 text-[11px] text-muted-foreground">
                     <span>↑↓ 选择</span><kbd>Enter</kbd><span>确认</span><kbd>Esc</kbd><span>关闭</span>
                   </div>
                 </div>
               )}
               <textarea
                 ref={taskTextareaRef}
-                className="chat-input-textarea"
+                className="min-h-[54px] max-h-[120px] w-full resize-none border-0 bg-transparent px-3 py-2 text-[13px] leading-6 text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
                 placeholder={selectedChapterId ? '输入 / 查看指令…' : (extraCommands?.length ? '输入 / 查看 AI 指令…' : '请先选择章节')}
                 value={query}
                 onChange={handleQueryChange}
@@ -938,12 +975,15 @@ export default function CollabAIPanel({
                 disabled={selectedChapterId === '' && !extraCommands?.length}
                 rows={2}
               />
-              <div className="chat-input-toolbar">
-                {/* 自定义章节下拉 */}
+              <div className="flex items-center gap-1.5 border-t border-border px-2 py-1.5">
                 {chapters && chapters.length > 0 && (
-                  <div className="chapter-picker" ref={chapterDropdownRef}>
+                  <div className="relative shrink-0" ref={chapterDropdownRef}>
                     <button
-                      className={`toolbar-chip chapter-chip ${!selectedChapterId ? 'placeholder' : ''}`}
+                      className={cn(
+                        'inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[11px] font-medium whitespace-nowrap text-muted-foreground transition-colors hover:border-primary hover:bg-primary/10 hover:text-primary',
+                        !selectedChapterId && 'text-muted-foreground/70',
+                        'font-serif tracking-[0.02em]'
+                      )}
                       onClick={() => setChapterDropdownOpen(o => !o)}
                       title={selectedChapterId
                         ? (() => { const ch = chapters.find(c => String(c.id) === String(selectedChapterId)); return ch ? `第${ch.chapter_number}章 ${ch.title}` : '章节'; })()
@@ -952,12 +992,12 @@ export default function CollabAIPanel({
                       {selectedChapterId
                         ? (() => { const ch = chapters.find(c => String(c.id) === String(selectedChapterId)); return ch ? `§${ch.chapter_number}` : '§'; })()
                         : '§'}
-                      <span className="chip-arrow">▾</span>
+                      <span className="text-[9px] opacity-60">▾</span>
                     </button>
                     {chapterDropdownOpen && (
-                      <div className="chapter-dropdown">
+                      <div className="absolute bottom-[calc(100%+4px)] left-0 z-[200] max-h-[200px] min-w-[160px] max-w-[220px] overflow-y-auto rounded-lg border border-border bg-background shadow-lg">
                         <div
-                          className={`chapter-option ${selectedChapterId === '' ? 'selected' : ''}`}
+                          className={cn('cursor-pointer truncate px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary', selectedChapterId === '' && 'bg-primary/10 text-primary')}
                           onMouseDown={e => { e.preventDefault(); setSelectedChapterId(''); setChapterDropdownOpen(false); }}
                         >
                           — 不限章节 —
@@ -965,7 +1005,7 @@ export default function CollabAIPanel({
                         {chapters.map(ch => (
                           <div
                             key={ch.id}
-                            className={`chapter-option ${String(selectedChapterId) === String(ch.id) ? 'selected' : ''}`}
+                            className={cn('cursor-pointer truncate px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary', String(selectedChapterId) === String(ch.id) && 'bg-primary/10 text-primary')}
                             onMouseDown={e => { e.preventDefault(); setSelectedChapterId(ch.id); setChapterDropdownOpen(false); }}
                           >
                             第 {ch.chapter_number} 章&nbsp;{ch.title}
@@ -976,7 +1016,7 @@ export default function CollabAIPanel({
                   </div>
                 )}
                 <button
-                  className="toolbar-chip"
+                  className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[11px] font-medium whitespace-nowrap text-muted-foreground transition-colors hover:border-primary hover:bg-primary/10 hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
                   onClick={handleInsertSlash}
                   disabled={selectedChapterId === '' && !extraCommands?.length}
                   title="插入指令"
@@ -988,14 +1028,14 @@ export default function CollabAIPanel({
                   selectedModel={selectedModel}
                   onSelectModel={setSelectedModel}
                 />
-                <span className="toolbar-sep" />
+                <span className="flex-1" />
                 <button
-                  className="chat-input-send"
+                  className="flex size-[30px] items-center justify-center rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
                   onClick={handleSend}
                   disabled={!query.trim() || (selectedChapterId === '' && !extraCommands?.length) || sending}
                   title="发送 (Ctrl+Enter)"
                 >
-                  {sending ? <Loader2 size={13} className="spinning" /> : <Send size={13} />}
+                  {sending ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
                 </button>
               </div>
             </div>

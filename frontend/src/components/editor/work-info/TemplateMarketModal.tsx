@@ -8,8 +8,9 @@ import type { UserInfo } from '../../../utils/authApi';
 import MessageModal from '../../common/MessageModal';
 import type { MessageType } from '../../common/MessageModal';
 import { parseError } from '../../../utils/errorUtils';
-
-import './TemplateMarketModal.css';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 
 interface TemplateMarketModalProps {
   isOpen: boolean;
@@ -119,6 +120,9 @@ export default function TemplateMarketModal({
   const [sourceTemplateId, setSourceTemplateId] = useState<number | undefined>(undefined);
   const [editingTemplate, setEditingTemplate] = useState<WorkTemplate | null>(null);
 
+  const textareaClassName =
+    'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50';
+
   const handleSaveTemplate = async () => {
     if (editingTemplate) {
       if (!saveForm.name) return;
@@ -220,92 +224,127 @@ export default function TemplateMarketModal({
       onClose={onClose}
       initialWidth={960}
       initialHeight={600}
-      className="template-market-modal-content"
+      className="overflow-hidden rounded-2xl border border-border bg-background shadow-[0_24px_48px_rgba(0,0,0,0.15),0_8px_24px_rgba(0,0,0,0.08)]"
       handleClassName=".template-market-header"
     >
-        <div className="template-market-header">
-          <h3>模板市场</h3>
-          <button className="close-btn" onClick={onClose}><X size={18} /></button>
+        <div className="template-market-header flex items-center justify-between border-b border-border px-6 py-5">
+          <h3 className="text-lg font-bold tracking-tight text-foreground">模板市场</h3>
+          <Button variant="ghost" size="icon-sm" onClick={onClose}>
+            <X size={18} />
+          </Button>
         </div>
 
-        <div className="market-toolbar">
-          <div className="tab-group">
-            <button
-              className={`tab-btn ${activeTab === 'market' ? 'active' : ''}`}
+        <div className="flex items-center gap-3 border-b border-border px-6 py-3.5 max-md:flex-col max-md:items-stretch max-md:px-4">
+          <div className="flex shrink-0 gap-1 rounded-xl bg-muted p-1 max-md:overflow-x-auto">
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                'rounded-lg px-3.5',
+                activeTab === 'market' && 'bg-background text-primary shadow-sm hover:bg-background'
+              )}
               onClick={() => setActiveTab('market')}
             >
               <Globe size={16} /> 公共市场
-            </button>
-            <button
-              className={`tab-btn ${activeTab === 'mine' ? 'active' : ''}`}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                'rounded-lg px-3.5',
+                activeTab === 'mine' && 'bg-background text-primary shadow-sm hover:bg-background'
+              )}
               onClick={() => setActiveTab('mine')}
             >
               <User size={16} /> 我的模板
-            </button>
+            </Button>
           </div>
 
-          <div className="search-box">
-            <Search size={16} />
-            <input
-              type="text"
+          <div className="relative min-w-0 flex-1">
+            <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
               placeholder="搜索模板..."
               value={searchQuery}
+              className="h-10 bg-muted/40 pl-9"
               onChange={e => setSearchQuery(e.target.value)}
             />
           </div>
 
-          <button
-            className="save-template-btn"
+          <Button
+            variant="outline"
+            className="shrink-0 border-primary/30 bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground"
             onClick={() => openSaveForm(undefined)}
             title="创建一个全新的模板（基于当前编辑的内容）"
           >
             <Save size={16} /> 创建新模板
-          </button>
+          </Button>
         </div>
 
-        <div className="market-content">
+        <div className="flex-1 overflow-y-auto bg-muted/40 p-6 max-md:p-4">
           {loading ? (
-            <div className="template-loading-state">加载中...</div>
+            <div className="px-5 py-15 text-center text-sm text-muted-foreground">加载中...</div>
           ) : (
-            <div className="templates-grid">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4 max-md:grid-cols-1">
               {templates.map(tpl => {
                 const isCurrent = currentTemplateConfig?.templateId === tpl.id.toString();
                 const canEditDelete = userInfo?.is_superuser ||
                   (!tpl.is_public && (activeTab === 'mine' || tpl.creator_id === userInfo?.id));
 
                 return (
-                  <div key={tpl.id} className={`template-card ${isCurrent ? 'active' : ''}`}>
-                    {isCurrent && <div className="current-badge">当前使用</div>}
+                  <div
+                    key={tpl.id}
+                    className={cn(
+                      'relative flex flex-col rounded-xl border bg-background p-5 transition-all',
+                      isCurrent
+                        ? 'border-primary shadow-[0_0_0_3px_hsl(var(--primary)/0.12)]'
+                        : 'border-border hover:-translate-y-0.5 hover:border-border/80 hover:shadow-lg'
+                    )}
+                  >
+                    {isCurrent && (
+                      <div className="absolute -top-px right-4 rounded-b-lg bg-primary px-2.5 py-[3px] text-[11px] font-semibold tracking-[0.3px] text-primary-foreground">
+                        当前使用
+                      </div>
+                    )}
 
-                    <div className="card-header">
-                      <h4>{tpl.name}</h4>
-                      {tpl.is_public && <span className="public-tag">公开</span>}
+                    <div className="mb-2.5 flex items-start justify-between gap-2">
+                      <h4 className="flex-1 text-[15px] font-semibold leading-6 text-foreground">{tpl.name}</h4>
+                      {tpl.is_public && (
+                        <span className="inline-flex shrink-0 items-center rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                          公开
+                        </span>
+                      )}
                     </div>
 
-                    <p className="card-desc">{tpl.description || '暂无描述'}</p>
+                    <p className="mb-4 flex-1 overflow-hidden text-[13px] leading-[1.65] text-muted-foreground [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3]">
+                      {tpl.description || '暂无描述'}
+                    </p>
 
-                    <div className="card-footer">
+                    <div className="mt-auto flex items-center justify-end gap-2 border-t border-border pt-3.5">
                       {!tpl.is_public && (
-                        <button
-                          className="card-use-btn"
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="border-primary/30 bg-primary/10 text-primary hover:bg-primary/15"
                           onClick={() => onSelectTemplate(tpl)}
                         >
                           <Download size={13} /> 使用
-                        </button>
+                        </Button>
                       )}
 
-                      <button
-                        className="card-saveas-btn"
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => handleSaveAs(tpl)}
                         title="基于此模板创建新模板"
                       >
                         <Save size={13} /> 另存为
-                      </button>
+                      </Button>
 
                       {canEditDelete && (
-                        <div className="card-menu-wrap">
-                          <button
-                            className="card-menu-btn"
+                        <div className="relative">
+                          <Button
+                            variant="outline"
+                            size="icon-sm"
                             onClick={(e) => {
                               e.stopPropagation();
                               setOpenMenuId(openMenuId === tpl.id ? null : tpl.id);
@@ -313,18 +352,18 @@ export default function TemplateMarketModal({
                             title="更多操作"
                           >
                             <MoreHorizontal size={15} />
-                          </button>
+                          </Button>
 
                           {openMenuId === tpl.id && (
-                            <div className="card-dropdown">
+                            <div className="absolute right-0 top-[calc(100%+6px)] z-50 min-w-[130px] rounded-xl border border-border bg-background p-1 shadow-lg">
                               <button
-                                className="dropdown-item"
+                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                 onClick={() => { openEditForm(tpl); setOpenMenuId(null); }}
                               >
                                 <Edit2 size={13} /> 编辑
                               </button>
                               <button
-                                className="dropdown-item danger"
+                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-destructive transition-colors hover:bg-destructive/10"
                                 onClick={() => { handleDeleteTemplate(tpl.id); setOpenMenuId(null); }}
                               >
                                 <Trash2 size={13} /> 删除
@@ -338,35 +377,36 @@ export default function TemplateMarketModal({
                 );
               })}
               {templates.length === 0 && (
-                <div className="template-empty-state">未找到相关模板</div>
+                <div className="col-span-full px-5 py-15 text-center text-sm text-muted-foreground">未找到相关模板</div>
               )}
             </div>
           )}
         </div>
 
       {showSaveForm && (
-          <div className="save-form-overlay">
-            <div className="save-form-content">
-              <h3>{editingTemplate ? '编辑模板' : '保存为新模板'}</h3>
-              <div className="form-group">
-                <label>模板名称</label>
-                <input
-                  type="text"
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/35 backdrop-blur-[2px] max-md:items-end">
+            <div className="w-[440px] max-w-[90%] rounded-2xl border border-border bg-background p-7 shadow-2xl max-md:w-full max-md:max-w-full max-md:rounded-b-none max-md:px-5 max-md:py-6">
+              <h3 className="mb-5 text-[17px] font-bold text-foreground">{editingTemplate ? '编辑模板' : '保存为新模板'}</h3>
+              <div className="mb-4 flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-muted-foreground">模板名称</label>
+                <Input
                   value={saveForm.name}
                   onChange={e => setSaveForm({ ...saveForm, name: e.target.value })}
                   placeholder="请输入模板名称"
+                  className="h-10"
                 />
               </div>
-              <div className="form-group">
-                <label>描述</label>
+              <div className="mb-4 flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-muted-foreground">描述</label>
                 <textarea
                   value={saveForm.description}
                   onChange={e => setSaveForm({ ...saveForm, description: e.target.value })}
                   placeholder="请输入模板描述"
                   rows={3}
+                  className={textareaClassName}
                 />
               </div>
-              <div className="form-group form-group--inline">
+              <div className="mb-4 flex min-h-6 items-center gap-2">
                 {userInfo?.is_superuser && (
                   <>
                     <input
@@ -374,16 +414,17 @@ export default function TemplateMarketModal({
                       id="is_public"
                       checked={saveForm.is_public}
                       onChange={e => setSaveForm({ ...saveForm, is_public: e.target.checked })}
+                      className="size-4 accent-primary"
                     />
-                    <label htmlFor="is_public" style={{ margin: 0 }}>设为公开模板</label>
+                    <label htmlFor="is_public" className="m-0 text-sm text-muted-foreground">设为公开模板</label>
                   </>
                 )}
               </div>
-              <div className="modal-footer">
-                <button onClick={() => setShowSaveForm(false)}>取消</button>
-                <button className="primary" onClick={handleSaveTemplate}>
+              <div className="mt-6 flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowSaveForm(false)}>取消</Button>
+                <Button onClick={handleSaveTemplate}>
                   {editingTemplate ? '确认更新' : '确认保存'}
-                </button>
+                </Button>
               </div>
             </div>
           </div>

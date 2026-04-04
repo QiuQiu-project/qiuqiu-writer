@@ -4,7 +4,8 @@ import DraggableResizableModal from '../common/DraggableResizableModal';
 import { Graph } from '@antv/g6';
 import type { GraphData } from '@antv/g6';
 import { useIsMobile } from '../../hooks/useMediaQuery';
-import './CharacterRelations.css';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 function getCssVar(name: string, fallback: string): string {
   try {
@@ -152,6 +153,9 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
   }, [viewMode]);
   const pendingFromRef = useRef<string | null>(null);
   const tempEdgeIdRef = useRef<string | null>(null);
+  const inputClassName = 'h-9';
+  const selectClassName =
+    'h-9 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50';
   useEffect(() => {
     manualLinkingRef.current = manualLinking;
     const graph = graphRef.current;
@@ -750,40 +754,40 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
   }, [isFullscreen, graphData, characters.length, viewMode]);
 
   return (
-    <div className="character-relations">
-      <div className="relations-header">
-        <div className="relations-title">
-          <h3>人物关系</h3>
+    <div className="flex h-full w-full flex-col overflow-hidden bg-background">
+      <div className="flex items-center justify-between border-b border-border px-6 py-5">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <h3 className="shrink-0 truncate text-lg font-semibold text-foreground">人物关系</h3>
           {dependencyKeys.length > 0 && (
-            <div className="relations-meta">
+            <div className="truncate text-xs text-muted-foreground">
               （已加载 {characters.length} 人物）
             </div>
           )}
         </div>
-        <div className="header-actions">
-          <button
-            className="action-btn toggle-view-btn"
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
             onClick={() => setViewMode(viewMode === 'list' ? 'graph' : 'list')}
             type="button"
             title={viewMode === 'list' ? '切换到关系图视图' : '切换到列表视图'}
           >
             {viewMode === 'list' ? <Share2 size={16} /> : <List size={16} />}
             <span>{viewMode === 'list' ? '关系图' : '列表'}</span>
-          </button>
+          </Button>
           {viewMode === 'list' && (
-            <button
-              className="action-btn"
+            <Button
+              variant="outline"
               onClick={() => setAddingRelation(true)}
               title="添加关系"
             >
               <Plus size={16} />
               <span>添加关系</span>
-            </button>
+            </Button>
           )}
           {viewMode === 'graph' && (
             <>
-              <button
-                className="action-btn"
+              <Button
+                variant="outline"
                 onClick={() => {
                   if (characters.length < 2) return;
                   pendingFromRef.current = null;
@@ -793,47 +797,52 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
               >
                 <Link2 size={16} />
                 <span>{manualLinking ? '取消连线' : '手动连线'}</span>
-              </button>
-              <button
-                className="action-btn"
+              </Button>
+              <Button
+                variant="outline"
                 onClick={() => setIsFullscreen(true)}
                 title="全屏查看关系图"
               >
                 <Maximize2 size={16} />
                 <span>全屏</span>
-              </button>
+              </Button>
             </>
           )}
         </div>
       </div>
 
       {viewMode === 'graph' ? (
-        <div className="relations-canvas" ref={containerRef}></div>
+        <div className="min-h-[500px] flex-1 bg-background" ref={containerRef}></div>
       ) : (
-        <div className="relations-list">
+        <div className="flex-1 overflow-y-auto bg-background px-6 py-4">
           {relations.length === 0 ? (
-            <div className="list-empty">暂无人物关系，点击“添加关系”来创建</div>
+            <div className="flex items-center justify-center rounded-xl border border-dashed border-border bg-muted/40 px-6 py-16 text-sm text-muted-foreground">
+              暂无人物关系，点击“添加关系”来创建
+            </div>
           ) : (
-            <div className="relations-list-table">
-              <div className="relations-list-header">
-                <div className="relations-list-cell">角色A</div>
-                <div className="relations-list-cell">关系</div>
-                <div className="relations-list-cell">角色B</div>
-                <div className="relations-list-cell">操作</div>
+            <div className="overflow-hidden rounded-xl border border-border bg-background">
+              <div className="grid grid-cols-[1fr_0.8fr_1fr_80px] items-center gap-4 border-b border-border bg-muted px-6 py-3 text-[13px] font-semibold text-muted-foreground">
+                <div className="min-w-0 truncate">角色A</div>
+                <div className="min-w-0 truncate">关系</div>
+                <div className="min-w-0 truncate">角色B</div>
+                <div className="min-w-0 truncate">操作</div>
               </div>
               {relations.map((rel) => {
                 const fromName = characters.find(c => c.id === rel.from)?.name || rel.from;
                 const toName = characters.find(c => c.id === rel.to)?.name || rel.to;
                 return (
-                  <div key={rel.id} className="relations-list-row">
-                    <div className="relations-list-cell" title={fromName}>{fromName}</div>
-                    <div className="relations-list-cell">
-                      <span className="relation-pill">{rel.type || '关系'}</span>
+                  <div key={rel.id} className="grid grid-cols-[1fr_0.8fr_1fr_80px] items-center gap-4 border-b border-border px-6 py-3 text-sm text-foreground last:border-b-0 hover:bg-muted/40">
+                    <div className="min-w-0 truncate" title={fromName}>{fromName}</div>
+                    <div className="min-w-0">
+                      <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                        {rel.type || '关系'}
+                      </span>
                     </div>
-                    <div className="relations-list-cell" title={toName}>{toName}</div>
-                    <div className="relations-list-cell relation-actions">
-                      <button
-                        className="action-btn"
+                    <div className="min-w-0 truncate" title={toName}>{toName}</div>
+                    <div className="flex items-center justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
                         type="button"
                         title="编辑"
                         onClick={() => {
@@ -847,9 +856,10 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
                         }}
                       >
                         <Pencil size={16} />
-                      </button>
-                      <button
-                        className="delete-btn"
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="icon-sm"
                         type="button"
                         title="删除"
                         onClick={() => {
@@ -861,7 +871,7 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
                         }}
                       >
                         <Trash2 size={16} />
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 );
@@ -888,12 +898,16 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
         title="添加关系"
         initialWidth={500}
         initialHeight={550}
+        className="overflow-hidden rounded-xl border border-border bg-background shadow-xl"
       >
-          <div className="modal-form">
-            <label>
-              <span>从</span>
+          <div className="flex flex-col gap-4 p-5">
+            <div className="border-b border-border pb-4">
+              <h3 className="text-base font-semibold text-foreground">添加关系</h3>
+            </div>
+            <label className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-muted-foreground">从</span>
               <select
-                className="edit-select"
+                className={selectClassName}
                 value={editForm.relationFrom || ''}
                 onChange={e =>
                   setEditForm({ ...editForm, relationFrom: e.target.value })
@@ -907,10 +921,10 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
                 ))}
               </select>
             </label>
-            <label>
-              <span>到</span>
+            <label className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-muted-foreground">到</span>
               <select
-                className="edit-select"
+                className={selectClassName}
                 value={editForm.relationTo || ''}
                 onChange={e =>
                   setEditForm({ ...editForm, relationTo: e.target.value })
@@ -924,11 +938,10 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
                 ))}
               </select>
             </label>
-            <label>
-              <span>关系类型</span>
-              <input
-                className="edit-input"
-                type="text"
+            <label className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-muted-foreground">关系类型</span>
+              <Input
+                className={inputClassName}
                 value={editForm.relationType || ''}
                 onChange={e =>
                   setEditForm({ ...editForm, relationType: e.target.value })
@@ -937,11 +950,10 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
                 autoFocus
               />
             </label>
-            <label>
-              <span>描述</span>
-              <input
-                className="edit-input"
-                type="text"
+            <label className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-muted-foreground">描述</span>
+              <Input
+                className={inputClassName}
                 value={editForm.relationDescription || ''}
                 onChange={e =>
                   setEditForm({
@@ -952,9 +964,17 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
               />
             </label>
           </div>
-          <div className="modal-actions">
-            <button
-              className="save-btn"
+          <div className="flex items-center justify-end gap-2 border-t border-border px-5 py-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setAddingRelation(false);
+                setEditForm({});
+              }}
+            >
+              取消
+            </Button>
+            <Button
               onClick={() => {
                 if (
                   editForm.relationFrom &&
@@ -982,7 +1002,7 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
               }}
             >
               保存
-            </button>
+            </Button>
           </div>
       </DraggableResizableModal>
 
@@ -992,12 +1012,16 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
         title="编辑关系"
         initialWidth={500}
         initialHeight={550}
+        className="overflow-hidden rounded-xl border border-border bg-background shadow-xl"
       >
-          <div className="modal-form">
-            <label>
-              <span>从</span>
+          <div className="flex flex-col gap-4 p-5">
+            <div className="border-b border-border pb-4">
+              <h3 className="text-base font-semibold text-foreground">编辑关系</h3>
+            </div>
+            <label className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-muted-foreground">从</span>
               <select
-                className="edit-select"
+                className={selectClassName}
                 value={editForm.relationFrom || ''}
                 onChange={e =>
                   setEditForm({ ...editForm, relationFrom: e.target.value })
@@ -1011,10 +1035,10 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
                 ))}
               </select>
             </label>
-            <label>
-              <span>到</span>
+            <label className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-muted-foreground">到</span>
               <select
-                className="edit-select"
+                className={selectClassName}
                 value={editForm.relationTo || ''}
                 onChange={e =>
                   setEditForm({ ...editForm, relationTo: e.target.value })
@@ -1028,11 +1052,10 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
                 ))}
               </select>
             </label>
-            <label>
-              <span>类型</span>
-              <input
-                className="edit-input"
-                type="text"
+            <label className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-muted-foreground">类型</span>
+              <Input
+                className={inputClassName}
                 value={editForm.relationType || ''}
                 onChange={e =>
                   setEditForm({ ...editForm, relationType: e.target.value })
@@ -1041,11 +1064,10 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
                 autoFocus
               />
             </label>
-            <label>
-              <span>描述</span>
-              <input
-                className="edit-input"
-                type="text"
+            <label className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-muted-foreground">描述</span>
+              <Input
+                className={inputClassName}
                 value={editForm.relationDescription || ''}
                 onChange={e =>
                   setEditForm({
@@ -1056,9 +1078,18 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
               />
             </label>
           </div>
-          <div className="modal-actions">
-            <button
-              className="save-btn"
+          <div className="flex items-center gap-2 border-t border-border px-5 py-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditingRelation(null);
+                setEditForm({});
+              }}
+            >
+              取消
+            </Button>
+            <div className="flex-1" />
+            <Button
               onClick={() => {
                 if (!editForm.relationFrom || !editForm.relationTo) return;
                 const newRelations = relations.map(r => {
@@ -1086,10 +1117,10 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
               }}
             >
               保存
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="modal-delete-btn"
+              variant="destructive"
               onClick={() => {
                 const newRelations = relations.filter(
                   r => r.id !== editingRelation
@@ -1106,57 +1137,57 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
               }}
             >
               删除
-            </button>
+            </Button>
           </div>
       </DraggableResizableModal>
 
       {isFullscreen && (
-        <div className="fullscreen-modal-overlay">
-          <div className="fullscreen-modal">
-            <div className="fullscreen-header">
-              <h3>人物关系图 {characters.length > 0 ? `(${characters.length} 角色)` : ''}</h3>
-              <div className="fullscreen-header-actions">
-                <button
+        <div className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-sm">
+          <div className="flex h-full flex-col bg-background">
+            <div className="flex items-center justify-between border-b border-border px-6 py-4">
+              <h3 className="text-base font-semibold text-foreground">人物关系图 {characters.length > 0 ? `(${characters.length} 角色)` : ''}</h3>
+              <div className="flex items-center gap-2">
+                <Button
                   type="button"
-                  className="fullscreen-zoom-btn"
+                  variant="outline"
                   title="放大"
                   onClick={() => fullscreenGraphRef.current?.zoomBy(1.25)}
                 >
                   <ZoomIn size={18} />
                   <span>放大</span>
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
-                  className="fullscreen-zoom-btn"
+                  variant="outline"
                   title="缩小"
                   onClick={() => fullscreenGraphRef.current?.zoomBy(0.8)}
                 >
                   <ZoomOut size={18} />
                   <span>缩小</span>
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
-                  className="fullscreen-zoom-btn"
+                  variant="outline"
                   title="适应视口"
                   onClick={() => fullscreenGraphRef.current?.fitView?.()}
                 >
                   <Maximize2 size={18} />
                   <span>适应视口</span>
-                </button>
-                <button
-                  className="close-fullscreen-btn"
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
                   onClick={() => setIsFullscreen(false)}
                   title="关闭"
                 >
                   <X size={20} />
-                </button>
+                </Button>
               </div>
             </div>
-            <div className="fullscreen-canvas-wrapper">
-              {/* 画布容器必须无 React 子节点，否则 React 协调时会移除 G6 追加的 canvas */}
-              <div className="fullscreen-canvas" ref={fullscreenContainerRef} />
+            <div className="relative min-h-0 flex-1 bg-muted/40">
+              <div className="h-full w-full" ref={fullscreenContainerRef} />
               {characters.length === 0 && (
-                <div className="fullscreen-empty-state">
+                <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
                   暂无角色数据，请先添加角色
                 </div>
               )}

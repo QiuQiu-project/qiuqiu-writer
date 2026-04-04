@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, Plus } from 'lucide-react';
-import './TagsManager.css';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 interface TagCategory {
   name: string;
@@ -61,6 +62,8 @@ export default function TagsManager({ readOnly }: TagsManagerProps = {}) {
   const [editingFaction, setEditingFaction] = useState<string | null>(null);
   const [factionForm, setFactionForm] = useState<{ name: string; levels: string[]; summary: string; details: string }>({ name: '', levels: [], summary: '', details: '' });
   const [newLevel, setNewLevel] = useState('');
+  const textareaClassName =
+    'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-60';
 
   const handleTagSelect = (category: string, tag: string) => {
     const current = selectedTags[category] || [];
@@ -90,9 +93,9 @@ export default function TagsManager({ readOnly }: TagsManagerProps = {}) {
   };
 
   return (
-    <div className="tags-manager">
-      <h2 className="tags-title">设定</h2>
-      <div className="tags-content">
+    <div className="h-full w-full overflow-y-auto p-6">
+      <h2 className="mb-6 text-xl font-bold text-foreground">设定</h2>
+      <div className="grid grid-cols-2 gap-5 max-xl:grid-cols-1">
         {tagCategories.map((category) => {
           const selected = selectedTags[category.name] || [];
           const count = selected.length;
@@ -101,22 +104,22 @@ export default function TagsManager({ readOnly }: TagsManagerProps = {}) {
           const isLimitReached = count >= limit;
 
           return (
-            <div key={category.name} className="tag-category">
-              <div className="category-header">
-                <h3 className="category-name">{category.name}</h3>
-                <span className="category-count">
+            <div key={category.name} className="rounded-xl border border-border bg-background p-5 shadow-sm">
+              <div className="mb-4 flex items-center justify-between border-b border-border pb-3">
+                <h3 className="text-base font-semibold text-foreground">{category.name}</h3>
+                <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
                   {count}/{limit}
                 </span>
               </div>
-              <div className="tags-select-wrapper">
+              <div className="flex flex-col gap-3">
                 {selected.length > 0 && (
-                  <div className="selected-tags-display">
+                  <div className="flex min-h-9 flex-wrap items-start gap-1.5 rounded-lg border border-border bg-muted/40 p-2">
                     {selected.map((tag) => (
-                      <span key={tag} className="selected-tag">
+                      <span key={tag} className="inline-flex items-center gap-1.5 rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground">
                         {tag}
                         {!readOnly && (
                           <button
-                            className="remove-tag-btn"
+                            className="rounded-full bg-white/20 p-0.5 transition-colors hover:bg-white/40"
                             onClick={() => removeTag(category.name, tag)}
                             title="移除"
                           >
@@ -128,14 +131,15 @@ export default function TagsManager({ readOnly }: TagsManagerProps = {}) {
                   </div>
                 )}
                 {!isLimitReached && (
-                  <div className="tags-checkbox-list">
+                  <div className="flex max-h-[200px] flex-wrap gap-2 overflow-y-auto rounded-lg border border-border bg-muted/40 p-3">
                     {availableTags.map((tag) => (
-                      <label key={tag} className="tag-checkbox-item">
+                      <label key={tag} className="flex cursor-pointer items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground transition-colors hover:border-primary hover:bg-primary/10">
                         <input
                           type="checkbox"
                           checked={false}
                           onChange={() => handleTagSelect(category.name, tag)}
                           disabled={isLimitReached || readOnly}
+                          className="size-4 accent-primary"
                         />
                         <span>{tag}</span>
                       </label>
@@ -143,7 +147,7 @@ export default function TagsManager({ readOnly }: TagsManagerProps = {}) {
                   </div>
                 )}
                 {isLimitReached && (
-                  <div className="tags-limit-reached">
+                  <div className="rounded-lg border border-dashed border-border bg-muted/40 p-3 text-center text-sm text-muted-foreground">
                     已达到选择上限（{limit}个）
                   </div>
                 )}
@@ -152,13 +156,12 @@ export default function TagsManager({ readOnly }: TagsManagerProps = {}) {
           );
         })}
 
-        {/* 文本信息 */}
-        <div className="tag-category">
-          <div className="category-header">
-            <h3 className="category-name">文本信息</h3>
+        <div className="col-span-full rounded-xl border border-border bg-background p-5 shadow-sm">
+          <div className="mb-4 border-b border-border pb-3">
+            <h3 className="text-base font-semibold text-foreground">文本信息</h3>
           </div>
           <textarea
-            className="info-textarea"
+            className={textareaClassName}
             value={textInfo}
             onChange={(e) => setTextInfo(e.target.value)}
             placeholder="输入文本信息..."
@@ -168,12 +171,12 @@ export default function TagsManager({ readOnly }: TagsManagerProps = {}) {
         </div>
 
         {/* 背景 */}
-        <div className="tag-category">
-          <div className="category-header">
-            <h3 className="category-name">背景</h3>
+        <div className="col-span-full rounded-xl border border-border bg-background p-5 shadow-sm">
+          <div className="mb-4 border-b border-border pb-3">
+            <h3 className="text-base font-semibold text-foreground">背景</h3>
           </div>
           <textarea
-            className="info-textarea"
+            className={textareaClassName}
             value={background}
             onChange={(e) => setBackground(e.target.value)}
             placeholder="输入背景信息..."
@@ -183,12 +186,13 @@ export default function TagsManager({ readOnly }: TagsManagerProps = {}) {
         </div>
 
         {/* 等级体系 */}
-        <div className="tag-category">
-          <div className="category-header">
-            <h3 className="category-name">等级体系</h3>
+        <div className="col-span-full rounded-xl border border-border bg-background p-5 shadow-sm">
+          <div className="mb-4 flex items-center justify-between border-b border-border pb-3">
+            <h3 className="text-base font-semibold text-foreground">等级体系</h3>
             {!readOnly && (
-              <button
-                className="btn btn-add"
+              <Button
+                variant="outline"
+                size="icon-sm"
                 onClick={() => {
                   const newFaction = {
                     id: String(Date.now()),
@@ -204,35 +208,32 @@ export default function TagsManager({ readOnly }: TagsManagerProps = {}) {
                 title="添加等级体系"
               >
                 <Plus size={16} />
-              </button>
+              </Button>
             )}
           </div>
-          <div className="factions-list">
+          <div className="grid grid-cols-3 gap-4 max-xl:grid-cols-2 max-lg:grid-cols-1">
             {factions.length === 0 ? (
-              <div className="empty-factions">暂无等级体系，点击上方 + 按钮添加</div>
+              <div className="col-span-full rounded-lg bg-muted/40 p-5 text-center text-sm text-muted-foreground">暂无等级体系，点击上方 + 按钮添加</div>
             ) : (
               factions.map((faction) => (
-                <div key={faction.id} className="faction-item">
+                <div key={faction.id} className="flex min-h-[200px] flex-col rounded-lg border border-border bg-background transition-all hover:border-primary/40 hover:shadow-sm">
                   {editingFaction === faction.id ? (
-                    <div className="faction-edit-form">
-                      <input
-                        type="text"
-                        className="faction-name-input"
+                    <div className="flex flex-col gap-4 p-4">
+                      <Input
                         value={factionForm.name}
                         onChange={(e) => setFactionForm({ ...factionForm, name: e.target.value })}
                         placeholder="等级体系名称"
                         autoFocus
                       />
-                      <div className="faction-levels-section">
-                        <div className="levels-header">
-                          <span className="levels-title">等级阶梯</span>
-                          <div className="add-level-input">
-                            <input
-                              type="text"
+                      <div className="flex flex-col gap-3">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <span className="text-sm font-semibold text-foreground">等级阶梯</span>
+                          <div className="flex min-w-[200px] flex-1 gap-2">
+                            <Input
                               value={newLevel}
                               onChange={(e) => setNewLevel(e.target.value)}
                               placeholder="输入等级名称"
-                              onKeyPress={(e) => {
+                              onKeyDown={(e) => {
                                 if (e.key === 'Enter' && newLevel.trim()) {
                                   setFactionForm({
                                     ...factionForm,
@@ -242,8 +243,8 @@ export default function TagsManager({ readOnly }: TagsManagerProps = {}) {
                                 }
                               }}
                             />
-                            <button
-                              className="btn btn-icon btn-icon-sm btn-primary"
+                            <Button
+                              size="icon-sm"
                               onClick={() => {
                                 if (newLevel.trim()) {
                                   setFactionForm({
@@ -255,16 +256,18 @@ export default function TagsManager({ readOnly }: TagsManagerProps = {}) {
                               }}
                             >
                               <Plus size={14} />
-                            </button>
+                            </Button>
                           </div>
                         </div>
-                        <div className="levels-list">
+                        <div className="flex min-h-[60px] flex-col gap-2 rounded-lg bg-muted/40 p-3">
                           {factionForm.levels.map((level, index) => (
-                            <div key={index} className="level-item">
-                              <span className="level-order">{index + 1}</span>
-                              <span className="level-name">{level}</span>
-                              <button
-                                className="btn btn-icon btn-icon-sm btn-danger-outline"
+                            <div key={index} className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2">
+                              <span className="inline-flex size-6 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">{index + 1}</span>
+                              <span className="flex-1 text-sm text-foreground">{level}</span>
+                              <Button
+                                variant="ghost"
+                                size="icon-xs"
+                                className="text-muted-foreground hover:text-destructive"
                                 onClick={() => {
                                   setFactionForm({
                                     ...factionForm,
@@ -274,29 +277,29 @@ export default function TagsManager({ readOnly }: TagsManagerProps = {}) {
                                 title="删除"
                               >
                                 <X size={12} />
-                              </button>
+                              </Button>
                             </div>
                           ))}
                           {factionForm.levels.length === 0 && (
-                            <div className="empty-levels">暂无等级，在上方输入框中添加</div>
+                            <div className="py-3 text-center text-sm text-muted-foreground">暂无等级，在上方输入框中添加</div>
                           )}
                         </div>
                       </div>
-                      <div className="faction-info-section">
-                        <label className="faction-info-label">
-                          <span>等级体系简述</span>
+                      <div className="flex flex-col gap-3">
+                        <label className="flex flex-col gap-2">
+                          <span className="text-sm font-medium text-muted-foreground">等级体系简述</span>
                           <textarea
-                            className="faction-info-textarea"
+                            className={textareaClassName}
                             value={factionForm.summary}
                             onChange={(e) => setFactionForm({ ...factionForm, summary: e.target.value })}
                             placeholder="输入等级体系简述..."
                             rows={3}
                           />
                         </label>
-                        <label className="faction-info-label">
-                          <span>详细信息</span>
+                        <label className="flex flex-col gap-2">
+                          <span className="text-sm font-medium text-muted-foreground">详细信息</span>
                           <textarea
-                            className="faction-info-textarea"
+                            className={textareaClassName}
                             value={factionForm.details}
                             onChange={(e) => setFactionForm({ ...factionForm, details: e.target.value })}
                             placeholder="输入详细信息..."
@@ -304,9 +307,9 @@ export default function TagsManager({ readOnly }: TagsManagerProps = {}) {
                           />
                         </label>
                       </div>
-                      <div className="faction-actions">
-                        <button
-                          className="btn btn-primary"
+                      <div className="flex gap-2">
+                        <Button
+                          className="flex-1"
                           onClick={() => {
                             setFactions(
                               factions.map((f) =>
@@ -327,9 +330,10 @@ export default function TagsManager({ readOnly }: TagsManagerProps = {}) {
                           }}
                         >
                           保存
-                        </button>
-                        <button
-                          className="btn btn-secondary"
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="flex-1"
                           onClick={() => {
                             setEditingFaction(null);
                             setFactionForm({ name: '', levels: [], summary: '', details: '' });
@@ -337,38 +341,39 @@ export default function TagsManager({ readOnly }: TagsManagerProps = {}) {
                           }}
                         >
                           取消
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   ) : (
-                    <div className="faction-display">
-                      <div className="faction-name-display">{faction.name}</div>
+                    <div className="flex flex-col gap-3 p-4">
+                      <div className="text-base font-semibold text-foreground">{faction.name}</div>
                       {faction.levels.length > 0 && (
-                        <div className="faction-levels-display">
+                        <div className="flex flex-wrap gap-2">
                           {faction.levels.map((level, index) => (
-                            <div key={index} className="level-badge">
-                              <span className="level-order-small">{index + 1}</span>
+                            <div key={index} className="inline-flex items-center gap-1.5 rounded-md bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                              <span className="inline-flex size-[18px] items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">{index + 1}</span>
                               <span>{level}</span>
                             </div>
                           ))}
                         </div>
                       )}
                       {faction.summary && (
-                        <div className="faction-summary-display">
-                          <span className="faction-info-label-text">简述：</span>
-                          <p className="faction-info-text">{faction.summary}</p>
+                        <div className="rounded-lg bg-muted/40 px-3 py-3">
+                          <span className="mb-1 block text-xs font-semibold text-muted-foreground">简述</span>
+                          <p className="m-0 whitespace-pre-wrap break-words text-sm leading-6 text-foreground">{faction.summary}</p>
                         </div>
                       )}
                       {faction.details && (
-                        <div className="faction-details-display">
-                          <span className="faction-info-label-text">详细信息：</span>
-                          <p className="faction-info-text">{faction.details}</p>
+                        <div className="rounded-lg bg-muted/40 px-3 py-3">
+                          <span className="mb-1 block text-xs font-semibold text-muted-foreground">详细信息</span>
+                          <p className="m-0 whitespace-pre-wrap break-words text-sm leading-6 text-foreground">{faction.details}</p>
                         </div>
                       )}
                       {!readOnly && (
-                        <div className="faction-actions-display">
-                          <button
-                            className="btn btn-secondary btn-sm"
+                        <div className="mt-auto flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
                             onClick={() => {
                               setEditingFaction(faction.id);
                               setFactionForm({ 
@@ -381,16 +386,17 @@ export default function TagsManager({ readOnly }: TagsManagerProps = {}) {
                             title="编辑"
                           >
                             编辑
-                          </button>
-                          <button
-                            className="btn btn-icon btn-icon-sm btn-danger-outline"
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="icon-sm"
                             onClick={() => {
                               setFactions(factions.filter((f) => f.id !== faction.id));
                             }}
                             title="删除"
                           >
                             <X size={14} />
-                          </button>
+                          </Button>
                         </div>
                       )}
                     </div>
