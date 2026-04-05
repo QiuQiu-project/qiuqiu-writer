@@ -333,10 +333,10 @@ export default function ComponentEditorModal({
                   </div>
                   
                   {/* Fallback for bulk add via text (optional, or keep both) */}
-                  <div style={{ marginTop: '8px' }}>
+                  <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <small style={{ color: '#64748b' }}>也可以通过下方文本框快速添加（每行一个）:</small>
                     <textarea
-                        style={{ marginTop: '4px', height: '80px' }}
+                        style={{ height: '80px' }}
                         value=""
                         onChange={e => {
                           const lines = e.target.value.split('\n').filter(Boolean);

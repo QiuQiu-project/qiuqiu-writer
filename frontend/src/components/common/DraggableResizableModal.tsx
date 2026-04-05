@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import Draggable from 'react-draggable';
 import { ResizableBox } from 'react-resizable';
 import { useIsMobile } from '../../hooks/useMediaQuery';
@@ -51,35 +52,33 @@ export default function DraggableResizableModal({
 
   const overlayClass = `fixed inset-0 flex items-center justify-center z-[3200] bg-black/20 supports-backdrop-filter:backdrop-blur-xs ${overlayClassName}`;
 
-  if (isMobile) {
-    return (
+  const mobileContent = (
+    <div
+      className={overlayClass}
+      style={{ padding: 0 }}
+      onClick={onClose}
+      onWheel={(e) => e.stopPropagation()}
+    >
       <div
-        className={overlayClass}
-        style={{ padding: 0 }}
-        onClick={onClose}
-        onWheel={(e) => e.stopPropagation()}
+        className={`border border-border bg-popover text-popover-foreground shadow-xl ${className}`}
+        style={{
+          width: '100%',
+          height: '100%',
+          maxHeight: '100dvh',
+          borderRadius: 0,
+          overflow: 'hidden',
+          overflowY: scrollable ? 'auto' : 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+        onClick={(e) => e.stopPropagation()}
       >
-        <div
-          className={`border border-border bg-popover text-popover-foreground shadow-xl ${className}`}
-          style={{
-            width: '100%',
-            height: '100%',
-            maxHeight: '100dvh',
-            borderRadius: 0,
-            overflow: 'hidden',
-            overflowY: scrollable ? 'auto' : 'hidden',
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {children}
-        </div>
+        {children}
       </div>
-    );
-  }
+    </div>
+  );
 
-  return (
+  const desktopContent = (
     <div
       className={overlayClass}
       onClick={onClose}
@@ -117,4 +116,6 @@ export default function DraggableResizableModal({
       </Draggable>
     </div>
   );
+
+  return createPortal(isMobile ? mobileContent : desktopContent, document.body);
 }

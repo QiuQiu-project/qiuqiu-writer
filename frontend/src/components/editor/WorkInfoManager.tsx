@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
-  Plus, X, Settings, LayoutGrid, Sparkles, Save, Trash2
+  Plus, X, Settings, LayoutGrid, Sparkles, Save, Trash2, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import CharacterRelations from './CharacterRelations';
 import type { CharacterRelationsData } from './CharacterRelations';
@@ -1212,6 +1212,38 @@ export default function WorkInfoManager(props: WorkInfoManagerProps = {}) {
             }}>
                 <Plus size={20} />
                 <span>添加组件</span>
+            </div>
+          )}
+          {template.modules.length > 1 && (
+            <div className="flex items-center justify-between gap-4 border-t border-border pt-4 mt-2">
+              {activeModuleIndex > 0 ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const prev = activeModuleIndex - 1;
+                    setActiveModuleIndex(prev);
+                    if (onActiveModuleChange) onActiveModuleChange(template.modules[prev].id);
+                  }}
+                >
+                  <ChevronLeft size={15} />
+                  {template.modules[activeModuleIndex - 1].name}
+                </Button>
+              ) : <div />}
+              {activeModuleIndex < template.modules.length - 1 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const next = activeModuleIndex + 1;
+                    setActiveModuleIndex(next);
+                    if (onActiveModuleChange) onActiveModuleChange(template.modules[next].id);
+                  }}
+                >
+                  {template.modules[activeModuleIndex + 1].name}
+                  <ChevronRight size={15} />
+                </Button>
+              )}
             </div>
           )}
         </div>
