@@ -489,7 +489,7 @@ export default function WorksPage() {
         <div
           className="absolute right-8 top-10 h-48 w-48 rounded-full opacity-[0.08] blur-[1px] max-md:hidden"
           style={{
-            backgroundImage: "url('/favicon.png')",
+            backgroundImage: "url('/logo.svg')",
             backgroundRepeat: 'no-repeat',
             backgroundPosition: 'center',
             backgroundSize: 'contain',
@@ -544,7 +544,7 @@ export default function WorksPage() {
                         <div className="relative min-h-[280px] bg-[linear-gradient(135deg,#b58754_0%,#ead9c8_55%,#f7eee5_100%)]">
                           <div className="absolute left-4 top-4 rounded-full bg-[#ffc329] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#7a4b00]">热门</div>
                           <div className="absolute inset-0 flex items-center justify-center opacity-20">
-                            <img src="/favicon.png" alt="球球" className="h-28 w-28 object-contain" />
+                            <img src="/logo.svg" alt="球球" className="h-28 w-28 object-contain" />
                           </div>
                         </div>
                         <div className="flex flex-col p-6">
@@ -699,7 +699,7 @@ export default function WorksPage() {
                         <img src={heroWork.cover_image} alt={heroWork.title} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center">
-                          <img src="/favicon.png" alt="球球" className="h-36 w-36 object-contain opacity-40" />
+                          <img src="/logo.svg" alt="球球" className="h-36 w-36 object-contain opacity-40" />
                         </div>
                       )}
                     </div>

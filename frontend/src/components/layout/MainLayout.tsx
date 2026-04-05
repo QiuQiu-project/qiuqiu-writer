@@ -166,7 +166,7 @@ export default function MainLayout() {
               className="flex items-center gap-3 no-underline transition-opacity hover:opacity-80"
             >
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#964900] text-white shadow-lg">
-                <img src="/favicon.png" alt="Logo" className="h-6 w-6 object-contain" data-no-lightbox />
+                <img src="/logo-white.svg" alt="Logo" className="h-6 w-6 object-contain" data-no-lightbox />
               </div>
               <div>
                 <div className="text-lg font-black text-[#1f045a]">球球写作</div>
@@ -231,7 +231,7 @@ export default function MainLayout() {
             <div className="flex items-center justify-between px-2 py-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#964900] text-white shadow-lg">
-                  <img src="/favicon.png" alt="Logo" className="h-6 w-6 object-contain" />
+                  <img src="/logo-white.svg" alt="Logo" className="h-6 w-6 object-contain" />
                 </div>
                 <div>
                   <div className="text-lg font-black text-[#1f045a]">球球写作</div>
@@ -347,7 +347,7 @@ export default function MainLayout() {
                 title="用户菜单"
               >
                 <img
-                  src={userInfo ? getUserAvatarUrl(userInfo.avatar_url, userInfo.username, userInfo.display_name) : '/favicon.png'}
+                  src={getUserAvatarUrl(userInfo?.avatar_url, userInfo?.username, userInfo?.display_name)}
                   alt="profile"
                   className="h-full w-full object-cover"
                   data-no-lightbox
@@ -419,7 +419,7 @@ export default function MainLayout() {
                 <Menu size={22} />
               </button>
               <div className="flex min-w-0 flex-1 items-center justify-center gap-2 px-3">
-                <img src="/favicon.png" alt="球球" className="size-6 object-contain" />
+                <img src="/logo.svg" alt="球球" className="size-6 object-contain" />
                 <span className="truncate text-base font-bold text-[#1f045a]">{workspaceSection === 'templates' ? '模板库' : '工作台'}</span>
               </div>
               <button
@@ -427,7 +427,7 @@ export default function MainLayout() {
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
               >
                 <img
-                  src={userInfo ? getUserAvatarUrl(userInfo.avatar_url, userInfo.username, userInfo.display_name) : '/favicon.png'}
+                  src={getUserAvatarUrl(userInfo?.avatar_url, userInfo?.username, userInfo?.display_name)}
                   alt="profile"
                   className="h-full w-full object-cover"
                   data-no-lightbox

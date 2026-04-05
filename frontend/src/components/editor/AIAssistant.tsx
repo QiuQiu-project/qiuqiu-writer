@@ -1015,7 +1015,7 @@ export default function AIAssistant({
           <div className="relative mb-6 flex gap-3">
             <div className="flex size-12 shrink-0 items-center justify-center rounded-full">
               <span className="text-[28px]">
-                <img src="/favicon.png" width={50} height={50} alt="球球" />
+                <img src="/logo.svg" width={50} height={50} alt="球球" />
               </span>
             </div>
             <div className="flex-1">
@@ -1055,7 +1055,7 @@ export default function AIAssistant({
                   {msg.role === 'assistant' && (
                     <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-transparent">
                         <span className="text-lg">
-                          <img src="/favicon.png" width={50} height={50} alt="球球" />
+                          <img src="/logo.svg" width={50} height={50} alt="球球" />
                         </span>
                     </div>
                   )}
@@ -1139,7 +1139,7 @@ export default function AIAssistant({
               <div className="flex gap-2.5">
                 <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-transparent">
                   <span className="text-lg">
-                    <img src="/favicon.png" width={50} height={50} alt="球球" />
+                    <img src="/logo.svg" width={50} height={50} alt="球球" />
                   </span>
                 </div>
                 <div className="flex flex-1 flex-col gap-1">

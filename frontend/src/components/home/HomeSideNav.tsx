@@ -19,7 +19,7 @@ export default function HomeSideNav() {
         className="flex items-center gap-2 px-5 pb-6 border-b mb-4"
         style={{ borderColor: 'var(--border-light)' }}
       >
-        <img src="/favicon.png" alt="Logo" className="w-8 h-8 object-contain" data-no-lightbox />
+        <img src="/logo.svg" alt="Logo" className="w-8 h-8 object-contain" data-no-lightbox />
         <span
           className="text-lg font-bold bg-clip-text text-transparent"
           style={{ backgroundImage: 'var(--accent-gradient)' }}

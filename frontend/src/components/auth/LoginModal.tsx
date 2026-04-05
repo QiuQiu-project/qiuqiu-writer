@@ -153,7 +153,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
       <div
         className="absolute inset-0 opacity-[0.03]"
         style={{
-          backgroundImage: "url('/favicon.png')",
+          backgroundImage: "url('/logo.svg')",
           backgroundRepeat: 'no-repeat',
           backgroundPosition: 'center',
           backgroundSize: 'min(42vw, 420px)',
@@ -172,7 +172,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
       {/* Logo — top left */}
       <div className="absolute top-6 left-8 flex items-center gap-2 z-10">
         <div className="w-9 h-9 rounded-2xl bg-white flex items-center justify-center shadow-lg shadow-[#1f045a]/8 backdrop-blur border border-[#ede4ff]">
-          <img src="/favicon.png" alt="球球写作" className="h-6 w-6 object-contain" />
+          <img src="/logo.svg" alt="球球写作" className="h-6 w-6 object-contain" />
         </div>
         <span className="text-[#1f045a] font-semibold text-base tracking-wide">球球写作</span>
       </div>

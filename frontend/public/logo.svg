@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- Left Q (球) -->
+  <circle cx="7.5" cy="9" r="4" fill="#1f045a"/>
+  <path d="M7.5 11.5 L10.5 15" stroke="#1f045a" stroke-width="2" stroke-linecap="round"/>
+  <!-- Right Q (球) -->
+  <circle cx="16.5" cy="9" r="4" fill="#ff8000"/>
+  <path d="M16.5 11.5 L19.5 15" stroke="#ff8000" stroke-width="2" stroke-linecap="round"/>
+  <!-- Writing underline (写作) -->
+  <path d="M3 20 L21 20" stroke="#1f045a" stroke-width="1.8" stroke-linecap="round"/>
+</svg>
