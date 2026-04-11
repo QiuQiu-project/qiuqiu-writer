@@ -1,22 +1,69 @@
-# 球球写作 (QiuQiu Writer)
+<div align="center">
 
-一个全栈 AI 写作平台，支持小说、剧本等多种创作形式，具备协同编辑、AI 辅助、书籍分析等功能。
+<img src="frontend/public/logo.svg" width="64" height="64" alt="logo" />
 
-## 项目结构
+# 球球写作
 
-```
-qiuqiuwriter/
-├── frontend/        # 用户端前端（React 19 + TypeScript + Vite，端口 5173）
-├── admin/           # 管理后台（React 18 + Ant Design，独立 Vite 应用）
-├── backend/         # API 服务器（FastAPI + Python 3.10+，端口 8001）
-├── docker/          # Docker 基础设施配置
-│   ├── docker-compose.infra.yml   # 基础服务（PostgreSQL、Redis、MongoDB）
-│   ├── docker-compose.app.yml     # 应用服务（前后端容器）
-│   └── docker-compose.prod.yml    # 生产环境配置
-├── deploy/          # 部署相关脚本
-├── start.sh         # 一键启动脚本
-└── README.md
-```
+**让创作更简单，让故事更精彩**
+
+专业的 AI 写作助手，帮助你从灵感到成稿，轻松完成每一部作品。
+
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)](https://react.dev)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://python.org)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-4169E1?logo=postgresql&logoColor=white)](https://postgresql.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+</div>
+
+---
+
+![hero](docs/screenshots/hero.png)
+
+---
+
+## 功能亮点
+
+### 🖊️ 智能写作工作台
+
+整理、管理并继续完善你的小说与剧本创作资产。支持卡片与列表两种视图，快速定位每一部作品。
+
+![workbench](docs/screenshots/workbench.png)
+
+---
+
+### ✨ 核心功能一览
+
+智能写作助手、多格式支持、多人 AI 协作、云端同步、实时编辑、多层记忆系统——一站式满足各类创作需求。
+
+![features](docs/screenshots/features.png)
+
+---
+
+### 📖 沉浸式编辑器
+
+基于 TipTap 的富文本编辑器，支持小说、剧本多种写作模式，所见即所得，章节结构清晰直观。
+
+![editor](docs/screenshots/editor.png)
+
+---
+
+### 🤖 AI 协作助手
+
+在编辑器内直接与 AI 对话，辅助续写、润色、情节分析。多人协作时 AI 同步为每位作者提供实时支持。
+
+![ai-assistant](docs/screenshots/ai-assistant.png)
+
+---
+
+### 🎯 适用于各类创作场景
+
+无论你是专业作家还是写作爱好者，球球写作都能满足你的需求。
+
+![usecases](docs/screenshots/usecases.png)
+
+---
 
 ## 技术栈
 
@@ -38,13 +85,34 @@ qiuqiuwriter/
 - AI 集成：支持 OpenAI 兼容接口（默认 DeepSeek）、Ollama 等
 
 ### 数据库
+
 | 服务 | 用途 | 必须 |
 |------|------|------|
-| PostgreSQL | 主数据库（用户、作品、章节） | 是 |
-| Redis | 缓存与会话 | 是 |
-| MongoDB | ShareDB 协同文档存储 | 是 |
-| Qdrant | 向量数据库（语义搜索） | 否 |
-| Neo4j | 图数据库（记忆功能） | 否 |
+| PostgreSQL | 主数据库（用户、作品、章节） | ✅ |
+| Redis | 缓存与会话 | ✅ |
+| MongoDB | ShareDB 协同文档存储 | ✅ |
+| Qdrant | 向量数据库（语义搜索） | 可选 |
+| Neo4j | 图数据库（记忆功能） | 可选 |
+
+---
+
+## 项目结构
+
+```
+qiuqiuwriter/
+├── frontend/        # 用户端前端（React 19 + TypeScript + Vite，端口 5173）
+├── admin/           # 管理后台（React 18 + Ant Design，独立 Vite 应用）
+├── backend/         # API 服务器（FastAPI + Python 3.10+，端口 8001）
+├── docker/          # Docker 基础设施配置
+│   ├── docker-compose.infra.yml   # 基础服务（PostgreSQL、Redis、MongoDB）
+│   ├── docker-compose.app.yml     # 应用服务（前后端容器）
+│   └── docker-compose.prod.yml    # 生产环境配置
+├── deploy/          # 部署相关脚本
+├── start.sh         # 一键启动脚本
+└── README.md
+```
+
+---
 
 ## 快速开始
 
@@ -96,24 +164,16 @@ MONGODB_DATABASE=writerai_sharedb
 
 ```bash
 cd backend
-make install          # 安装依赖（首次运行）
-make serve            # 启动开发服务器（端口 8001）
-```
-
-或手动启动：
-
-```bash
-cd backend
-source .venv/bin/activate
-uvicorn memos.api.server_api:app --host 0.0.0.0 --port 8001 --reload
+make install   # 安装依赖（首次运行）
+make serve     # 启动开发服务器（端口 8001）
 ```
 
 ### 4. 启动前端
 
 ```bash
 cd frontend
-npm install           # 安装依赖（首次运行）
-npm run dev           # 启动开发服务器（端口 5173）
+npm install
+npm run dev    # 启动开发服务器（端口 5173）
 ```
 
 ### 5. 启动管理后台（可选）
@@ -129,6 +189,8 @@ npm run dev
 ```bash
 ./start.sh
 ```
+
+---
 
 ## 开发命令
 
@@ -156,6 +218,8 @@ poetry run pytest tests/test_specific.py -v
 poetry run pytest tests/ -k "test_name" -v
 ```
 
+---
+
 ## API 文档
 
 后端启动后访问：
@@ -166,26 +230,19 @@ API 路由前缀：
 - 主接口：`/api/v1/`
 - AI 服务：`/v1/`
 
-## 主要功能
-
-- **富文本编辑**：基于 TipTap，支持小说编辑器、剧本编辑器等多种模式
-- **协同编辑**：基于 Yjs CRDT + ShareDB，支持多人实时协同
-- **AI 辅助写作**：接入大语言模型，辅助创作
-- **书籍分析**：AI 驱动的书籍内容分析功能
-- **用户系统**：注册/登录、个人作品管理
-- **广场/社区**：UGC 内容展示（UGCPlaza）
-- **深色/浅色主题**：CSS 变量实现的主题切换系统
+---
 
 ## 生产部署
 
 ```bash
-# 构建并启动全容器化环境
 cd docker
 docker compose -f docker-compose.prod.yml up -d
 ```
 
 生产环境变量配置在 `docker/.env`（参考 `backend/.env.example`）。
 
+---
+
 ## 许可证
 
-MIT
+[MIT](LICENSE)
