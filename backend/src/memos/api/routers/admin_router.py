@@ -16,6 +16,7 @@ from memos.api.schemas.admin import (
     MediaModelConfig, MediaModelConfigUpdateRequest,
     MediaCreditPack, MediaCreditPackUpdateRequest,
 )
+from memos.api.models.system import AuditLog
 from memos.api.services.admin_service import AdminService
 from memos.api.services.invitation_code_service import InvitationCodeService
 from memos.api.core.token_plans import get_plan_configs, save_plan_configs
@@ -518,10 +519,18 @@ async def get_plans_config(
 @router.put("/plans/config", response_model=list[PlanConfig])
 async def update_plans_config(
     request: PlanConfigUpdateRequest,
-    admin_id: str = Depends(get_current_admin)
+    admin_id: str = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_async_db),
 ):
+    old_configs = await get_plan_configs()
     configs = [p.model_dump() for p in request.plans]
     await save_plan_configs(configs)
+    db.add(AuditLog(
+        user_id=admin_id, action="update_plan_configs",
+        target_type="system_setting", target_id="plan_configs",
+        details={"old": old_configs, "new": configs},
+    ))
+    await db.commit()
     return await get_plan_configs()
 
 
@@ -564,7 +573,15 @@ async def get_admin_media_packs(admin_id: str = Depends(get_current_admin)):
 async def update_admin_media_packs(
     request: MediaCreditPackUpdateRequest,
     admin_id: str = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_async_db),
 ):
+    old_packs = await get_media_credit_packs()
     packs = [p.model_dump() for p in request.packs]
     await save_media_credit_packs(packs)
+    db.add(AuditLog(
+        user_id=admin_id, action="update_media_packs",
+        target_type="system_setting", target_id="media_credit_packs",
+        details={"old": old_packs, "new": packs},
+    ))
+    await db.commit()
     return await get_media_credit_packs()

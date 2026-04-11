@@ -171,8 +171,10 @@ async def get_current_user_id(
     )
 
     try:
+        token = credentials.credentials
+
         # 验证访问令牌
-        payload = verify_token(credentials.credentials, "access")
+        payload = verify_token(token, "access")
         if payload is None:
             raise credentials_exception
 
@@ -181,8 +183,13 @@ async def get_current_user_id(
             raise credentials_exception
         user_id_raw = str(user_id_raw)
 
-        # 检查用户是否在线（用原始 sub，兼容迁移前存的 session:1）
         redis = await get_redis()
+
+        # 检查 token 是否已登出（黑名单）
+        if await redis.exists(f"blacklist:{token}"):
+            raise credentials_exception
+
+        # 检查用户是否在线（用原始 sub，兼容迁移前存的 session:1）
         session_exists = await redis.exists(f"session:{user_id_raw}")
         if not session_exists:
             raise credentials_exception

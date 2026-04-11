@@ -8,7 +8,8 @@
 """
 
 import logging
-from datetime import datetime, timezone
+import time
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel
@@ -40,6 +41,21 @@ router = APIRouter(prefix="/api/v1/payment", tags=["Payment"])
 token_service = TokenService()
 media_credit_service = MediaCreditService()
 
+# 订单有效期：超过此时长的 pending 订单拒绝激活
+_ORDER_EXPIRY_HOURS = 24
+
+
+async def _check_payment_rate_limit(user_id: str, action: str, limit: int = 5, window: int = 60) -> None:
+    """Redis 计数器限流：同一用户在 window 秒内最多 limit 次。"""
+    from memos.api.core.redis import get_redis
+    redis = await get_redis()
+    key = f"ratelimit:{action}:{user_id}:{int(time.time()) // window}"
+    count = await redis.incr(key)
+    if count == 1:
+        await redis.expire(key, window * 2)
+    if count > limit:
+        raise HTTPException(status_code=429, detail="请求过于频繁，请稍后再试")
+
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
 
@@ -61,26 +77,45 @@ class OrderStatusResponse(BaseModel):
 
 # ── 激活套餐（支付成功后调用）────────────────────────────────────────────────
 
-async def _activate_plan(order_id: str) -> None:
-    """将订单标记为已支付，并升级用户套餐"""
+async def _activate_plan(order_id: str, notify_data: dict | None = None) -> None:
+    """
+    原子化激活套餐：
+    1. UPDATE WHERE status='pending' AND 未过期 → 仅一个并发请求成功（RETURNING user_id, plan_key）
+    2. 在同一事务提交后调用 token_service.set_user_plan
+    3. 若 set_user_plan 失败，订单保持 paid（钱已收），记录 CRITICAL 日志等待人工处理
+    """
+    expiry_cutoff = datetime.now(timezone.utc) - timedelta(hours=_ORDER_EXPIRY_HOURS)
+    now = datetime.now(timezone.utc)
+    vals: dict = {"status": "paid", "paid_at": now}
+    if notify_data:
+        vals["notify_data"] = notify_data
+
     async with AsyncSessionLocal() as session:
         result = await session.execute(
-            select(PaymentOrder).where(PaymentOrder.id == order_id)
+            update(PaymentOrder)
+            .where(
+                PaymentOrder.id == order_id,
+                PaymentOrder.status == "pending",
+                PaymentOrder.created_at >= expiry_cutoff,
+            )
+            .values(**vals)
+            .returning(PaymentOrder.user_id, PaymentOrder.plan_key)
         )
-        order = result.scalar_one_or_none()
-        if not order or order.status == "paid":
+        row = result.first()
+        if not row:
+            # 已支付、不存在或已过期，幂等返回
             return
-
-        order.status = "paid"
-        order.paid_at = datetime.now(timezone.utc)
         await session.commit()
+        user_id, plan_key = row
 
-    # 升级套餐（复用现有 token_service）
     try:
-        await token_service.set_user_plan(order.user_id, order.plan_key)
-        logger.info(f"套餐已激活: user={order.user_id}, plan={order.plan_key}, order={order_id}")
+        await token_service.set_user_plan(user_id, plan_key)
+        logger.info(f"套餐已激活: user={user_id}, plan={plan_key}, order={order_id}")
     except Exception as e:
-        logger.error(f"激活套餐失败 order={order_id}: {e}")
+        logger.critical(
+            f"套餐激活失败（订单已标记 paid，需人工处理）: order={order_id}, "
+            f"user={user_id}, plan={plan_key}, error={e}"
+        )
 
 
 # ── 创建订单 ─────────────────────────────────────────────────────────────────
@@ -90,6 +125,7 @@ async def create_order(
     body: CreateOrderRequest,
     current_user_id: str = Depends(get_current_user_id),
 ):
+    await _check_payment_rate_limit(current_user_id, "create_order", limit=5, window=60)
     # 校验套餐
     plans = await get_plan_configs()
     plan = next((p for p in plans if p["key"] == body.plan_key), None)
@@ -194,12 +230,12 @@ async def get_order_status(
 
 # ── 回调路由：按订单 ID 前缀分发到对应激活函数 ──────────────────────────────
 
-def _dispatch_activate(order_id: str, background: BackgroundTasks) -> None:
+def _dispatch_activate(order_id: str, background: BackgroundTasks, notify_data: dict | None = None) -> None:
     """根据订单 ID 前缀决定激活套餐还是充值 credits"""
     if order_id.startswith("MC"):
-        background.add_task(_activate_media_credits, order_id)
+        background.add_task(_activate_media_credits, order_id, notify_data)
     else:
-        background.add_task(_activate_plan, order_id)
+        background.add_task(_activate_plan, order_id, notify_data)
 
 
 # ── 微信支付回调 ─────────────────────────────────────────────────────────────
@@ -210,7 +246,7 @@ async def wechat_notify(request: Request, background: BackgroundTasks):
     result = verify_wechat_callback(dict(request.headers), body)
     if result and result.get("trade_state") == "SUCCESS":
         order_id = result.get("out_trade_no", "")
-        _dispatch_activate(order_id, background)
+        _dispatch_activate(order_id, background, notify_data=result)
     return {"code": "SUCCESS", "message": "成功"}
 
 
@@ -226,7 +262,7 @@ async def alipay_notify(request: Request, background: BackgroundTasks):
         and data.get("trade_status") == "TRADE_SUCCESS"
     ):
         order_id = data.get("out_trade_no", "")
-        _dispatch_activate(order_id, background)
+        _dispatch_activate(order_id, background, notify_data=data)
     return "success"  # 支付宝要求返回纯文本
 
 
@@ -267,29 +303,44 @@ class CreateMediaOrderRequest(BaseModel):
     method: str     # wechat / alipay
 
 
-async def _activate_media_credits(order_id: str) -> None:
-    """将媒体充值订单标记为已支付，并原子地向用户账户充入 credits"""
-    async with AsyncSessionLocal() as session:
-        result = await session.execute(
-            select(MediaCreditOrder).where(MediaCreditOrder.id == order_id)
-        )
-        order = result.scalar_one_or_none()
-        if not order or order.status == "paid":
-            return
+async def _activate_media_credits(order_id: str, notify_data: dict | None = None) -> None:
+    """
+    原子化充值媒体 Credits：
+    UPDATE WHERE status='pending' AND 未过期 → RETURNING user_id, credits
+    → 在同一事务内更新用户 media_credits，两步同一 session 提交，任意失败整体回滚。
+    """
+    expiry_cutoff = datetime.now(timezone.utc) - timedelta(hours=_ORDER_EXPIRY_HOURS)
+    now = datetime.now(timezone.utc)
+    vals: dict = {"status": "paid", "paid_at": now}
+    if notify_data:
+        vals["notify_data"] = notify_data
 
+    async with AsyncSessionLocal() as session:
         try:
-            # 在同一事务内完成状态更新 + credits 充值，避免状态已 paid 但 credits 未到账
-            order.status = "paid"
-            order.paid_at = datetime.now(timezone.utc)
+            result = await session.execute(
+                update(MediaCreditOrder)
+                .where(
+                    MediaCreditOrder.id == order_id,
+                    MediaCreditOrder.status == "pending",
+                    MediaCreditOrder.created_at >= expiry_cutoff,
+                )
+                .values(**vals)
+                .returning(MediaCreditOrder.user_id, MediaCreditOrder.credits)
+            )
+            row = result.first()
+            if not row:
+                # 已支付、不存在或已过期，幂等返回
+                return
+            user_id, credits = row
+
             await session.execute(
                 update(User)
-                .where(User.id == order.user_id)
-                .values(media_credits=User.media_credits + order.credits)
+                .where(User.id == user_id)
+                .values(media_credits=User.media_credits + credits)
             )
             await session.commit()
             logger.info(
-                f"媒体 Credits 已充值: user={order.user_id}, "
-                f"credits={order.credits}, order={order_id}"
+                f"媒体 Credits 已充值: user={user_id}, credits={credits}, order={order_id}"
             )
         except Exception as e:
             await session.rollback()
@@ -302,6 +353,7 @@ async def create_media_order(
     current_user_id: str = Depends(get_current_user_id),
 ):
     """创建媒体 Credits 充值订单"""
+    await _check_payment_rate_limit(current_user_id, "create_media_order", limit=5, window=60)
     pack = await get_pack_by_key(body.pack_key)
     if not pack:
         raise HTTPException(404, f"充值包不存在: {body.pack_key}")
