@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Card, Tabs, Button, Space, Tag, message, Typography,
 } from 'antd';
 import { EditOutlined, SaveOutlined, CloseOutlined } from '@ant-design/icons';
-import { EditableProTable, ProColumns } from '@ant-design/pro-components';
+import { EditableProTable, ProColumns, EditableFormInstance } from '@ant-design/pro-components';
 import request from '@/utils/request';
 
 const { Title, Text } = Typography;
@@ -90,6 +90,7 @@ function ModelSection({
   const [editableKeys, setEditableKeys] = useState<React.Key[]>([]);
   const [draft, setDraft] = useState<MediaModelConfig[]>([]);
   const [saving, setSaving] = useState(false);
+  const editableFormRef = useRef<EditableFormInstance<MediaModelConfig>>();
 
   const endpoint = `/admin/media/${type}-models`;
 
@@ -120,14 +121,18 @@ function ModelSection({
   };
 
   const handleSave = async () => {
-    const ids = draft.map((m) => m.model_id.trim()).filter(Boolean);
+    const latestDraft = draft.map((m) => {
+      const rowData = editableFormRef.current?.getRowData?.(m.model_id);
+      return rowData ? { ...m, ...rowData } : m;
+    });
+    const ids = latestDraft.map((m) => m.model_id.trim()).filter(Boolean);
     if (new Set(ids).size !== ids.length || ids.some((id) => !id)) {
       message.error('Model ID 不能为空或重复');
       return;
     }
     setSaving(true);
     try {
-      const body = { models: draft.map((m) => ({ ...m, model_id: m.model_id.trim() })) };
+      const body = { models: latestDraft.map((m) => ({ ...m, model_id: m.model_id.trim() })) };
       await request.put(endpoint, body);
       await fetch();
       setIsEditing(false);
@@ -186,6 +191,7 @@ function ModelSection({
       {isEditing ? (
         <EditableProTable<MediaModelConfig>
           rowKey="model_id"
+          editableFormRef={editableFormRef}
           maxLength={20}
           scroll={{ x: 800 }}
           recordCreatorProps={{

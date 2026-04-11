@@ -30,6 +30,8 @@ interface LLMModel {
   default_image_size?: string;
   /** 图片模型专用：支持的尺寸列表（供前端展示选择） */
   image_sizes?: string[];
+  /** 非文本模型：每次生成消耗的 credits 数 */
+  credits_per_generation?: number;
 }
 
 interface SystemSetting {
@@ -92,6 +94,7 @@ const LLMConfigs: React.FC = () => {
       api_key: record.api_key ? PLACEHOLDER_KEY : '',
       default_image_size: record.default_image_size || '',
       image_sizes: record.image_sizes || [],
+      credits_per_generation: record.credits_per_generation ?? 1,
     });
     setModalOpen(true);
   };
@@ -107,6 +110,7 @@ const LLMConfigs: React.FC = () => {
       api_key: record.api_key ? PLACEHOLDER_KEY : '',
       default_image_size: record.default_image_size || '',
       image_sizes: record.image_sizes || [],
+      credits_per_generation: record.credits_per_generation ?? 1,
     });
     setModalOpen(true);
   };
@@ -137,6 +141,7 @@ const LLMConfigs: React.FC = () => {
       }
       if (!finalApiKey) finalApiKey = undefined;
 
+      const isNonText = values.model_type !== 'text';
       const merged: LLMModel = {
         id: editing?.id ?? crypto.randomUUID(),
         name: values.name,
@@ -150,6 +155,7 @@ const LLMConfigs: React.FC = () => {
         max_tokens: values.max_tokens ?? undefined,
         default_image_size: values.model_type === 'image' ? (values.default_image_size?.trim() || undefined) : undefined,
         image_sizes: values.model_type === 'image' ? (values.image_sizes?.length ? values.image_sizes : undefined) : undefined,
+        credits_per_generation: isNonText ? (values.credits_per_generation ?? 1) : undefined,
       };
 
       if (editing) {
@@ -228,6 +234,9 @@ const LLMConfigs: React.FC = () => {
         <Space size={4}>
           {record.temperature != null && <Tag>temp={record.temperature}</Tag>}
           {record.max_tokens != null && <Tag>{record.max_tokens} tokens</Tag>}
+          {record.model_type !== 'text' && record.credits_per_generation != null && (
+            <Tag color="purple">{record.credits_per_generation} credits/次</Tag>
+          )}
         </Space>
       ),
     },
@@ -365,6 +374,18 @@ const LLMConfigs: React.FC = () => {
               <InputNumber min={256} max={128000} step={1000} placeholder="8000" style={{ width: '100%' }} />
             </Form.Item>
           </Space>
+
+          {watchedModelType !== 'text' && (
+            <Form.Item
+              name="credits_per_generation"
+              label="Credits/次"
+              extra="用户每次调用该模型消耗的 credits 数量"
+              style={{ marginTop: 16 }}
+              rules={[{ required: true, message: '请输入 credits 数量' }]}
+            >
+              <InputNumber min={1} max={1000} precision={0} placeholder="1" style={{ width: '100%' }} />
+            </Form.Item>
+          )}
 
           {watchedModelType === 'image' && (
             <>

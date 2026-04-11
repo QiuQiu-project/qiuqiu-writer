@@ -9,69 +9,11 @@
 """
 from typing import Any
 
-# ── 默认图像模型配置 ────────────────────────────────────────────────────────────
-DEFAULT_IMAGE_MODEL_CONFIGS: list[dict[str, Any]] = [
-    {
-        "model_id": "flux-1-schnell",
-        "label": "Flux 1 Schnell",
-        "description": "高速生成，适合快速出图",
-        "credits_per_generation": 1,
-        "enabled": True,
-    },
-    {
-        "model_id": "flux-1-pro",
-        "label": "Flux 1 Pro",
-        "description": "高质量写实风格，细节丰富",
-        "credits_per_generation": 2,
-        "enabled": True,
-    },
-    {
-        "model_id": "sdxl",
-        "label": "Stable Diffusion XL",
-        "description": "经典开源模型，风格多样",
-        "credits_per_generation": 1,
-        "enabled": True,
-    },
-    {
-        "model_id": "dalle3",
-        "label": "DALL·E 3",
-        "description": "OpenAI 出品，文字理解能力强",
-        "credits_per_generation": 3,
-        "enabled": True,
-    },
-]
+# ── 默认图像模型配置（空列表，由管理员在后台配置）────────────────────────────
+DEFAULT_IMAGE_MODEL_CONFIGS: list[dict[str, Any]] = []
 
-# ── 默认视频模型配置 ────────────────────────────────────────────────────────────
-DEFAULT_VIDEO_MODEL_CONFIGS: list[dict[str, Any]] = [
-    {
-        "model_id": "wan-t2v",
-        "label": "万象视频",
-        "description": "国产高质量文生视频，5 秒片段",
-        "credits_per_generation": 8,
-        "enabled": True,
-    },
-    {
-        "model_id": "kling-v1",
-        "label": "可灵 1.0",
-        "description": "流畅动态效果，5 秒片段",
-        "credits_per_generation": 10,
-        "enabled": True,
-    },
-    {
-        "model_id": "kling-v2",
-        "label": "可灵 2.0",
-        "description": "电影级画质，支持 10 秒片段",
-        "credits_per_generation": 20,
-        "enabled": True,
-    },
-    {
-        "model_id": "minimax-video",
-        "label": "MiniMax 视频",
-        "description": "角色一致性强，适合故事场景",
-        "credits_per_generation": 15,
-        "enabled": True,
-    },
-]
+# ── 默认视频模型配置（空列表，由管理员在后台配置）────────────────────────────
+DEFAULT_VIDEO_MODEL_CONFIGS: list[dict[str, Any]] = []
 
 # ── 统一媒体充值包（图像/视频共享 credits）────────────────────────────────────
 DEFAULT_MEDIA_CREDIT_PACKS: list[dict[str, Any]] = [
@@ -158,12 +100,48 @@ async def _save_setting(key: str, configs: list[dict[str, Any]]) -> None:
         await session.commit()
 
 
+async def _get_llm_models_by_type(model_type: str) -> list[dict[str, Any]]:
+    """从 llm_models 读取指定 model_type 的启用模型"""
+    try:
+        from memos.api.core.database import AsyncSessionLocal
+        from memos.api.models.system import SystemSetting
+        from sqlalchemy import select
+
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(SystemSetting).where(SystemSetting.key == "llm_models")
+            )
+            row = result.scalar_one_or_none()
+            if row and isinstance(row.value, list):
+                return [
+                    m for m in row.value
+                    if isinstance(m, dict)
+                    and str(m.get("model_type", "")).strip().lower() == model_type
+                    and m.get("enabled", True)
+                ]
+    except Exception:
+        pass
+    return []
+
+
+def _to_model_config(m: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "model_id": m.get("model_id", ""),
+        "label": m.get("label") or m.get("name") or m.get("model_id", ""),
+        "description": m.get("description", ""),
+        "credits_per_generation": int(m.get("credits_per_generation") or 1),
+        "enabled": True,
+    }
+
+
 async def get_image_model_configs() -> list[dict[str, Any]]:
-    return await _get_setting(_SETTING_KEYS["image_models"])
+    """从 llm_models（model_type=image）读取，credits_per_generation 直接取自模型配置。"""
+    return [_to_model_config(m) for m in await _get_llm_models_by_type("image") if m.get("model_id")]
 
 
 async def get_video_model_configs() -> list[dict[str, Any]]:
-    return await _get_setting(_SETTING_KEYS["video_models"])
+    """从 llm_models（model_type=video）读取，credits_per_generation 直接取自模型配置。"""
+    return [_to_model_config(m) for m in await _get_llm_models_by_type("video") if m.get("model_id")]
 
 
 async def get_media_credit_packs() -> list[dict[str, Any]]:
