@@ -22,6 +22,7 @@ from memos.api.core.token_plans import get_plan_configs
 from memos.api.core.media_credit_plans import get_pack_by_key  # noqa: F401
 from memos.api.models.payment_order import PaymentOrder
 from memos.api.models.media_credit_order import MediaCreditOrder
+from memos.api.models.user import User
 from memos.api.services.payment_service import (
     create_alipay_order,
     create_wechat_order,
@@ -191,6 +192,16 @@ async def get_order_status(
     return OrderStatusResponse(status=order.status)
 
 
+# ── 回调路由：按订单 ID 前缀分发到对应激活函数 ──────────────────────────────
+
+def _dispatch_activate(order_id: str, background: BackgroundTasks) -> None:
+    """根据订单 ID 前缀决定激活套餐还是充值 credits"""
+    if order_id.startswith("MC"):
+        background.add_task(_activate_media_credits, order_id)
+    else:
+        background.add_task(_activate_plan, order_id)
+
+
 # ── 微信支付回调 ─────────────────────────────────────────────────────────────
 
 @router.post("/notify/wechat")
@@ -199,7 +210,7 @@ async def wechat_notify(request: Request, background: BackgroundTasks):
     result = verify_wechat_callback(dict(request.headers), body)
     if result and result.get("trade_state") == "SUCCESS":
         order_id = result.get("out_trade_no", "")
-        background.add_task(_activate_plan, order_id)
+        _dispatch_activate(order_id, background)
     return {"code": "SUCCESS", "message": "成功"}
 
 
@@ -215,20 +226,34 @@ async def alipay_notify(request: Request, background: BackgroundTasks):
         and data.get("trade_status") == "TRADE_SUCCESS"
     ):
         order_id = data.get("out_trade_no", "")
-        background.add_task(_activate_plan, order_id)
+        _dispatch_activate(order_id, background)
     return "success"  # 支付宝要求返回纯文本
 
 
 # ── 模拟支付（MOCK_MODE 专用）────────────────────────────────────────────────
 
 @router.get("/mock-pay/{order_id}")
-async def mock_pay(order_id: str, background: BackgroundTasks):
+async def mock_pay(
+    order_id: str,
+    background: BackgroundTasks,
+    current_user_id: str = Depends(get_current_user_id),
+):
     """
     开发/测试专用：访问此 URL 即视为支付成功。
     生产环境 PAYMENT_MOCK_MODE=false 时此接口自动返回 404。
     """
     if not settings.PAYMENT_MOCK_MODE:
         raise HTTPException(404, "Not found")
+    # 校验订单归属，防止横向越权
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(PaymentOrder).where(
+                PaymentOrder.id == order_id,
+                PaymentOrder.user_id == current_user_id,
+            )
+        )
+        if not result.scalar_one_or_none():
+            raise HTTPException(404, "订单不存在")
     background.add_task(_activate_plan, order_id)
     return {"message": "模拟支付成功，套餐将在几秒内激活"}
 
@@ -243,7 +268,7 @@ class CreateMediaOrderRequest(BaseModel):
 
 
 async def _activate_media_credits(order_id: str) -> None:
-    """将媒体充值订单标记为已支付，并向用户账户充入 credits"""
+    """将媒体充值订单标记为已支付，并原子地向用户账户充入 credits"""
     async with AsyncSessionLocal() as session:
         result = await session.execute(
             select(MediaCreditOrder).where(MediaCreditOrder.id == order_id)
@@ -252,18 +277,23 @@ async def _activate_media_credits(order_id: str) -> None:
         if not order or order.status == "paid":
             return
 
-        order.status = "paid"
-        order.paid_at = datetime.now(timezone.utc)
-        await session.commit()
-
-    try:
-        await media_credit_service.add_credits(order.user_id, order.credits)
-        logger.info(
-            f"媒体 Credits 已充值: user={order.user_id}, "
-            f"credits={order.credits}, order={order_id}"
-        )
-    except Exception as e:
-        logger.error(f"充值 Credits 失败 order={order_id}: {e}")
+        try:
+            # 在同一事务内完成状态更新 + credits 充值，避免状态已 paid 但 credits 未到账
+            order.status = "paid"
+            order.paid_at = datetime.now(timezone.utc)
+            await session.execute(
+                update(User)
+                .where(User.id == order.user_id)
+                .values(media_credits=User.media_credits + order.credits)
+            )
+            await session.commit()
+            logger.info(
+                f"媒体 Credits 已充值: user={order.user_id}, "
+                f"credits={order.credits}, order={order_id}"
+            )
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"充值 Credits 失败 order={order_id}: {e}")
 
 
 @router.post("/create-media-order", response_model=CreateOrderResponse)
@@ -362,9 +392,23 @@ async def get_media_order_status(
 
 
 @router.get("/mock-media-pay/{order_id}")
-async def mock_media_pay(order_id: str, background: BackgroundTasks):
+async def mock_media_pay(
+    order_id: str,
+    background: BackgroundTasks,
+    current_user_id: str = Depends(get_current_user_id),
+):
     """开发/测试专用：模拟媒体 Credits 充值支付"""
     if not settings.PAYMENT_MOCK_MODE:
         raise HTTPException(404, "Not found")
+    # 校验订单归属，防止横向越权
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(MediaCreditOrder).where(
+                MediaCreditOrder.id == order_id,
+                MediaCreditOrder.user_id == current_user_id,
+            )
+        )
+        if not result.scalar_one_or_none():
+            raise HTTPException(404, "订单不存在")
     background.add_task(_activate_media_credits, order_id)
     return {"message": "模拟充值成功，Credits 将在几秒内到账"}

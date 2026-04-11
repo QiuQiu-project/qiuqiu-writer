@@ -289,10 +289,14 @@ async def login(data: AdminLoginRequest, db: AsyncSession = Depends(get_async_db
     return token
 
 @router.post("/auth/register", response_model=AdminUserResponse, status_code=status.HTTP_201_CREATED, tags=["Admin Auth"])
-async def register(data: AdminCreateRequest, db: AsyncSession = Depends(get_async_db)):
+async def register(
+    data: AdminCreateRequest,
+    db: AsyncSession = Depends(get_async_db),
+    admin_id: str = Depends(get_current_admin),
+):
     """
-    Create a new admin user.
-    Note: In production, this endpoint should probably be protected or disabled.
+    Create a new admin user. Requires an existing admin token to prevent
+    unauthorized self-registration in production.
     """
     service = AdminService(db)
     try:

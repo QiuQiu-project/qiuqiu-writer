@@ -152,7 +152,7 @@ class Settings(BaseSettings):
 
     # ── 支付配置 ─────────────────────────────────────────────────────────────
     # 模拟支付模式（本地开发用，无需真实商户凭证）
-    PAYMENT_MOCK_MODE: bool = True
+    PAYMENT_MOCK_MODE: bool = False
     # 回调域名（需要公网可访问；本地开发可用 ngrok 暴露）
     PAYMENT_NOTIFY_BASE_URL: str = "https://your-domain.com"
 
