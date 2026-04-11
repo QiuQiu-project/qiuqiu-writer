@@ -5,7 +5,7 @@ import {
   Sparkles,
   Users,
   Zap,
-  Shield,
+  Brain,
   Cloud,
   PenTool,
   FileText,
@@ -55,8 +55,8 @@ export default function HomePage() {
     },
     {
       icon: <Users size={22} />,
-      title: '协作创作',
-      description: '多人实时协作编辑，共同完成作品，让创作充满乐趣',
+      title: '多人AI协作',
+      description: '多人实时协作 + AI 同步辅助，共同创作时 AI 随时为每位作者提供支持',
     },
     {
       icon: <Cloud size={22} />,
@@ -69,9 +69,9 @@ export default function HomePage() {
       description: '流畅的富文本编辑体验，支持 Markdown，所见即所得',
     },
     {
-      icon: <Shield size={22} />,
-      title: '安全可靠',
-      description: '数据加密存储，多重备份机制，你的作品永远安全',
+      icon: <Brain size={22} />,
+      title: '多层记忆系统',
+      description: '创作者记忆、作品记忆与对话记忆三层架构，让 AI 持续了解你的风格与故事世界',
     },
   ];
 
