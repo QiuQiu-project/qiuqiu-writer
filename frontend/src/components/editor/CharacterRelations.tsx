@@ -386,8 +386,6 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
       let graph: Graph | null = null;
       
       try {
-        console.log('[CharacterRelations] Initializing G6 Graph...', { width, height, nodeCount: data.nodes?.length });
-        
         const edgeColor = getCssVar('--text-primary', '#000000');
         const labelBg = getCssVar('--bg-secondary', '#ffffff');
         const labelText = getCssVar('--text-primary', '#000000');
@@ -506,8 +504,6 @@ function CharacterRelations({ data, onChange, dependencyKeys = [] }: CharacterRe
         if (currentGraphDataId === prevGraphDataIdRef.current && graph) {
           graphRef.current = graph;
           isInitializingRef.current = false;
-          console.log('[CharacterRelations] G6 Graph initialized successfully');
-
           graph.on('edge:click', (e: unknown) => {
             const event = e as { target?: { id?: string }; item?: { id?: string } };
             const edgeId = event.target?.id || event.item?.id;

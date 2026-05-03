@@ -140,9 +140,9 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
-node_modules/
 package-lock.json
 /backend/models/
+.idea/
 # invitation_code.py
 # yjs_document.py
 # 这些文件不应该被忽略，因为它们是核心模型文件
