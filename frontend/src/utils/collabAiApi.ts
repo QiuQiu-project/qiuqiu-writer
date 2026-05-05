@@ -146,7 +146,6 @@ export class CollabAIClient {
     }
 
     this.ws.onopen = () => {
-      console.log(`[CollabAI] Connected to work ${this.workId}`);
       this.reconnectDelay = 3000; // 重置重连延迟
       this._startPing();
     };
@@ -161,7 +160,6 @@ export class CollabAIClient {
     };
 
     this.ws.onclose = (event) => {
-      console.log(`[CollabAI] Disconnected (code=${event.code}, reason=${event.reason})`);
       this._stopPing();
       if (this.shouldReconnect && event.code !== 1008) {
         // code 1008 = 认证失败，不重连
@@ -177,7 +175,6 @@ export class CollabAIClient {
   private _scheduleReconnect(): void {
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.reconnectTimer = setTimeout(() => {
-      console.log(`[CollabAI] Reconnecting...`);
       this._connect();
     }, this.reconnectDelay);
     // 指数退避：最长 30 秒
