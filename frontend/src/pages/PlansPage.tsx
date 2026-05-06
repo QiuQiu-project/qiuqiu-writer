@@ -176,7 +176,6 @@ export default function PlansPage() {
               setCycle={setCycle}
               tokenInfo={tokenInfo}
               firstPaid={firstPaid}
-              currentPlanConfig={currentPlanConfig}
               onUpgrade={(plan, idx) => setPayTarget({ plan, themeIndex: idx })}
             />
           )
@@ -211,14 +210,13 @@ export default function PlansPage() {
 // ── 文字套餐区域 ────────────────────────────────────────────────────────────────
 
 function TextPlansSection({
-  plans, cycle, setCycle, tokenInfo, firstPaid, currentPlanConfig, onUpgrade,
+  plans, cycle, setCycle, tokenInfo, firstPaid, onUpgrade,
 }: {
   plans: PlanConfig[];
   cycle: BillingCycle;
   setCycle: (c: BillingCycle) => void;
   tokenInfo: TokenInfo | null;
   firstPaid: PlanConfig | undefined;
-  currentPlanConfig: PlanConfig | undefined | null;
   onUpgrade: (plan: PlanConfig, idx: number) => void;
 }) {
   return (
@@ -506,7 +504,7 @@ function MediaPaymentPanel({
   };
 
   useEffect(() => {
-    createOrder(method);
+    void Promise.resolve().then(() => createOrder(method));
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -819,7 +817,7 @@ function PaymentPanel({ plan, cycle, themeIndex, onBack, onClose }: {
   };
 
   useEffect(() => {
-    createOrder(method);
+    void Promise.resolve().then(() => createOrder(method));
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

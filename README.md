@@ -4,9 +4,14 @@
 
 # 球球写作
 
+### 本项目为球球写作开源版
+
 **让创作更简单，让故事更精彩**
 
 专业的 AI 写作助手，帮助你从灵感到成稿，轻松完成每一部作品。
+
+[![Edition](https://img.shields.io/badge/Edition-%E5%BC%80%E6%BA%90%E7%89%88-2ea44f?style=flat-square)](#项目声明)
+[![Free](https://img.shields.io/badge/Free-%E5%85%8D%E8%B4%B9-3178C6?style=flat-square)](#项目声明)
 
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)](https://react.dev)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
@@ -16,6 +21,15 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 </div>
+
+---
+
+## 项目声明
+
+> **本项目为「球球写作开源版」。**
+>
+> 本仓库源码基于 [MIT 协议](LICENSE) 开源，并免费提供给社区使用。
+> 您可以在 MIT 协议范围内用于学习、研究、二次开发以及商业部署，无需额外付费授权。
 
 ---
 

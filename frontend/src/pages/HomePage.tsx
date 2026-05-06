@@ -121,16 +121,30 @@ export default function HomePage() {
 
           {/* Badge */}
           <div
-            className="inline-flex items-center gap-[7px] px-[18px] py-1.5 rounded-full text-[13px] font-medium tracking-[0.04em] backdrop-blur-sm mb-9"
-            style={{
-              background: 'var(--hero-badge-bg)',
-              border: '1px solid var(--hero-badge-border)',
-              color: 'var(--hero-badge-color)',
-              animation: 'fade-in-down 0.65s cubic-bezier(0.16, 1, 0.3, 1) both',
-            }}
+            className="inline-flex flex-wrap items-center justify-center gap-2 mb-9"
+            style={{ animation: 'fade-in-down 0.65s cubic-bezier(0.16, 1, 0.3, 1) both' }}
           >
-            <Sparkles size={13} />
-            <span>AI 驱动的智能写作平台</span>
+            <div
+              className="inline-flex items-center gap-[7px] px-[18px] py-1.5 rounded-full text-[13px] font-medium tracking-[0.04em] backdrop-blur-sm"
+              style={{
+                background: 'var(--hero-badge-bg)',
+                border: '1px solid var(--hero-badge-border)',
+                color: 'var(--hero-badge-color)',
+              }}
+            >
+              <Sparkles size={13} />
+              <span>AI 驱动的智能写作平台</span>
+            </div>
+            <div
+              className="inline-flex items-center gap-[6px] px-[14px] py-1.5 rounded-full text-[12px] font-semibold tracking-[0.04em] backdrop-blur-sm text-white"
+              style={{
+                background: 'linear-gradient(135deg, #2ea44f 0%, #1a7d3a 100%)',
+                boxShadow: '0 6px 18px rgba(46,164,79,0.28)',
+              }}
+              title="本项目为球球写作开源版，源码开源免费"
+            >
+              <span>本项目为球球写作开源版</span>
+            </div>
           </div>
 
           {/* Title */}
