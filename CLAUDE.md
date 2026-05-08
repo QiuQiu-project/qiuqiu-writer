@@ -104,7 +104,9 @@ poetry run pytest tests/ -k "test_name" -v     # Run single test by name
 ## Key Conventions
 
 - Backend uses Poetry for dependency management. Add packages with `poetry add <pkg>`.
-- Frontend uses npm. The `admin/` and `frontend/` have separate `node_modules`.
+- Frontend uses **npm** (Node ≥ 20, npm ≥ 10). `admin/` and `frontend/` have separate `node_modules` and separate `package-lock.json` files.
+  - **Lockfiles MUST be committed.** `package-lock.json` is no longer in `.gitignore`.
+  - Use `npm ci` for reproducible installs (CI, Docker, fresh clones). Use `npm install` only when intentionally updating dependencies.
 - Python 3.10+ required. Backend virtual env at `backend/.venv`.
 - Backend env config in `backend/.env` (copy from `backend/.env.example`).
 - Docker compose files are in `docker/`. Production env goes in `docker/.env`.

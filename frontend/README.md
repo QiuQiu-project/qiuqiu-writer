@@ -43,8 +43,8 @@ uvicorn memos.api.server_api:app --host 0.0.0.0 --port 8001 --workers 1
 ## 安装和运行
 
 ```bash
-# 安装依赖
-npm install
+# 安装依赖（按 package-lock.json 可复现安装）
+npm ci
 
 # 配置环境变量（可选）
 cp .env.example .env

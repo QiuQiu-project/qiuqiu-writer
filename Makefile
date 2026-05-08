@@ -61,14 +61,14 @@ app: check-docker
 .PHONY: build-frontend
 build-frontend:
 	@echo "📦 构建 Frontend..."
-	cd frontend && npm install && npm run build
+	cd frontend && npm ci && npm run build
 	@echo "✅ Frontend 构建完成"
 
 # 构建后台管理项目
 .PHONY: build-admin
 build-admin:
 	@echo "📦 构建 Admin..."
-	cd admin && npm install && npm run build
+	cd admin && npm ci && npm run build
 	@echo "✅ Admin 构建完成"
 
 # 构建所有前端
