@@ -132,7 +132,7 @@ qiuqiuwriter/
 
 ### 前置条件
 
-- Node.js 18+
+- Node.js **20+** 与 npm **10+**（前端与管理后台统一使用 npm；`package-lock.json` 已纳入版本控制，安装请使用 `npm ci`）
 - Python 3.10+
 - Docker & Docker Compose
 
@@ -186,7 +186,7 @@ make serve     # 启动开发服务器（端口 8001）
 
 ```bash
 cd frontend
-npm install
+npm ci          # 按 package-lock.json 可复现安装；新增依赖时改用 npm install <pkg>
 npm run dev    # 启动开发服务器（端口 5173）
 ```
 
@@ -194,7 +194,7 @@ npm run dev    # 启动开发服务器（端口 5173）
 
 ```bash
 cd admin
-npm install
+npm ci
 npm run dev
 ```
 

@@ -71,10 +71,20 @@ if [ "$BUILD_BACKEND" = true ]; then
 fi
 
 # ---------- 构建前端项目 ----------
+# 使用 npm ci（如有 package-lock.json）保证可复现构建；否则回退到 npm install
+npm_install_cmd() {
+    if [ -f "package-lock.json" ]; then
+        npm ci
+    else
+        echo "⚠️  未找到 package-lock.json，回退到 npm install（请提交 lockfile 以获得可复现安装）"
+        npm install
+    fi
+}
+
 if [ "$BUILD_FRONTEND" = true ]; then
     echo "📦 构建 Frontend..."
     cd "$(dirname "$0")/frontend" || exit 1
-    npm install && npm run build
+    npm_install_cmd && npm run build
     echo "✅ Frontend 构建完成"
     cd - > /dev/null || exit 1
 fi
@@ -82,7 +92,7 @@ fi
 if [ "$BUILD_ADMIN" = true ]; then
     echo "📦 构建 Admin..."
     cd "$(dirname "$0")/admin" || exit 1
-    npm install && npm run build
+    npm_install_cmd && npm run build
     echo "✅ Admin 构建完成"
     cd - > /dev/null || exit 1
 fi
@@ -211,7 +221,7 @@ cd frontend || exit 1
 
 if [ ! -d "node_modules" ]; then
     echo "安装前端依赖..."
-    npm install
+    npm_install_cmd
 fi
 
 echo "前端将在 http://localhost:5173 运行"

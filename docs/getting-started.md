@@ -4,7 +4,7 @@
 
 | 工具 | 版本要求 |
 |------|----------|
-| Node.js | 18+ |
+| Node.js | 20+（前端要求 npm ≥ 10） |
 | Python | 3.10+ |
 | Docker & Docker Compose | 任意最新版 |
 | Poetry | 1.8+ |
@@ -83,7 +83,7 @@ uvicorn memos.api.server_api:app --host 0.0.0.0 --port 8001 --reload
 
 ```bash
 cd frontend
-npm install
+npm ci          # 按 package-lock.json 可复现安装；新增依赖时改用 npm install <pkg>
 npm run dev     # 开发服务器，端口 5173
 ```
 
@@ -93,7 +93,7 @@ npm run dev     # 开发服务器，端口 5173
 
 ```bash
 cd admin
-npm install
+npm ci
 npm run dev
 ```
 

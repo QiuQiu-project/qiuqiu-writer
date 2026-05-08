@@ -129,11 +129,12 @@ app.include_router(example_router, prefix="/api/v1")
 
 ### 依赖管理
 
-前端使用 **npm**。`frontend/` 和 `admin/` 各有独立的 `node_modules`。
+前端使用 **npm**（Node ≥ 20，npm ≥ 10）。`frontend/` 和 `admin/` 各有独立的 `node_modules` 与独立的 `package-lock.json`（已纳入版本控制）。
 
 ```bash
 cd frontend
-npm install          # 安装依赖
+npm ci               # 按 lockfile 可复现安装（CI、Docker、首次 clone 均使用）
+npm install <pkg>    # 仅在新增 / 升级依赖时使用，会更新 lockfile 并需提交
 npm run dev          # 启动开发服务器（端口 5173）
 npm run build        # 构建生产版本
 npm run lint         # ESLint 检查
@@ -223,7 +224,7 @@ const MyExtension = Extension.create({
 
 ```bash
 cd admin
-npm install
+npm ci
 npm run dev
 ```
 
