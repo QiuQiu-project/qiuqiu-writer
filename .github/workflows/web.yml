@@ -1,0 +1,48 @@
+name: web
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.workspace }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        workspace: [frontend, admin]
+    defaults:
+      run:
+        working-directory: ${{ matrix.workspace }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: ${{ matrix.workspace }}/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Required gates —— 当前两个项目都通过
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+
+      # ---- Advisory until baseline cleanup (see docs/upgrade-plan.md#p0-2b) ----
+      # frontend 当前 45 个 ESLint 错误；admin 还没装 ESLint 依赖。
+      # 留 advisory 让 CI 先落地，baseline PR 合入后再去掉 continue-on-error / 限制条件。
+      - name: Lint (advisory, frontend only)
+        if: matrix.workspace == 'frontend'
+        continue-on-error: true
+        run: npm run lint

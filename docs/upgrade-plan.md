@@ -88,17 +88,37 @@
 
 **目的**：每次 PR 都跑 lint + build + smoke test，refactor 才有兜底
 
+**落地策略（2026-05-08 调整）**：
+现状盘点显示 lint/format 类检查在仓库当前状态下无法直接绿：backend `ruff check --no-fix` 报 **2548** 个错误，`ruff format --check` 提示 **102** 个文件需重新格式化；frontend `npm run lint` 报 **45** 个错误；admin 没装 ESLint 依赖。
+为了不让 CI 一上来就长期红、也避免在 P0-2 里塞进一次大规模代码 churn，采用"**门禁分层**"：
+- **强制门禁（required）**：`poetry install --only test`、`npm ci`、`npx tsc --noEmit`、`npm run build` —— 当前都能绿，能挡回新增回归
+- **建议性步骤（advisory，`continue-on-error: true`）**：`ruff check --no-fix`、`ruff format --check`、frontend `npm run lint` —— 仍跑、仍出错误日志，但不阻断合并；待 P0-2b baseline 清理后再去掉 advisory 标记
+- **暂缓**：backend `pytest` 推到 P0-5（需要先收敛 service container 依赖）；admin lint 推到 P0-2b（需要先补 ESLint 配置）
+
 **动作清单**：
 
-- [ ] `.github/workflows/backend.yml`
+- [x] `.github/workflows/backend.yml`
   - 触发：`pull_request`、`push: [main]`
-  - 步骤：checkout → setup-python 3.11 → `poetry install --with extras` → `ruff check` → `ruff format --check` → `pytest -x --maxfail=5`
-- [ ] `.github/workflows/web.yml`
+  - 步骤：checkout → setup-python 3.11 → pipx install poetry==2.3.4 → `poetry install --only test --no-root --no-interaction` → `ruff check --no-fix`（advisory）→ `ruff format --check`（advisory）
+  - **暂缓**：`pytest`（推到 P0-5，需 service containers）
+- [x] `.github/workflows/web.yml`
   - 触发：同上
   - matrix：`workspace: [frontend, admin]`
-  - 步骤：checkout → setup-node 20（带 `cache: npm`、`cache-dependency-path: ${{ matrix.workspace }}/package-lock.json`）→ `npm ci` → `npm run lint` → `npx tsc --noEmit` → `npm run build`
-- [ ] 两个 workflow 都加 `concurrency: group: ${{ github.workflow }}-${{ github.ref }}, cancel-in-progress: true`
-- [ ] **不加** Docker build / push（等 P0 稳定再上）
+  - 步骤：checkout → setup-node 20（带 `cache: npm`、`cache-dependency-path: ${{ matrix.workspace }}/package-lock.json`）→ `npm ci` → `npx tsc --noEmit`（required）→ `npm run build`（required）→ `npm run lint`（advisory，仅 frontend）
+- [x] 两个 workflow 都加 `concurrency: group: ${{ github.workflow }}-${{ github.ref }}, cancel-in-progress: true`
+- [x] **不加** Docker build / push（等 P0 稳定再上）
+
+#### P0-2b · 代码 baseline 清理（拆分自 P0-2 的发现）
+
+**前置背景**：P0-2 为了不阻断 CI 落地，把 lint/format/admin-lint 标为 advisory；本步把它们升为 required。
+
+**动作清单**：
+
+- [ ] backend：跑 `poetry run ruff check --fix`，提交可自动修复的部分；剩余 manual 项分主题逐次清理（typing、命名、import order 等）
+- [ ] backend：跑 `poetry run ruff format`，全仓重排版，作为单次"格式化基线"提交
+- [ ] frontend：处理 45 个 ESLint 报错（`react-hooks/set-state-in-effect`、`react-refresh` 等），每类一个小 PR
+- [ ] admin：补 ESLint 依赖与 `eslint.config.js`（沿用 frontend 配置），首次允许失败后逐步收紧
+- [ ] 上述四项完成后，去掉 `.github/workflows/backend.yml` 与 `.github/workflows/web.yml` 中对应步骤的 `continue-on-error: true` 与 `if: matrix.workspace == 'frontend'`，把 advisory 升为 required
 
 #### P0-3 · 日志脱敏（最紧急的安全洞）
 
@@ -358,3 +378,4 @@ Week 8+:   Phase 4 (按需)
 
 - **2026-05-07** — v1 草案，待确认包管理器选型后启动 Phase 0
 - **2026-05-08** — P0-1 落地：选定 npm 作为 JS 包管理器（Node ≥ 20，npm ≥ 10）；提交 `frontend/package-lock.json`（805 packages）与 `admin/package-lock.json`（205 packages）；从 `.gitignore` 移除 lockfile 忽略项；`start.sh` / `Makefile` / `deploy.sh` 切换到 `npm ci`；两个 `package.json` 加 `engines` 字段；同步更新 `README.md`、`CLAUDE.md`、`docs/getting-started.md`、`docs/development.md`、`frontend/README.md`。`npm ci` 在两个项目上验证通过（frontend 1m / admin 4s，均 exit 0）。
+- **2026-05-08** — P0-2 落地：新增 `.github/workflows/backend.yml` 与 `.github/workflows/web.yml`，触发器 `pull_request` + `push: [main]`，带 concurrency cancel-in-progress。基于实际状态采用门禁分层：强制门禁（poetry install / npm ci / tsc / build，当前皆绿）+ advisory（ruff check / ruff format / frontend lint，配 `continue-on-error: true`）。pytest 推迟到 P0-5（需 service containers）；admin lint 推迟到 P0-2b（需补 ESLint）。新增 P0-2b 子项跟踪 baseline 清理。

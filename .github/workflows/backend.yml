@@ -1,0 +1,54 @@
+name: backend
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: poetry install + ruff
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        run: pipx install poetry==2.3.4
+
+      - name: Configure Poetry
+        run: poetry config virtualenvs.in-project true
+
+      - name: Cache poetry venv
+        uses: actions/cache@v4
+        with:
+          path: backend/.venv
+          key: poetry-${{ runner.os }}-py3.11-${{ hashFiles('backend/poetry.lock') }}
+
+      - name: Install lint dependencies
+        run: poetry install --only test --no-root --no-interaction
+
+      # ---- Advisory until baseline cleanup (see docs/upgrade-plan.md#p0-2b) ----
+      # Today: 2548 ruff errors + 102 files需 reformat。先把 CI 落地，
+      # 等 baseline 清理 PR 合入后再去掉 continue-on-error，转为强制门禁。
+      - name: ruff check (advisory)
+        continue-on-error: true
+        run: poetry run ruff check --no-fix
+
+      - name: ruff format --check (advisory)
+        continue-on-error: true
+        run: poetry run ruff format --check
+
+      # NOTE: pytest 暂未启用 —— P0-5 引入 smoke test、显式声明所需 service
+      # containers 后再开。当前 backend/tests/ 大量用例依赖 PostgreSQL/Redis/MongoDB，
+      # 直接 `pytest -x` 会在无服务的 runner 上立刻失败。
